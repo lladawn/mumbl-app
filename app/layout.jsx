@@ -1,9 +1,57 @@
 import AppShell from "../src/components/AppShell";
 import "../styles.css";
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://justmumbl.vercel.app";
+const description =
+  "An anonymous-first team room for engineers to say the thing they've been mumbling all week.";
+
 export const metadata = {
-  title: "mumbl",
-  description: "say the thing you've been mumbling all week.",
+  metadataBase: new URL(appUrl),
+  title: {
+    default: "mumbl",
+    template: "%s · mumbl",
+  },
+  description,
+  applicationName: "mumbl",
+  keywords: [
+    "mumbl",
+    "anonymous team feedback",
+    "engineering teams",
+    "team heartbeat",
+    "work culture",
+  ],
+  authors: [{ name: "mumbl" }],
+  creator: "mumbl",
+  publisher: "mumbl",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "mumbl",
+    description,
+    url: "/",
+    siteName: "mumbl",
+    type: "website",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "mumbl - say the thing you've been mumbling all week",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "mumbl",
+    description,
+    images: ["/twitter-image"],
+  },
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+  },
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({ children }) {
