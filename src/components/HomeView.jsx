@@ -1,17 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { sampleSpace } from "../lib/demoData";
-import { useMumblStore } from "../hooks/useMumblStore";
+import { useState } from "react";
+import { useRecentSlug } from "../hooks/useRecentSlug";
 import JoinModal from "./JoinModal";
 
 export default function HomeView() {
   const router = useRouter();
-  const { state } = useMumblStore();
   const [joinOpen, setJoinOpen] = useState(false);
-  const recentSlug = state.recentSlug || Object.keys(state.spaces)[0] || sampleSpace.slug;
+  const recentSlug = useRecentSlug();
 
   return (
     <>

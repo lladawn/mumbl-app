@@ -54,5 +54,7 @@ export function getReactionLabels(space, post) {
 }
 
 export function countReactions(post) {
-  return Object.values(post.reactions || {}).reduce((sum, reactors) => sum + reactors.length, 0);
+  return Object.values(post.reactions || {}).reduce((sum, reactionValue) => {
+    return sum + (Array.isArray(reactionValue) ? reactionValue.length : reactionValue);
+  }, 0);
 }

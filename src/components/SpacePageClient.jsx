@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { postTypes, validTabs, vibes } from "../lib/constants";
 import { countReactions } from "../lib/heartbeat";
-import { loadSession } from "../lib/storage";
-import { useMumblStore } from "../hooks/useMumblStore";
+import { useRemoteSpace } from "../hooks/useRemoteSpace";
 import ComposeBox from "./space/ComposeBox";
 import HeartbeatView from "./space/HeartbeatView";
 import PostCard from "./space/PostCard";
@@ -13,16 +12,10 @@ import SharePanel from "./space/SharePanel";
 import Toast from "./Toast";
 
 export default function SpacePageClient({ slug, tab }) {
-  const { state, submitPost, toggleReaction, dismissFirstPost } = useMumblStore();
+  const { space, status, error, submitPost, toggleReaction, dismissFirstPost } = useRemoteSpace(slug);
   const [selectedType, setSelectedType] = useState("thought");
   const [composeAnonymous, setComposeAnonymous] = useState(true);
   const [toast, setToast] = useState("");
-  const [sessionToken, setSessionToken] = useState("");
-
-  useEffect(() => {
-    setSessionToken(loadSession());
-  }, []);
-  const space = state.spaces[slug];
 
   async function copyText(text, message) {
     try {
@@ -33,13 +26,26 @@ export default function SpacePageClient({ slug, tab }) {
     }
   }
 
+  if (status === "loading" && !space) {
+    return (
+      <section className="create-view">
+        <div className="panel">
+          <h2>checking the room.</h2>
+          <p className="panel-copy">pulling the latest mumbl from the backend.</p>
+        </div>
+      </section>
+    );
+  }
+
   if (!space) {
     return (
       <section className="create-view">
         <div className="panel">
-          <h2>couldn't find that mumbl.</h2>
+          <h2>{status === "not-found" ? "couldn't find that mumbl." : "backend is being difficult."}</h2>
           <p className="panel-copy">
-            the link might have wandered off. make a fresh space and give the team somewhere better than silence.
+            {status === "not-found"
+              ? "the link might have wandered off. make a fresh space and give the team somewhere better than silence."
+              : error || "try again after the Supabase setup is finished."}
           </p>
           <Link className="solid-button button-link" href="/create">
             create space
@@ -94,34 +100,34 @@ export default function SpacePageClient({ slug, tab }) {
                 setSelectedType={setSelectedType}
                 composeAnonymous={composeAnonymous}
                 setComposeAnonymous={setComposeAnonymous}
-                dismissFirstPost={dismissFirstPost}
-                submitPost={({ content, displayName }) => {
-                  submitPost({
-                    slug: space.slug,
-                    type: selectedType,
-                    content,
-                    displayName,
-                    isAnonymous: composeAnonymous,
-                  });
-                  setToast("dropped. the room heard it.");
+                dismissFirstPost={async () => {
+                  try {
+                    await dismissFirstPost();
+                    setToast("share link unlocked.");
+                  } catch (dismissError) {
+                    setToast(dismissError.message || "couldn't dismiss that prompt.");
+                  }
+                }}
+                submitPost={async ({ content, displayName }) => {
+                  try {
+                    await submitPost({
+                      type: selectedType,
+                      content,
+                      displayName,
+                      isAnonymous: composeAnonymous,
+                    });
+                    setToast("dropped. the room heard it.");
+                  } catch (submitError) {
+                    setToast(submitError.message || "couldn't post that yet.");
+                  }
                 }}
               />
-              <PostList
-                posts={posts}
-                space={space}
-                sessionToken={sessionToken}
-                toggleReaction={toggleReaction}
-              />
+              <PostList posts={posts} space={space} toggleReaction={toggleReactionWithToast(toggleReaction, setToast)} />
             </>
           )}
 
           {activeTab === "wins" && (
-            <WinsView
-              posts={wins}
-              space={space}
-              sessionToken={sessionToken}
-              toggleReaction={toggleReaction}
-            />
+            <WinsView posts={wins} space={space} toggleReaction={toggleReactionWithToast(toggleReaction, setToast)} />
           )}
 
           {activeTab === "heartbeat" && <HeartbeatView space={space} />}
@@ -148,7 +154,7 @@ function TabLink({ slug, tab, activeTab, children }) {
   );
 }
 
-function WinsView({ posts, space, sessionToken, toggleReaction }) {
+function WinsView({ posts, space, toggleReaction }) {
   const reactionCount = space.posts.reduce((sum, post) => sum + countReactions(post), 0);
   const namedPosters = new Set(space.posts.map((post) => (post.isAnonymous ? "anon" : post.displayName)).filter(Boolean));
 
@@ -168,27 +174,29 @@ function WinsView({ posts, space, sessionToken, toggleReaction }) {
           <span>reactions given</span>
         </div>
       </div>
-      <PostList posts={posts} space={space} sessionToken={sessionToken} toggleReaction={toggleReaction} emptyText="no wins yet. rude of the week, honestly." />
+      <PostList posts={posts} space={space} toggleReaction={toggleReaction} emptyText="no wins yet. rude of the week, honestly." />
     </>
   );
 }
 
-function PostList({ posts, space, sessionToken, toggleReaction, emptyText = "quiet room. dangerous. drop the first mumbl." }) {
+function PostList({ posts, space, toggleReaction, emptyText = "quiet room. dangerous. drop the first mumbl." }) {
   return (
     <div className="feed-list">
       {posts.length ? (
-        posts.map((post) => (
-          <PostCard
-            post={post}
-            space={space}
-            sessionToken={sessionToken}
-            toggleReaction={toggleReaction}
-            key={post.id}
-          />
-        ))
+        posts.map((post) => <PostCard post={post} space={space} toggleReaction={toggleReaction} key={post.id} />)
       ) : (
         <div className="empty-state">{emptyText}</div>
       )}
     </div>
   );
+}
+
+function toggleReactionWithToast(toggleReaction, setToast) {
+  return async (input) => {
+    try {
+      await toggleReaction(input);
+    } catch (error) {
+      setToast(error.message || "reaction bounced. annoying, but fixable.");
+    }
+  };
 }

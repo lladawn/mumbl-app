@@ -7,12 +7,18 @@
     "app": "next dev -H 127.0.0.1",
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
-    "start": "next start -H 127.0.0.1"
+    "start": "next start -H 127.0.0.1",
+    "db:link": "supabase link --project-ref trsxgmmcavduhqwhqlrg",
+    "db:push": "supabase db push",
+    "db:status": "supabase migration list --linked"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.3",
+    "next": "^16.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "next": "^16.0.0"
+    "react-dom": "^19.0.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "supabase": "^2.98.2"
+  }
 }

@@ -2,20 +2,31 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { createRemoteSpace } from "../lib/api";
 import { vibes } from "../lib/constants";
-import { useMumblStore } from "../hooks/useMumblStore";
+import Toast from "./Toast";
 
 export default function CreatePageClient() {
   const router = useRouter();
-  const { createSpace } = useMumblStore();
   const [spaceName, setSpaceName] = useState("");
   const [selectedVibe, setSelectedVibe] = useState("chill");
+  const [isCreating, setIsCreating] = useState(false);
+  const [toast, setToast] = useState("");
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const name = spaceName.trim();
-    if (!name) return;
-    router.push(`/r/${createSpace(name, selectedVibe)}`);
+    if (!name || isCreating) return;
+
+    setIsCreating(true);
+    setToast("");
+    try {
+      const { slug } = await createRemoteSpace({ name, vibe: selectedVibe });
+      router.push(`/r/${slug}`);
+    } catch (error) {
+      setToast(error.message || "couldn't create that mumbl yet.");
+      setIsCreating(false);
+    }
   }
 
   return (
@@ -56,8 +67,8 @@ export default function CreatePageClient() {
               </div>
             </label>
             <div className="form-actions">
-              <button className="solid-button" type="submit">
-                create space
+              <button className="solid-button" type="submit" disabled={isCreating}>
+                {isCreating ? "creating..." : "create space"}
               </button>
             </div>
           </form>
@@ -74,6 +85,7 @@ export default function CreatePageClient() {
           </div>
         </div>
       </div>
+      {toast && <Toast message={toast} onDone={() => setToast("")} />}
     </section>
   );
 }

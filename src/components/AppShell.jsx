@@ -3,15 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { sampleSpace } from "../lib/demoData";
-import { useMumblStore } from "../hooks/useMumblStore";
+import { useRecentSlug } from "../hooks/useRecentSlug";
 import JoinModal from "./JoinModal";
 
 export default function AppShell({ children }) {
   const router = useRouter();
-  const { state } = useMumblStore();
   const [joinOpen, setJoinOpen] = useState(false);
-  const recentSlug = state.recentSlug || Object.keys(state.spaces)[0] || sampleSpace.slug;
+  const recentSlug = useRecentSlug();
 
   return (
     <div className="shell">

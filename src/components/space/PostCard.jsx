@@ -3,7 +3,7 @@
 import { getReactionLabels } from "../../lib/heartbeat";
 import { timeAgo } from "../../lib/storage";
 
-export default function PostCard({ space, post, sessionToken, toggleReaction }) {
+export default function PostCard({ space, post, toggleReaction }) {
   const author = post.isAnonymous ? "anonymous" : post.displayName || "someone brave";
   const initials = post.isAnonymous ? "?" : (post.displayName || "m").trim().charAt(0).toLowerCase();
   const reactionLabels = getReactionLabels(space, post);
@@ -20,16 +20,17 @@ export default function PostCard({ space, post, sessionToken, toggleReaction }) 
         <p className="post-text">{post.content}</p>
         <div className="post-footer">
           {reactionLabels.map((label) => {
-            const reactors = post.reactions?.[label] || [];
-            const active = reactors.includes(sessionToken);
+            const reactionValue = post.reactions?.[label] || 0;
+            const count = Array.isArray(reactionValue) ? reactionValue.length : reactionValue;
+            const active = post.activeReactions?.includes(label) || false;
             return (
               <button
                 className={`reaction-button ${active ? "active" : ""}`}
                 type="button"
                 key={label}
-                onClick={() => toggleReaction({ slug: space.slug, postId: post.id, label, sessionToken })}
+                onClick={() => toggleReaction({ postId: post.id, label })}
               >
-                {label} · {reactors.length}
+                {label} · {count}
               </button>
             );
           })}

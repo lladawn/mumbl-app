@@ -89,6 +89,16 @@ create table anon_audit (
 - `POST /api/spaces/:slug/first-post-dismissed` marks the creator-first prompt as dismissed.
 - `POST /api/cron/heartbeats` generates weekly heartbeats from anonymised post data.
 
+## Local Setup
+
+1. Create a Supabase project.
+2. Run `supabase/migrations/0001_initial_schema.sql` in the Supabase SQL editor or through the Supabase CLI.
+3. Copy `.env.example` to `.env.local`.
+4. Fill in `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `MUMBL_TOKEN_HASH_SECRET`, and `CRON_SECRET`.
+5. Restart `npm run app`.
+
+The service role key must stay server-only. It is used only in Next.js route handlers.
+
 ## Why Supabase Fits
 
 Supabase is a strong fit here because Mumbl needs relational integrity more than a document store: unique slugs, deduped reactions, weekly heartbeat uniqueness, and explicit privacy constraints. Postgres checks and unique indexes let us enforce product promises below the UI, which matters a lot for an anonymous-first product.

@@ -16,7 +16,7 @@ export default function JoinModal({ recentSlug, navigate, close }) {
     <div className="modal-backdrop" onClick={close}>
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="join-title" onClick={(event) => event.stopPropagation()}>
         <h2 id="join-title">join a space</h2>
-        <p className="panel-copy">paste a mumbl link or jump into the latest local room.</p>
+        <p className="panel-copy">paste a mumbl link or slug. no signup, no ceremony.</p>
         <form className="form-stack" onSubmit={handleSubmit}>
           <label>
             invite link or slug
@@ -29,16 +29,18 @@ export default function JoinModal({ recentSlug, navigate, close }) {
             <button className="ghost-button" type="button" onClick={close}>
               cancel
             </button>
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => {
-                navigate(`/r/${recentSlug}`);
-                close();
-              }}
-            >
-              open {recentSlug}
-            </button>
+            {recentSlug && (
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => {
+                  navigate(`/r/${recentSlug}`);
+                  close();
+                }}
+              >
+                open {recentSlug}
+              </button>
+            )}
           </div>
         </form>
       </div>
