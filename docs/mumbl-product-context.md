@@ -181,10 +181,10 @@ posted or explicitly dismissed the prompt.
 
 ### 1. create a room (30 seconds)
 
-Anyone can create a team space on mumbl.app with no signup required. They:
+Anyone can create a team space on mumbl.wtf with no signup required. They:
 - type a name for their space (e.g. "backend team", "design squad")
 - pick a vibe: `chill & honest` / `chaotic good` / `professional-ish` / `gremlin mode`
-- get a unique shareable link instantly: `mumbl.app/r/backend-gremlins`
+- get a unique shareable link instantly: `mumbl.wtf/r/backend-gremlins`
 
 No email. No password. No waiting. The vibe setting shapes the tone of the
 space — the copy, the placeholder text, the weekly digest personality.
@@ -193,7 +193,7 @@ space — the copy, the placeholder text, the weekly digest personality.
 
 The creator shares the link directly with teammates via:
 - a pre-filled tweet/X post ("just set up a space for our team on mumbl — where
-  we can actually be honest at work (anonymously). join us: mumbl.app/r/...")
+  we can actually be honest at work (anonymously). join us: mumbl.wtf/r/...")
 - a pre-copied Slack message
 - WhatsApp
 - plain copy-paste
@@ -319,7 +319,7 @@ the space.
 
 ## screens / views
 
-### landing page (`mumbl.app`)
+### landing page (`mumbl.wtf`)
 - headline: "say the thing you've been mumbling all week."
 - subline: one sentence, human, no jargon
 - single CTA: "create your space →"
@@ -335,7 +335,7 @@ the space.
 - share link + share options visible but secondary until first post is dropped
   (or creator dismisses)
 
-### space view (`mumbl.app/r/:slug`)
+### space view (`mumbl.wtf/r/:slug`)
 - space name + member count + member pip avatars
 - tabs: feed / wins / heartbeat
 - compose box at the top of feed (always visible)

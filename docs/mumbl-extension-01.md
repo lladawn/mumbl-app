@@ -9,7 +9,7 @@
 
 **mumbl.wtf** — the domain. registered. this is the one.
 
-not mumbl.app (taken), not mumbl.space (considered and dropped), not
+not mumbl.wtf (taken), not mumbl.wtf (considered and dropped), not
 mumbl.io. mumbl.wtf is right because it names the feeling before you even
 open the app. when someone shares `mumbl.wtf/r/backend-gremlins` on twitter,
 people click it just because of the domain. the curiosity is built in.
@@ -204,7 +204,7 @@ support it from day one (see schema additions below).
 
 spaces are private by default. creators can opt in to make their space public.
 public spaces contribute anonymised post data to a shared culture feed visible
-at `mumbl.space/explore`.
+at `mumbl.wtf/explore`.
 
 the explore page shows:
 - how many public spaces are active this week

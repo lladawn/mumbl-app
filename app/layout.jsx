@@ -1,7 +1,7 @@
 import AppShell from "../src/components/AppShell";
 import "../styles.css";
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://justmumbl.vercel.app";
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://mumbl.wtf";
 const description =
   "An anonymous-first team room for engineers to say the thing they've been mumbling all week.";
 

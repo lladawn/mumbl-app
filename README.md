@@ -19,12 +19,12 @@ http://127.0.0.1:3000/
 
 ## Project Shape
 
-- `app/` contains Next.js routes: landing, create, and room pages.
+- `app/` contains Next.js routes: landing, create, explore, room pages, and API handlers.
 - `src/components/` contains reusable UI components.
 - `src/components/space/` contains room-specific feed, compose, reaction, share, and heartbeat pieces.
 - `src/hooks/` contains client-side state hooks.
 - `src/lib/` contains product constants, API helpers, storage helpers for session/creator tokens, and heartbeat logic.
-- `docs/product_context.md` is the product source of truth.
+- `docs/mumbl-product-context.md` and `docs/mumbl-extension-01.md` are the product source of truth. The extension wins on conflicts.
 - `docs/backend-plan.md` is the recommended Supabase/Postgres backend path.
 
 ## What Exists
@@ -37,8 +37,9 @@ http://127.0.0.1:3000/
 - Anonymous-first compose flow with optional display handle
 - Phrase-based reactions with local session dedupe
 - Wins tab with lightweight stats
-- Heartbeat tab generated from local anonymised post data
+- Heartbeat tab with weekly history and vibe-over-time from anonymised backend data
 - Share-copy actions for link, Slack, X, and WhatsApp
+- Aggregate-only `/explore` page for public-space culture pulse
 
 ## Product Principles
 
@@ -53,13 +54,13 @@ Use Supabase Postgres behind Next.js route handlers. Keep writes server-mediated
 
 ## Public Spaces
 
-Spaces are private by default. Creators can opt in from the room sidebar to contribute anonymised aggregate themes to future Mumbl Explore. Individual posts are never shown publicly, and public names are optional.
+Spaces are private by default. Creators can opt in from the room sidebar to contribute anonymised aggregate themes to Mumbl Explore. Individual posts are never shown publicly, and public names are optional.
 
 ## Heartbeats
 
 Weekly heartbeat generation is scheduled through Vercel Cron in `vercel.json` and runs every Monday at 09:00 UTC. The endpoint is `GET /api/cron/heartbeats` and is protected by `CRON_SECRET`.
 
-The current generator is deterministic/local; the AI provider can replace the generator later while keeping the anonymised payload shape.
+The current generator is deterministic/local; the AI provider can replace the generator later while keeping the anonymised payload shape. Heartbeat history and vibe-over-time are displayed from stored heartbeat rows.
 
 ## Backend Setup
 
@@ -81,3 +82,7 @@ Until those variables exist, API routes return a setup `503`.
 - React
 - Plain CSS
 - Browser `localStorage` only for session token, creator token, and recent room slug
+
+## Domain
+
+Canonical product domain: `https://mumbl.wtf`. Use `NEXT_PUBLIC_APP_URL=https://mumbl.wtf` in production once the domain is pointed at Vercel.

@@ -927,3 +927,133 @@ textarea:focus {
   width: fit-content;
   border-radius: 999px;
 }
+
+.explore-view {
+  width: min(1160px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 42px 0 72px;
+}
+
+.explore-header {
+  max-width: 820px;
+  margin-bottom: 28px;
+}
+
+.explore-header h1 {
+  font-size: clamp(2.8rem, 7vw, 6.3rem);
+}
+
+.explore-header p {
+  color: var(--muted);
+  font-size: clamp(1rem, 1.8vw, 1.25rem);
+  line-height: 1.55;
+}
+
+.explore-pulse {
+  margin-bottom: 18px;
+  padding: clamp(22px, 4vw, 34px);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--blue);
+  box-shadow: 5px 5px 0 var(--ink);
+}
+
+.explore-pulse h2 {
+  margin-bottom: 10px;
+  color: var(--blue-ink);
+  font-size: 0.86rem;
+  text-transform: lowercase;
+}
+
+.explore-pulse p {
+  margin-bottom: 0;
+  font-size: clamp(1.45rem, 3vw, 2.5rem);
+  font-weight: 800;
+  line-height: 1.18;
+}
+
+.explore-grid,
+.explore-themes {
+  display: grid;
+  gap: 14px;
+}
+
+.explore-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.explore-themes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.heartbeat-history,
+.heartbeat-history-list {
+  margin-top: 14px;
+}
+
+.heartbeat-history {
+  padding: 18px;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.heartbeat-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.heartbeat-history-header h3 {
+  margin-bottom: 0;
+}
+
+.heartbeat-history-header span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.vibe-bars {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  min-height: 132px;
+}
+
+.vibe-bar-wrap {
+  display: grid;
+  grid-template-rows: 96px auto;
+  gap: 8px;
+  align-items: end;
+  justify-items: center;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.vibe-bar {
+  width: 100%;
+  min-height: 18px;
+  border: 1px solid var(--ink);
+  border-radius: 6px 6px 0 0;
+  background: var(--gold);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.heartbeat-history-list {
+  display: grid;
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .explore-grid,
+  .explore-themes {
+    grid-template-columns: 1fr;
+  }
+}

@@ -99,11 +99,15 @@ create table anon_audit (
 
 The service role key must stay server-only. It is used only in Next.js route handlers.
 
+## Extension Schema
+
+The extension adds `memory_entries` for future Supermemory sync tracking and `space_plans` for future flat pricing. These tables exist as runway only; there is no Supermemory or billing UI yet.
+
 ## Public Space Runway
 
 The schema now supports public opt-in with `spaces.is_public` and `spaces.public_name`, plus weekly `culture_snapshots` for a future `/explore` page. Public is off by default and can only be changed with the creator token.
 
-V1 should show only the room badge and toggle. Do not show individual public posts. Build `/explore` only after there is enough real usage for aggregate data to mean something.
+V1 should show only the room badge and toggle. Do not show individual public posts. `/explore` is aggregate-only and should stay useful even when signal is thin.
 
 ## Why Supabase Fits
 

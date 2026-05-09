@@ -1,5 +1,5 @@
 export default function sitemap() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://justmumbl.vercel.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://mumbl.wtf";
 
   return [
     {
@@ -13,6 +13,12 @@ export default function sitemap() {
       lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 0.8,
+    },
+    {
+      url: `${appUrl}/explore`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.7,
     },
   ];
 }
