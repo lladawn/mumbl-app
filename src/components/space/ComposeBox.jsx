@@ -15,23 +15,47 @@ export default function ComposeBox({
 }) {
   const [content, setContent] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDismissing, setIsDismissing] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const trimmed = content.trim();
-    if (!trimmed) return;
-    submitPost({ content: trimmed, displayName: displayName.trim() });
-    setContent("");
-    setDisplayName("");
+    if (!trimmed || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      await submitPost({ content: trimmed, displayName: displayName.trim() });
+      setContent("");
+      setDisplayName("");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDismiss() {
+    if (isDismissing) return;
+
+    setIsDismissing(true);
+    try {
+      await dismissFirstPost(space.slug);
+    } finally {
+      setIsDismissing(false);
+    }
   }
 
   return (
-    <form className={`compose ${space.firstPostDone ? "" : "you-first"}`} onSubmit={handleSubmit}>
+    <form className={`compose ${space.firstPostDone ? "" : "you-first"}`} onSubmit={handleSubmit} aria-busy={isSubmitting}>
       <div className="compose-header">
         <p className="compose-title">
           {space.firstPostDone ? "what's mumbl saying?" : "you first - what's actually on your mind this week?"}
         </p>
-        <button className={`anon-toggle ${composeAnonymous ? "" : "off"}`} type="button" onClick={() => setComposeAnonymous(!composeAnonymous)}>
+        <button
+          className={`anon-toggle ${composeAnonymous ? "" : "off"}`}
+          type="button"
+          onClick={() => setComposeAnonymous(!composeAnonymous)}
+          disabled={isSubmitting}
+        >
           {composeAnonymous ? "anonymous on" : "posting with handle"}
         </button>
       </div>
@@ -41,26 +65,41 @@ export default function ComposeBox({
         maxLength={420}
         placeholder={postTypes[selectedType].placeholder || vibes[space.vibe].placeholder}
         required
+        disabled={isSubmitting}
       />
       <label className={`display-name-row ${composeAnonymous ? "hidden" : ""}`}>
         display handle
-        <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="off" placeholder="e.g. sam from infra" />
+        <input
+          value={displayName}
+          onChange={(event) => setDisplayName(event.target.value)}
+          autoComplete="off"
+          placeholder="e.g. sam from infra"
+          disabled={isSubmitting}
+        />
       </label>
       <div className="type-grid">
         {Object.entries(postTypes).map(([key, type]) => (
-          <button className={`type-button ${selectedType === key ? "active" : ""}`} type="button" key={key} onClick={() => setSelectedType(key)}>
+          <button
+            className={`type-button ${selectedType === key ? "active" : ""}`}
+            type="button"
+            key={key}
+            onClick={() => setSelectedType(key)}
+            disabled={isSubmitting}
+          >
             <strong>{type.label}</strong>
             <span>{type.hint}</span>
           </button>
         ))}
       </div>
       <div className="feed-actions" style={{ marginTop: 14 }}>
-        <button className="solid-button" type="submit">
-          drop it on mumbl
+        <button className="solid-button button-with-loader" type="submit" disabled={isSubmitting}>
+          {isSubmitting && <span className="mini-loader" aria-hidden="true" />}
+          {isSubmitting ? "dropping..." : "drop it on mumbl"}
         </button>
         {!space.firstPostDone && (
-          <button className="ghost-button" type="button" onClick={() => dismissFirstPost(space.slug)}>
-            show the share link anyway
+          <button className="ghost-button button-with-loader" type="button" onClick={handleDismiss} disabled={isDismissing || isSubmitting}>
+            {isDismissing && <span className="mini-loader" aria-hidden="true" />}
+            {isDismissing ? "unlocking..." : "show the share link anyway"}
           </button>
         )}
       </div>

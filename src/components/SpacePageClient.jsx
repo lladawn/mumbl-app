@@ -7,6 +7,7 @@ import { countReactions } from "../lib/heartbeat";
 import { useRemoteSpace } from "../hooks/useRemoteSpace";
 import ComposeBox from "./space/ComposeBox";
 import HeartbeatView from "./space/HeartbeatView";
+import LoadingMark from "./LoadingMark";
 import PostCard from "./space/PostCard";
 import SharePanel from "./space/SharePanel";
 import PublicSpacePanel from "./space/PublicSpacePanel";
@@ -20,7 +21,7 @@ export default function SpacePageClient({ slug, tab }) {
 
   async function copyText(text, message) {
     try {
-      await navigator.clipboard.writeText(text);
+      await copyToClipboard(text);
       setToast(message);
     } catch {
       setToast("copy did not work here. the link is still visible.");
@@ -30,7 +31,8 @@ export default function SpacePageClient({ slug, tab }) {
   if (status === "loading" && !space) {
     return (
       <section className="create-view">
-        <div className="panel">
+        <div className="panel loading-panel" aria-live="polite" aria-busy="true">
+          <LoadingMark />
           <h2>checking the room.</h2>
           <p className="panel-copy">pulling the latest mumbl from the backend.</p>
         </div>
@@ -121,6 +123,7 @@ export default function SpacePageClient({ slug, tab }) {
                     setToast("dropped. the room heard it.");
                   } catch (submitError) {
                     setToast(submitError.message || "couldn't post that yet.");
+                    throw submitError;
                   }
                 }}
               />
@@ -202,4 +205,33 @@ function toggleReactionWithToast(toggleReaction, setToast) {
       setToast(error.message || "reaction bounced. annoying, but fixable.");
     }
   };
+}
+
+async function copyToClipboard(text) {
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Some embedded browsers expose the Clipboard API but still deny writes.
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "0";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+
+  if (!copied) {
+    throw new Error("copy failed");
+  }
 }

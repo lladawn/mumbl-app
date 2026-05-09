@@ -39,7 +39,7 @@ export default function CreatePageClient() {
             name the space, pick the room temperature, then drop the first honest thing before you invite everyone else
             in.
           </p>
-          <form className="form-stack" onSubmit={handleSubmit}>
+          <form className="form-stack" onSubmit={handleSubmit} aria-busy={isCreating}>
             <label>
               space name
               <input
@@ -48,6 +48,7 @@ export default function CreatePageClient() {
                 autoComplete="off"
                 placeholder="backend team"
                 required
+                disabled={isCreating}
               />
             </label>
             <label>
@@ -59,6 +60,7 @@ export default function CreatePageClient() {
                     type="button"
                     key={key}
                     onClick={() => setSelectedVibe(key)}
+                    disabled={isCreating}
                   >
                     <strong>{vibe.label}</strong>
                     <span>{vibe.hint}</span>
@@ -67,7 +69,8 @@ export default function CreatePageClient() {
               </div>
             </label>
             <div className="form-actions">
-              <button className="solid-button" type="submit" disabled={isCreating}>
+              <button className="solid-button button-with-loader" type="submit" disabled={isCreating}>
+                {isCreating && <span className="mini-loader" aria-hidden="true" />}
                 {isCreating ? "creating..." : "create space"}
               </button>
             </div>

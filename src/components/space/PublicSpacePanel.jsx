@@ -21,7 +21,7 @@ export default function PublicSpacePanel({ space, updateVisibility, onToast }) {
   }
 
   return (
-    <form className="panel public-panel" onSubmit={handleSubmit}>
+    <form className="panel public-panel" onSubmit={handleSubmit} aria-busy={isSaving}>
       <h3>mumbl explore</h3>
       <p className="panel-copy">
         optional. only aggregate themes later, never individual posts. space names stay hidden unless you set one here.
@@ -30,14 +30,16 @@ export default function PublicSpacePanel({ space, updateVisibility, onToast }) {
         className={`anon-toggle public-toggle ${isPublic ? "" : "off"}`}
         type="button"
         onClick={() => setIsPublic((value) => !value)}
+        disabled={isSaving}
       >
         {isPublic ? "contributing" : "private"}
       </button>
       <label className={isPublic ? "" : "hidden"}>
         public display name
-        <input value={publicName} onChange={(event) => setPublicName(event.target.value)} placeholder={space.name} />
+        <input value={publicName} onChange={(event) => setPublicName(event.target.value)} placeholder={space.name} disabled={isSaving} />
       </label>
-      <button className="share-button primary" type="submit" disabled={isSaving}>
+      <button className="share-button primary button-with-loader" type="submit" disabled={isSaving}>
+        {isSaving && <span className="mini-loader" aria-hidden="true" />}
         {isSaving ? "saving..." : "save"}
       </button>
     </form>

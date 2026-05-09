@@ -1057,3 +1057,141 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+.button-with-loader {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+button:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+button:disabled:hover {
+  transform: none;
+}
+
+.loading-panel {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
+.mumbl-loader {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 12px 8px 9px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--gold);
+  box-shadow: 4px 4px 0 var(--ink);
+  animation: mumbl-bob 1050ms ease-in-out infinite;
+}
+
+.mumbl-loader::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  bottom: -7px;
+  width: 13px;
+  height: 13px;
+  border-right: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  background: var(--gold);
+  transform: rotate(45deg);
+}
+
+.mumbl-loader-mark {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: var(--mint);
+  color: var(--mint-ink);
+  font-size: 0.95rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.mumbl-loader-dots {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.mumbl-loader-dots span,
+.mini-loader {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: var(--clay);
+  box-shadow: 1px 1px 0 var(--ink);
+  animation: mumbl-dot 820ms ease-in-out infinite;
+}
+
+.mumbl-loader-dots span:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.mumbl-loader-dots span:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+.mini-loader {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  background: currentColor;
+  box-shadow: none;
+}
+
+.reaction-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reaction-button.pending {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+@keyframes mumbl-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes mumbl-dot {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+
+  50% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
