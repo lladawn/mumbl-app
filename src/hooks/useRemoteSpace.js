@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createRemotePost, dismissRemoteFirstPost, fetchSpace, toggleRemoteReaction } from "../lib/api";
+import { createRemotePost, dismissRemoteFirstPost, fetchSpace, toggleRemoteReaction, updateRemoteSpaceVisibility } from "../lib/api";
 
 export function useRemoteSpace(slug) {
   const [space, setSpace] = useState(null);
@@ -41,6 +41,11 @@ export function useRemoteSpace(slug) {
     await refresh();
   }
 
+  async function updateVisibility(input) {
+    await updateRemoteSpaceVisibility({ slug, ...input });
+    await refresh();
+  }
+
   return {
     space,
     status,
@@ -49,5 +54,6 @@ export function useRemoteSpace(slug) {
     submitPost,
     toggleReaction,
     dismissFirstPost,
+    updateVisibility,
   };
 }

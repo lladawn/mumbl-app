@@ -3,7 +3,15 @@ import { getServerEnv } from "../../../../src/server/env";
 import { badRequest, ok, serverError } from "../../../../src/server/http";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 
+export async function GET(request) {
+  return generateHeartbeats(request);
+}
+
 export async function POST(request) {
+  return generateHeartbeats(request);
+}
+
+async function generateHeartbeats(request) {
   try {
     const { cronSecret } = getServerEnv();
     const authHeader = request.headers.get("authorization");

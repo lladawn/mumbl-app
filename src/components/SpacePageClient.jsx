@@ -9,10 +9,11 @@ import ComposeBox from "./space/ComposeBox";
 import HeartbeatView from "./space/HeartbeatView";
 import PostCard from "./space/PostCard";
 import SharePanel from "./space/SharePanel";
+import PublicSpacePanel from "./space/PublicSpacePanel";
 import Toast from "./Toast";
 
 export default function SpacePageClient({ slug, tab }) {
-  const { space, status, error, submitPost, toggleReaction, dismissFirstPost } = useRemoteSpace(slug);
+  const { space, status, error, submitPost, toggleReaction, dismissFirstPost, updateVisibility } = useRemoteSpace(slug);
   const [selectedType, setSelectedType] = useState("thought");
   const [composeAnonymous, setComposeAnonymous] = useState(true);
   const [toast, setToast] = useState("");
@@ -67,6 +68,7 @@ export default function SpacePageClient({ slug, tab }) {
           <p>
             {space.memberCount} in here · {vibes[space.vibe].label} · anonymous · always
           </p>
+          {space.isPublic && <span className="public-badge">contributing to mumbl explore</span>}
         </div>
         <div className="pips" aria-label="member avatars">
           {["?", "r", "k", "j", "+"].map((pip) => (
@@ -138,6 +140,7 @@ export default function SpacePageClient({ slug, tab }) {
             <h3>for the team</h3>
             <p>the heartbeat is generated from anonymised posts and reactions. no manager cave, no separate dashboard.</p>
           </div>
+          <PublicSpacePanel space={space} updateVisibility={updateVisibility} onToast={setToast} />
         </aside>
       </div>
 

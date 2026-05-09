@@ -37,6 +37,19 @@ export async function createRemotePost({ slug, type, content, isAnonymous, displ
   return parseJson(response);
 }
 
+export async function updateRemoteSpaceVisibility({ slug, isPublic, publicName }) {
+  const response = await fetch(`/api/spaces/${slug}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      creatorToken: getCreatorToken(slug),
+      isPublic,
+      publicName,
+    }),
+  });
+  return parseJson(response);
+}
+
 export async function dismissRemoteFirstPost(slug) {
   const response = await fetch(`/api/spaces/${slug}/first-post-dismissed`, {
     method: "POST",

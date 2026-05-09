@@ -8,6 +8,8 @@ create table if not exists spaces (
   creator_token_hash text not null,
   member_count int not null default 1 check (member_count >= 1),
   first_post_done boolean not null default false,
+  is_public boolean not null default false,
+  public_name text,
   created_at timestamptz not null default now()
 );
 
@@ -52,6 +54,21 @@ create table if not exists heartbeats (
 
 create index if not exists heartbeats_space_week_idx on heartbeats (space_id, week_of desc);
 
+create table if not exists culture_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  week_of date not null unique,
+  total_public_spaces int not null default 0,
+  total_posts int not null default 0,
+  total_reactions int not null default 0,
+  anon_percentage numeric(5,2) not null default 0,
+  top_rant_theme text,
+  top_win_theme text,
+  most_active_day text,
+  culture_pulse text,
+  tweet_text text,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists anon_audit (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references posts(id) on delete cascade,
@@ -64,6 +81,7 @@ alter table posts enable row level security;
 alter table reactions enable row level security;
 alter table heartbeats enable row level security;
 alter table anon_audit enable row level security;
+alter table culture_snapshots enable row level security;
 
 -- The app uses Next.js route handlers with the Supabase service role key.
 -- Do not add broad anon policies unless the client starts reading directly.

@@ -99,6 +99,12 @@ create table anon_audit (
 
 The service role key must stay server-only. It is used only in Next.js route handlers.
 
+## Public Space Runway
+
+The schema now supports public opt-in with `spaces.is_public` and `spaces.public_name`, plus weekly `culture_snapshots` for a future `/explore` page. Public is off by default and can only be changed with the creator token.
+
+V1 should show only the room badge and toggle. Do not show individual public posts. Build `/explore` only after there is enough real usage for aggregate data to mean something.
+
 ## Why Supabase Fits
 
 Supabase is a strong fit here because Mumbl needs relational integrity more than a document store: unique slugs, deduped reactions, weekly heartbeat uniqueness, and explicit privacy constraints. Postgres checks and unique indexes let us enforce product promises below the UI, which matters a lot for an anonymous-first product.

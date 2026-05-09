@@ -51,6 +51,16 @@ http://127.0.0.1:3000/
 
 Use Supabase Postgres behind Next.js route handlers. Keep writes server-mediated so Mumbl can enforce rate limits, hashed session tokens, anonymous post constraints, and heartbeat prompt stripping in one place. See `docs/backend-plan.md`.
 
+## Public Spaces
+
+Spaces are private by default. Creators can opt in from the room sidebar to contribute anonymised aggregate themes to future Mumbl Explore. Individual posts are never shown publicly, and public names are optional.
+
+## Heartbeats
+
+Weekly heartbeat generation is scheduled through Vercel Cron in `vercel.json` and runs every Monday at 09:00 UTC. The endpoint is `GET /api/cron/heartbeats` and is protected by `CRON_SECRET`.
+
+The current generator is deterministic/local; the AI provider can replace the generator later while keeping the anonymised payload shape.
+
 ## Backend Setup
 
 The frontend now uses these backend route handlers for spaces, posts, reactions, and room reads.
