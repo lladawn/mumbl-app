@@ -138,6 +138,16 @@ every feature decision should be measured against this. if a feature makes
 mumbl feel more like a feedback tool and less like a place where friendships
 form, it's the wrong feature.
 
+### posts are the identity of the space
+
+mumbl does not count members, visitors, joins, or lurkers. if someone opens the
+link, they are in. no record of that needs to exist.
+
+The feed is the only signal of whether a space is alive. a space with 3 honest
+posts is more alive than one with 40 silent visitors. The only counts visible in
+the product are reaction counts on posts — "i felt this · 8" — because they
+measure resonance, not surveillance.
+
 ---
 
 ## why mumbl and not slack — the structural argument
@@ -189,7 +199,7 @@ breaking everything their product is built on. this is mumbl's permanent moat.
 
 - reactions take one tap — even lurkers contribute
 - the monday heartbeat creates a reason to come back every week
-- the heartbeat is screenshot-worthy — it brings new members in
+- the heartbeat is screenshot-worthy — it brings new spaces in
 - the creator posts first (see original doc) — seeds the culture before anyone
   else arrives so the space never feels empty
 
@@ -207,14 +217,16 @@ public spaces contribute anonymised post data to a shared culture feed visible
 at `mumbl.wtf/explore`.
 
 the explore page shows:
-- how many public spaces are active this week
 - top themes across all public spaces (not individual posts — themes only)
 - most common rant topic across the industry this week
-- most reacted win type
-- which team sizes are most active
-- day of week with highest post volume across all spaces
+- most resonant win type
+- day of week with the strongest posting energy across public spaces
 - a live "culture pulse" — a one-liner about what engineering teams are
   collectively feeling right now
+
+The page should feel like a culture weather report, not an analytics dashboard.
+Do not show numeric public-space, post, reaction, member, visitor, or anonymous
+percent counts in the UI.
 
 ### why this is powerful
 
@@ -232,11 +244,10 @@ via claude API. posted to mumbl's twitter/X account.
 format: short, funny, specific, honest. never generic.
 
 example:
-> "this week across 240+ engineering teams on mumbl:
-> — 74% of rants were about sprint planning (classic)
-> — tuesday was the most burned-out day
-> — someone's CI pipeline improvement got 47 reactions (the people's champion)
-> — 83% of posts were anonymous
+> "this week on mumbl:
+> — sprint planning is somehow still the final boss
+> — tuesday had the most burned-out energy
+> — ci pipeline wins remain the people's champion
 > the machines are tired but they're still here."
 
 this tweet is the top-of-funnel acquisition channel. it costs nothing and
@@ -246,7 +257,7 @@ it writes itself from real data.
 
 - no individual posts are ever shown on the explore page
 - no space names are shown without creator opt-in
-- only themes, aggregate counts, and percentages
+- only themes and narrative aggregate shape; no individual posts and no visible numeric dashboards
 - spaces can toggle public/private at any time — when toggled private, their
   data is removed from the aggregate within 24 hours
 - public spaces get a small badge on their room page: "contributing to
@@ -319,7 +330,7 @@ no post content. no names. no session tokens. just the week's shape.
 ### what teams can do with it
 
 - **team timeline** — a scrollable view of every week's vibe read going back
-  to when they joined. see the shape of the team's year.
+  to the first stored heartbeat. see the shape of the team's year.
 - **before/after tracking** — "3 months before we went async-first vs 3 months
   after." real evidence that process changes are working (or aren't).
 - **ask mumbl** — a simple text input: "when were we most stressed?" or "what's
@@ -372,13 +383,13 @@ much they share it. revenue follows love, not the other way around.**
 
 ### no limits on the free plan. ever.
 
-the previous version of this doc had a 15-member cap and a 4-week history
-limit. both are gone. here's why:
+the previous version of this doc had artificial caps. those are gone. here's
+why:
 
-every limit is a reason not to share. "hey join our mumbl space" followed by
-"sorry we hit the member cap" kills the energy instantly. mumbl grows when
-engineers share it freely — unlimited members, unlimited history, unlimited
-spaces. let it spread without friction.
+every limit is a reason not to share. "hey open our mumbl space" followed by
+"sorry we hit a cap" kills the energy instantly. mumbl grows when engineers
+share it freely — unlimited spaces, unlimited posts, unlimited history. no
+people caps, because mumbl does not count people at all.
 
 the free plan is not a trial. it's the product. it stays whole, unlimited,
 and shareable forever.
@@ -414,7 +425,6 @@ that person, not their boss.
 ### free plan — unlimited everything
 
 - unlimited spaces
-- unlimited members
 - unlimited heartbeat history
 - full feed + all post types + reactions
 - wins tab
@@ -442,7 +452,7 @@ a team has been using mumbl for a while and wants to go deeper.
 - anonymity — always free, always on by default
 - the explore page — public good and growth engine
 - reactions — participation should never cost anything
-- member count or history — no artificial limits, ever
+- people counts or people history — not tracked, not priced, not shown
 
 ### what drives the upgrade
 
@@ -470,16 +480,15 @@ build in this order. each item should feel shippable before moving to the next.
 1. landing page — headline, vibe picker, create → get link instantly
 2. "you first" — after creating a space, prompt the creator to post before
    they see the share link. one post seeds the culture. empty rooms don't get
-   joined.
-3. space feed — view posts, member count, newest first
+   opened the link.
+3. space feed — view posts, newest first. posts are the identity of the space
 4. compose + post — post types (find/thought/rant/win/lol), anonymous toggle
    default on, 500 char limit
 5. reactions — phrase-based ("i felt this · 8"), session dedup, one tap
 
 **tabs**
-6. wins tab — filtered feed view + 3 stat cards (wins this week / members
-   posted / reactions given). small build, makes wins feel celebrated when
-   they do happen.
+6. wins tab — filtered feed view only. no aggregate stat cards; reaction counts
+   stay on posts because they measure resonance, not surveillance.
 7. heartbeat tab — monday AI digest + vibe read + uplift via claude API.
    this is not a v2 feature. it's the reason people come back. ship it.
 
@@ -550,7 +559,7 @@ codex is fast. use that. arrive at launch with something that feels whole.
 ## updated growth model
 
 1. creator makes a space, posts first, shares the link on twitter/X
-2. teammates join — they see a post already there, honesty is already welcome
+2. teammates open the link — they see a post already there, honesty is already welcome
 3. someone posts something real, 14 people react — they feel heard
 4. monday comes — the heartbeat is funny and honest and screenshot-worthy
 5. someone screenshots it and posts it on twitter

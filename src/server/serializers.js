@@ -6,7 +6,6 @@ export function serializeSpace(space, posts = [], heartbeats = [], reactionRows 
     slug: space.slug,
     name: space.name,
     vibe: space.vibe,
-    memberCount: space.member_count,
     firstPostDone: space.first_post_done,
     isPublic: space.is_public || false,
     publicName: space.public_name || "",

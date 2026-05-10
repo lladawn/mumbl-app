@@ -49,7 +49,6 @@ export async function POST(request) {
         slug: insertedSpace.slug,
         name: insertedSpace.name,
         vibe: insertedSpace.vibe,
-        memberCount: insertedSpace.member_count,
         firstPostDone: insertedSpace.first_post_done,
         posts: [],
         heartbeats: [],

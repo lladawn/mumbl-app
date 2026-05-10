@@ -47,12 +47,6 @@ export default async function ExplorePage() {
             <h2>culture pulse</h2>
             <p>{explore.culturePulse}</p>
           </div>
-          <div className="explore-grid">
-            <ExploreStat value={explore.totalPublicSpaces} label="public spaces active" />
-            <ExploreStat value={explore.totalPosts} label="posts this week" />
-            <ExploreStat value={explore.totalReactions} label="reactions given" />
-            <ExploreStat value={`${explore.anonPercentage}%`} label="anonymous posts" />
-          </div>
           <div className="explore-themes">
             <ThemeCard title="top rant topic" value={explore.topRantTheme} />
             <ThemeCard title="most reacted win type" value={explore.topWinTheme} />
@@ -61,15 +55,6 @@ export default async function ExplorePage() {
         </>
       )}
     </section>
-  );
-}
-
-function ExploreStat({ value, label }) {
-  return (
-    <div className="stat-card explore-stat">
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </div>
   );
 }
 

@@ -145,7 +145,7 @@ Examples:
   hear one."
 - "a lot of 'i felt this' reactions and not many replies — people are listening.
   whoever posted the thing about deployment anxiety: people heard you."
-- "genuinely good week. someone find the team member who had the big win and
+- "genuinely good week. someone find the teammate who had the big win and
   actually tell them directly. mumbl noticed."
 
 The uplift must feel like advice from a smart teammate who read the room — not
@@ -159,7 +159,7 @@ a productivity coach, not a bot, not HR.
 
 This must be stated clearly in the product — "your heartbeat is for you, not
 for management" — and enforced architecturally. The heartbeat is generated from
-anonymised post data and is visible to all space members. The creator does not
+anonymised post data and is visible to everyone in the space. The creator does not
 get a separate "manager view" of the heartbeat.
 
 ---
@@ -201,10 +201,11 @@ The creator shares the link directly with teammates via:
 This is the growth loop. Every new space shared on Twitter is a mumbl ad. The
 tweet copy should be genuine and human, not marketing.
 
-### 3. teammates join
+### 3. teammates open the link
 
 Clicking the link opens the team space directly. No account needed to read or
-react. To post, a user picks a display handle or stays anonymous. That's it.
+react. To post, a person picks a display handle or stays anonymous. That's it.
+Mumbl does not record visits; if the link opens, they are in.
 
 ### 4. the feed lives
 
@@ -213,6 +214,10 @@ The space is a running feed of posts from the team. It stays alive because:
 - reactions feel good and take one tap
 - the weekly heartbeat makes it worth checking every Monday
 - the vibe is fun enough that posting feels like a break, not a task
+
+Posts are the identity of the space. A space with 3 honest posts is more alive
+than one with 40 silent visitors. The feed is the only signal of whether a space
+is alive; mumbl does not count members, visitors, or joins.
 
 ---
 
@@ -278,7 +283,7 @@ session tokens, no attribution.
   week, not a corporate newsletter
 - covers themes and mood, never individual posts
 - no names, no quotes, no attribution
-- should be screenshot-worthy — people will share it, which brings new members
+- should be screenshot-worthy — people will share it, which brings new spaces
 - length: 3–5 sentences. dense but readable.
 
 ### rules for the vibe read:
@@ -336,7 +341,7 @@ the space.
   (or creator dismisses)
 
 ### space view (`mumbl.wtf/r/:slug`)
-- space name + member count + member pip avatars
+- space name + vibe setting + date created. no member counts, no visit tracking, no pip avatars
 - tabs: feed / wins / heartbeat
 - compose box at the top of feed (always visible)
 - anonymous toggle (default on) as a small pill, not a checkbox
@@ -345,7 +350,7 @@ the space.
 
 ### wins tab
 - filtered view of win posts only
-- 3 stat cards at top: wins this week / members posted / reactions given
+- no stat cards. wins are just the filtered win posts; reaction counts stay on posts only
 - same post card format
 
 ### heartbeat tab (replaces "weekly wrap")
@@ -394,7 +399,8 @@ slightly chaotic senior engineer, not a product marketer.
   - `heartbeats` table: id, space_id, week_of, vibe_read, digest, uplift, created_at
   - `anon_audit` table: id, post_id, hashed_session (break-glass only, creator access)
 - **auth:** no auth for v1. spaces are identified by slug + a creator token stored
-  in localStorage. members are identified by session token only (no account).
+  in localStorage. mumbl does not track visits or membership. session tokens
+  are used only for reaction dedupe and moderation audit hashes.
 - **AI heartbeat:** Claude API weekly cron — strips identity, passes post content
   + reaction counts, returns vibe_read + digest + uplift in vibe-matched voice
 - **deployment:** Vercel (frontend + API routes) + Supabase or Railway (PostgreSQL)
@@ -411,7 +417,6 @@ create table spaces (
   name text not null,                 -- e.g. "backend gremlins"
   vibe text not null default 'chill', -- chill | chaotic | professional | gremlin
   creator_token text not null,        -- stored client-side, proves ownership
-  member_count int default 1,
   created_at timestamptz default now()
 );
 
@@ -423,7 +428,6 @@ create table posts (
   content text not null,
   is_anonymous boolean default true,
   display_name text,                  -- null if anonymous
-  session_token text,                 -- for soft dedup, never shown
   created_at timestamptz default now()
 );
 
@@ -449,10 +453,11 @@ create table heartbeats (
 );
 ```
 
-Anonymity note: `session_token` in posts is a random UUID generated client-side
-per browser session — it's used only to prevent a user from reacting twice or
-for the creator's moderation break-glass. It is never displayed, never linked to
-a real identity, and never used for analytics.
+Anonymity note: anonymous posts store no session token. Reaction session tokens
+are random browser UUIDs used only to prevent duplicate reactions, and moderation
+audit hashes exist only for safety break-glass. Mumbl never records who opened or
+opened a space, never displays identity analytics, and never uses session tokens
+for people counting.
 
 ---
 
@@ -499,7 +504,7 @@ Build in this order. Stop when it feels alive.
 
 1. **landing page** — headline, vibe picker, create → get link flow
 2. **"you first" prompt** — foregrounded compose box before share link is surfaced
-3. **space feed** — view posts, see reactions, see member count
+3. **space feed** — view posts, see reactions, newest first. posts are the only signal that a space is alive
 4. **compose + post** — anonymous toggle, post types, submit
 5. **reactions** — tap to react, count updates, session dedup
 6. **wins tab** — filtered view, stat cards
@@ -529,7 +534,7 @@ Everything else is v2.
 
 Mumbl grows when:
 1. someone creates a space and shares the link on Twitter/X
-2. the creator posts first — teammates join and see honesty is already here
+2. the creator posts first — teammates open the link and see honesty is already here
 3. someone posts something and 14 people react — they feel heard for the first
    time in a while
 4. Monday comes and the heartbeat is screenshot-worthy — someone shares it

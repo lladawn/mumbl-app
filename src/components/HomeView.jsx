@@ -34,7 +34,7 @@ export default function HomeView() {
           <div className="artifact feed">
             <div className="artifact-title">
               <span>backend gremlins</span>
-              <span>18 in here</span>
+              <span>chaotic good</span>
             </div>
             <MiniPost avatar="?" tint />
             <MiniPost avatar="r" short />

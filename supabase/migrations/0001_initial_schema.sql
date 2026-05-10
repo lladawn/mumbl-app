@@ -6,7 +6,6 @@ create table if not exists spaces (
   name text not null,
   vibe text not null default 'chill' check (vibe in ('chill', 'chaotic', 'professional', 'gremlin')),
   creator_token_hash text not null,
-  member_count int not null default 1 check (member_count >= 1),
   first_post_done boolean not null default false,
   is_public boolean not null default false,
   public_name text,

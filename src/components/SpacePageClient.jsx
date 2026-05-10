@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { postTypes, validTabs, vibes } from "../lib/constants";
-import { countReactions } from "../lib/heartbeat";
 import { useRemoteSpace } from "../hooks/useRemoteSpace";
 import ComposeBox from "./space/ComposeBox";
 import HeartbeatView from "./space/HeartbeatView";
@@ -67,17 +66,8 @@ export default function SpacePageClient({ slug, tab }) {
       <div className="space-header">
         <div className="space-title">
           <h1>{space.name}</h1>
-          <p>
-            {space.memberCount} in here · {vibes[space.vibe].label} · anonymous · always
-          </p>
+          <p>{vibes[space.vibe].label} · created {formatCreatedDate(space.createdAt)}</p>
           {space.isPublic && <span className="public-badge">contributing to mumbl explore</span>}
-        </div>
-        <div className="pips" aria-label="member avatars">
-          {["?", "r", "k", "j", "+"].map((pip) => (
-            <span className="pip" key={pip}>
-              {pip}
-            </span>
-          ))}
         </div>
       </div>
 
@@ -85,10 +75,10 @@ export default function SpacePageClient({ slug, tab }) {
         <div className="space-main">
           <div className="tab-row" role="tablist" aria-label="space tabs">
             <TabLink slug={space.slug} tab="feed" activeTab={activeTab}>
-              feed · {posts.length}
+              feed
             </TabLink>
             <TabLink slug={space.slug} tab="wins" activeTab={activeTab}>
-              wins · {wins.length}
+              wins
             </TabLink>
             <TabLink slug={space.slug} tab="heartbeat" activeTab={activeTab}>
               heartbeat
@@ -161,28 +151,11 @@ function TabLink({ slug, tab, activeTab, children }) {
 }
 
 function WinsView({ posts, space, toggleReaction }) {
-  const reactionCount = space.posts.reduce((sum, post) => sum + countReactions(post), 0);
-  const namedPosters = new Set(space.posts.map((post) => (post.isAnonymous ? "anon" : post.displayName)).filter(Boolean));
+  return <PostList posts={posts} space={space} toggleReaction={toggleReaction} emptyText="no wins yet. rude of the week, honestly." />;
+}
 
-  return (
-    <>
-      <div className="stats-row">
-        <div className="stat-card">
-          <strong>{posts.length}</strong>
-          <span>wins this week</span>
-        </div>
-        <div className="stat-card">
-          <strong>{namedPosters.size}</strong>
-          <span>members posted</span>
-        </div>
-        <div className="stat-card">
-          <strong>{reactionCount}</strong>
-          <span>reactions given</span>
-        </div>
-      </div>
-      <PostList posts={posts} space={space} toggleReaction={toggleReaction} emptyText="no wins yet. rude of the week, honestly." />
-    </>
-  );
+function formatCreatedDate(timestamp) {
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(timestamp));
 }
 
 function PostList({ posts, space, toggleReaction, emptyText = "quiet room. dangerous. drop the first mumbl." }) {

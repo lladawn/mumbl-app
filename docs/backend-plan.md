@@ -9,7 +9,7 @@ Use:
 - Next.js App Router for pages and route handlers
 - Supabase Postgres for persistence
 - Supabase client on the server only for privileged writes
-- Browser-generated session token for reaction dedupe
+- Browser-generated session token for reaction dedupe only. Do not use it for member, visit, or join tracking.
 - Creator token stored in local storage for creator-only moderation actions
 - A scheduled Next.js route or Vercel cron for Monday heartbeat generation
 
@@ -24,7 +24,6 @@ create table spaces (
   name text not null,
   vibe text not null default 'chill',
   creator_token_hash text not null,
-  member_count int not null default 1,
   created_at timestamptz not null default now()
 );
 
@@ -78,7 +77,7 @@ create table anon_audit (
 - Reaction dedupe stores only a server-side hash of the session token.
 - `anon_audit` exists only for break-glass moderation and should never be queried by normal product views.
 - Heartbeat prompts receive only `{ type, content, reaction_count }`.
-- The creator gets no separate dashboard. Heartbeats are visible to every member.
+- The creator gets no separate dashboard. Heartbeats are visible to everyone in the space.
 
 ## API Shape
 

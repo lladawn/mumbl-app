@@ -14,7 +14,7 @@ export async function getExploreSummary() {
 
   const { data: spaces, error: spacesError } = await supabase
     .from("spaces")
-    .select("id,member_count,is_public")
+    .select("id,is_public")
     .eq("is_public", true);
   if (spacesError) throw spacesError;
 

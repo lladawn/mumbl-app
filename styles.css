@@ -90,8 +90,7 @@ a {
 }
 
 .brand-mark,
-.avatar,
-.pip {
+.avatar {
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
@@ -340,7 +339,6 @@ h1 {
 .panel,
 .compose,
 .post-card,
-.stat-card,
 .heartbeat-card,
 .modal {
   border: 1px solid var(--ink);
@@ -466,7 +464,6 @@ textarea:focus {
 .post-meta,
 .post-footer,
 .tab-row,
-.stats-row,
 .heartbeat-note,
 .share-link-row {
   display: flex;
@@ -568,23 +565,6 @@ textarea:focus {
   color: var(--muted);
 }
 
-.pips {
-  display: flex;
-  align-items: center;
-}
-
-.pip {
-  width: 30px;
-  height: 30px;
-  margin-left: -8px;
-  border-radius: 50%;
-  background: var(--blue);
-  font-size: 0.73rem;
-}
-
-.pip:first-child {
-  margin-left: 0;
-}
 
 .tab-row {
   justify-content: flex-start;
@@ -711,29 +691,6 @@ textarea:focus {
   line-height: 1.45;
 }
 
-.stats-row {
-  align-items: stretch;
-  margin-bottom: 16px;
-}
-
-.stat-card {
-  flex: 1;
-  min-width: 0;
-  padding: 16px;
-}
-
-.stat-card strong {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 1.8rem;
-}
-
-.stat-card span {
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-transform: lowercase;
-}
 
 .heartbeat-stack {
   display: grid;
@@ -871,7 +828,6 @@ textarea:focus {
 
   .vibe-grid,
   .type-grid,
-  .stats-row,
   .share-link-row,
   .feed-actions {
     grid-template-columns: 1fr;

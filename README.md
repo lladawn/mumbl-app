@@ -50,7 +50,7 @@ http://127.0.0.1:3000/
 
 ## Backend Direction
 
-Use Supabase Postgres behind Next.js route handlers. Keep writes server-mediated so Mumbl can enforce rate limits, hashed session tokens, anonymous post constraints, and heartbeat prompt stripping in one place. See `docs/backend-plan.md`.
+Use Supabase Postgres behind Next.js route handlers. Keep writes server-mediated so Mumbl can enforce rate limits, hashed reaction dedupe tokens, anonymous post constraints, and heartbeat prompt stripping in one place. See `docs/backend-plan.md`.
 
 ## Public Spaces
 
@@ -81,7 +81,7 @@ Until those variables exist, API routes return a setup `503`.
 - Next.js
 - React
 - Plain CSS
-- Browser `localStorage` only for session token, creator token, and recent room slug
+- Browser `localStorage` only for reaction dedupe session token, creator token, and recent room slug. It is not used for member or visit tracking.
 
 ## Domain
 
