@@ -1,3 +1,5 @@
+import Script from "next/script";
+import AnalyticsTracker from "../src/components/AnalyticsTracker";
 import AppShell from "../src/components/AppShell";
 import "../styles.css";
 
@@ -59,6 +61,15 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         <AppShell>{children}</AppShell>
+        <AnalyticsTracker />
+        <Script
+          defer
+          src="https://breathe-umami.vercel.app/script.js"
+          data-website-id="a932cca7-6762-44cc-b314-183ebc24ccd1"
+          data-auto-track="false"
+          data-do-not-track="true"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

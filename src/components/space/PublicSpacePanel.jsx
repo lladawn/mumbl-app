@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { trackEvent } from "../../lib/analytics";
 
 export default function PublicSpacePanel({ space, updateVisibility, onToast }) {
   const [isPublic, setIsPublic] = useState(space.isPublic);
@@ -12,8 +13,10 @@ export default function PublicSpacePanel({ space, updateVisibility, onToast }) {
     setIsSaving(true);
     try {
       await updateVisibility({ isPublic, publicName });
+      trackEvent("public_space_saved", { enabled: isPublic });
       onToast(isPublic ? "this space now contributes anonymised themes." : "this space is private again.");
     } catch (error) {
+      trackEvent("public_space_save_failed", { enabled: isPublic });
       onToast(error.message || "couldn't update explore settings.");
     } finally {
       setIsSaving(false);

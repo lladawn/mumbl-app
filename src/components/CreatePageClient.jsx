@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createRemoteSpace } from "../lib/api";
+import { trackEvent } from "../lib/analytics";
 import { vibes } from "../lib/constants";
 import Toast from "./Toast";
 
@@ -22,8 +23,10 @@ export default function CreatePageClient() {
     setToast("");
     try {
       const { slug } = await createRemoteSpace({ name, vibe: selectedVibe });
+      trackEvent("space_created", { vibe: selectedVibe });
       router.push(`/r/${slug}`);
     } catch (error) {
+      trackEvent("space_create_failed", { vibe: selectedVibe });
       setToast(error.message || "couldn't create that mumbl yet.");
       setIsCreating(false);
     }

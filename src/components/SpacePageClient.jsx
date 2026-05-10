@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { trackEvent } from "../lib/analytics";
 import { postTypes, validTabs, vibes } from "../lib/constants";
 import { useRemoteSpace } from "../hooks/useRemoteSpace";
 import ComposeBox from "./space/ComposeBox";
@@ -18,11 +19,13 @@ export default function SpacePageClient({ slug, tab }) {
   const [composeAnonymous, setComposeAnonymous] = useState(true);
   const [toast, setToast] = useState("");
 
-  async function copyText(text, message) {
+  async function copyText(text, message, target = "copy") {
     try {
       await copyToClipboard(text);
+      trackEvent("share_copied", { target });
       setToast(message);
     } catch {
+      trackEvent("share_copy_failed", { target });
       setToast("copy did not work here. the link is still visible.");
     }
   }
@@ -97,8 +100,10 @@ export default function SpacePageClient({ slug, tab }) {
                 dismissFirstPost={async () => {
                   try {
                     await dismissFirstPost();
+                    trackEvent("first_post_prompt_dismissed");
                     setToast("share link unlocked.");
                   } catch (dismissError) {
+                    trackEvent("first_post_prompt_dismiss_failed");
                     setToast(dismissError.message || "couldn't dismiss that prompt.");
                   }
                 }}
@@ -110,8 +115,10 @@ export default function SpacePageClient({ slug, tab }) {
                       displayName,
                       isAnonymous: composeAnonymous,
                     });
+                    trackEvent("post_created", { type: selectedType, anonymous: composeAnonymous, vibe: space.vibe });
                     setToast("dropped. the room heard it.");
                   } catch (submitError) {
+                    trackEvent("post_create_failed", { type: selectedType, anonymous: composeAnonymous, vibe: space.vibe });
                     setToast(submitError.message || "couldn't post that yet.");
                     throw submitError;
                   }
@@ -174,8 +181,11 @@ function toggleReactionWithToast(toggleReaction, setToast) {
   return async (input) => {
     try {
       await toggleReaction(input);
+      trackEvent("reaction_toggled", { label: input.label });
     } catch (error) {
+      trackEvent("reaction_toggle_failed", { label: input.label });
       setToast(error.message || "reaction bounced. annoying, but fixable.");
+      throw error;
     }
   };
 }
