@@ -1,0 +1,101 @@
+# Environments
+
+Mumbl should run with separate Git branches and separate backend environments so local or staging work never mutates the live product by accident.
+
+## Branch model
+
+- `main` = production
+- `dev` = shared staging / preview branch
+- feature branches = short-lived work that merges into `dev`
+
+Recommended flow:
+
+1. branch from `dev`
+2. open PR into `dev`
+3. verify on preview / staging
+4. merge `dev` into `main` when ready for production
+
+## Vercel
+
+Use Vercel's official branch and environment split:
+
+- Production Branch: `main`
+- Preview Deployments: `dev` and all feature branches
+- Local Development: `.env.local` only
+
+On Vercel:
+
+1. set the project's Production Branch to `main`
+2. keep production env vars scoped to `Production`
+3. add staging values under `Preview`, ideally branch-scoped to `dev`
+4. keep local values out of Vercel and in `.env.local`
+
+If you are on Vercel Hobby, `dev` still runs as a Preview deployment. Use branch-specific Preview variables for `dev`.
+
+## Supabase
+
+Use separate Supabase environments:
+
+- local development: local Supabase stack if you want full isolation
+- staging: a separate Supabase project for `dev`
+- production: a separate Supabase project for `main`
+
+Do not point `.env.local` at the production Supabase project.
+
+Recommended values:
+
+- local `.env.local` -> local Supabase or staging Supabase
+- Vercel Preview -> staging Supabase
+- Vercel Production -> production Supabase
+
+## CLI workflow
+
+The repository no longer hardcodes a Supabase project ref and does not require duplicate ref env vars.
+
+Link the CLI intentionally:
+
+```bash
+npm run db:link -- your-staging-project-ref
+```
+
+or
+
+```bash
+SUPABASE_PROJECT_REF=your-staging-project-ref npm run db:link
+```
+
+If you keep staging values in `.env.local` and optional production values in `.env.production.local`, you can use:
+
+```bash
+npm run db:link:staging
+npm run db:link:prod
+```
+
+Then run:
+
+```bash
+npm run db:push
+```
+
+Before pushing production migrations, re-link to the production project on purpose.
+The helper derives the project ref from `NEXT_PUBLIC_SUPABASE_URL`, so the URL is the source of truth.
+
+## Environment variables
+
+Use different values per environment:
+
+- Development: local-only values in `.env.local`
+- Preview / `dev`: staging Supabase URL, staging service role key, staging cron secret
+- Production / `main`: production Supabase URL, production service role key, production cron secret
+
+Analytics should be opt-in per environment:
+
+- local: disabled
+- preview: optional
+- production: enabled
+
+## Important rule
+
+Treat `main` + Vercel Production + production Supabase as one lane.
+Treat `dev` + Vercel Preview + staging Supabase as the other lane.
+Never reuse production credentials in the `dev` lane.

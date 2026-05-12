@@ -70,11 +70,27 @@ The frontend now uses these backend route handlers for spaces, posts, reactions,
 2. Copy `.env.example` to `.env.local`.
 3. Fill in `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `MUMBL_TOKEN_HASH_SECRET`, and `CRON_SECRET`.
 4. Authenticate the Supabase CLI with `npx supabase login`.
-5. Run `npm run db:link`.
+5. Run `npm run db:link -- your-project-ref` or `npm run db:link -- https://your-project.supabase.co`.
+   `npm run db:link:staging` reads `.env.local`; `npm run db:link:prod` reads `.env.production.local`.
 6. Run `npm run db:push` to apply `supabase/migrations/0001_initial_schema.sql`.
 7. Restart `npm run app`.
 
 Until those variables exist, API routes return a setup `503`.
+
+## Branches And Environments
+
+Use `main` for production and `dev` for shared staging / preview work.
+
+- `main` -> Vercel Production -> production Supabase
+- `dev` -> Vercel Preview -> staging Supabase
+- local `.env.local` -> local or staging Supabase, never production
+
+Analytics is environment-gated. Local development is off by default. See [docs/environments.md](/Users/dawn/Code/mumbl-app/docs/environments.md).
+Release flow and safety checks live in [docs/release-checklist.md](/Users/dawn/Code/mumbl-app/docs/release-checklist.md).
+
+## CI
+
+GitHub Actions runs `npm ci` and `npm run build` on pushes and pull requests to `dev` and `main`. The workflow lives at `.github/workflows/ci.yml`.
 
 ## Current Stack
 

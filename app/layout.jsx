@@ -4,6 +4,9 @@ import AppShell from "../src/components/AppShell";
 import "../styles.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://mumbl.wtf";
+const analyticsEnabled = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === "true";
+const umamiScriptSrc = process.env.NEXT_PUBLIC_UMAMI_SRC || "https://breathe-umami.vercel.app/script.js";
+const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID || "";
 const description =
   "An anonymous-first team room for engineers to say the thing they've been mumbling all week.";
 
@@ -61,15 +64,17 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         <AppShell>{children}</AppShell>
-        <AnalyticsTracker />
-        <Script
-          defer
-          src="https://breathe-umami.vercel.app/script.js"
-          data-website-id="a932cca7-6762-44cc-b314-183ebc24ccd1"
-          data-auto-track="false"
-          data-do-not-track="true"
-          strategy="afterInteractive"
-        />
+        {analyticsEnabled && umamiWebsiteId ? <AnalyticsTracker /> : null}
+        {analyticsEnabled && umamiWebsiteId ? (
+          <Script
+            defer
+            src={umamiScriptSrc}
+            data-website-id={umamiWebsiteId}
+            data-auto-track="false"
+            data-do-not-track="true"
+            strategy="afterInteractive"
+          />
+        ) : null}
       </body>
     </html>
   );
