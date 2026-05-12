@@ -7,7 +7,7 @@ Target: support beta spikes up to 10,000 concurrent users across 1,000 spaces wi
 - Post creation is rate-limited per hashed session token with an atomic Postgres function.
 - Reaction creation is rate-limited per hashed session token with an atomic Postgres function.
 - Heartbeat generation is queued in `heartbeat_jobs` and processed in bounded batches.
-- Daily prompts are stored in `prompts`, rotated once per UTC day, and reused on room reads.
+- Daily prompt infrastructure exists, but the feed prompt experiment is currently parked and no prompt cron is active.
 - Room vibe uses aggregate reaction labels only, not people counts.
 - Heartbeat cards render as shareable OG-style images at `/r/[slug]/heartbeat-card`.
 
@@ -19,6 +19,10 @@ Use Supabase Pooler for any future direct Postgres worker, queue runner, or repo
 
 
 For the current Vercel + Supabase-js app, the best practice is still to keep database writes behind route handlers and use Supabase's HTTPS APIs. Add a pooled Postgres connection string only when we introduce a direct SQL worker or external queue runner.
+
+## Cron schedule
+
+On Vercel Hobby, cron jobs must not run more than once per day. The active Vercel cron only triggers weekly heartbeats at Monday 09:00 UTC. For manual testing, use `npm run heartbeat:test`.
 
 ## 10k concurrent readiness checklist
 

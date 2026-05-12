@@ -1,6 +1,5 @@
 import { badRequest, notFound, ok, serverError } from "../../../../src/server/http";
 import { hashToken } from "../../../../src/server/hash";
-import { ensureDailyPrompt } from "../../../../src/server/prompts";
 import { getTopReactionLabels, startOfTodayIso } from "../../../../src/server/roomVibe";
 import { serializeSpace, summariseReactions } from "../../../../src/server/serializers";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
@@ -28,7 +27,7 @@ export async function GET(request, { params }) {
     if (postsError) throw postsError;
 
     const postIds = posts.map((post) => post.id);
-    const [reactionsResult, activeReactionsResult, heartbeatsResult, todayReactionsResult, dailyPrompt] = await Promise.all([
+    const [reactionsResult, activeReactionsResult, heartbeatsResult, todayReactionsResult] = await Promise.all([
       postIds.length
         ? supabase.from("reactions").select("post_id,label").in("post_id", postIds)
         : Promise.resolve({ data: [], error: null }),
@@ -39,7 +38,6 @@ export async function GET(request, { params }) {
       postIds.length
         ? supabase.from("reactions").select("label,created_at").in("post_id", postIds).gte("created_at", startOfTodayIso())
         : Promise.resolve({ data: [], error: null }),
-      ensureDailyPrompt(),
     ]);
 
     if (reactionsResult.error) throw reactionsResult.error;
@@ -54,7 +52,7 @@ export async function GET(request, { params }) {
         heartbeatsResult.data,
         summariseReactions(reactionsResult.data),
         activeReactionsResult.data,
-        { dailyPrompt, roomVibe: getTopReactionLabels(todayReactionsResult.data) },
+        { roomVibe: getTopReactionLabels(todayReactionsResult.data) },
       ),
     });
   } catch (error) {

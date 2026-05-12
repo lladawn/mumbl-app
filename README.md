@@ -58,7 +58,7 @@ Spaces are private by default. Creators can opt in from the room sidebar to cont
 
 ## Heartbeats
 
-Weekly heartbeat generation is scheduled through Vercel Cron in `vercel.json` and runs every Monday at 09:00 UTC. The endpoint is `GET /api/cron/heartbeats` and is protected by `CRON_SECRET`.
+Weekly heartbeat generation is scheduled through Vercel Cron in `vercel.json` and runs every Monday at 09:00 UTC, which stays within Vercel Hobby cron limits. The endpoint is `GET /api/cron/heartbeats` and is protected by `CRON_SECRET`.
 
 The current generator is deterministic/local; the AI provider can replace the generator later while keeping the anonymised payload shape. Heartbeat history and vibe-over-time are displayed from stored heartbeat rows.
 
