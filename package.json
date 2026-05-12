@@ -8,9 +8,12 @@
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start -H 127.0.0.1",
-    "db:link": "supabase link --project-ref trsxgmmcavduhqwhqlrg",
+    "db:link": "node scripts/supabase-link.mjs",
+    "db:link:staging": "node scripts/supabase-link.mjs .env.local",
+    "db:link:prod": "node scripts/supabase-link.mjs .env.production.local",
     "db:push": "supabase db push",
-    "db:status": "supabase migration list --linked"
+    "db:status": "supabase migration list --linked",
+    "heartbeat:test": "node scripts/heartbeat-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",

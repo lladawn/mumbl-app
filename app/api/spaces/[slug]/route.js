@@ -1,5 +1,6 @@
 import { badRequest, notFound, ok, serverError } from "../../../../src/server/http";
 import { hashToken } from "../../../../src/server/hash";
+import { getTopReactionLabels, startOfTodayIso } from "../../../../src/server/roomVibe";
 import { serializeSpace, summariseReactions } from "../../../../src/server/serializers";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 import { cleanString } from "../../../../src/server/validation";
@@ -26,7 +27,7 @@ export async function GET(request, { params }) {
     if (postsError) throw postsError;
 
     const postIds = posts.map((post) => post.id);
-    const [reactionsResult, activeReactionsResult, heartbeatsResult] = await Promise.all([
+    const [reactionsResult, activeReactionsResult, heartbeatsResult, todayReactionsResult] = await Promise.all([
       postIds.length
         ? supabase.from("reactions").select("post_id,label").in("post_id", postIds)
         : Promise.resolve({ data: [], error: null }),
@@ -34,11 +35,15 @@ export async function GET(request, { params }) {
         ? supabase.from("reactions").select("post_id,label").in("post_id", postIds).eq("session_token_hash", sessionTokenHash)
         : Promise.resolve({ data: [], error: null }),
       supabase.from("heartbeats").select("*").eq("space_id", space.id).order("week_of", { ascending: false }),
+      postIds.length
+        ? supabase.from("reactions").select("label,created_at").in("post_id", postIds).gte("created_at", startOfTodayIso())
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
     if (reactionsResult.error) throw reactionsResult.error;
     if (activeReactionsResult.error) throw activeReactionsResult.error;
     if (heartbeatsResult.error) throw heartbeatsResult.error;
+    if (todayReactionsResult.error) throw todayReactionsResult.error;
 
     return ok({
       space: serializeSpace(
@@ -47,6 +52,7 @@ export async function GET(request, { params }) {
         heartbeatsResult.data,
         summariseReactions(reactionsResult.data),
         activeReactionsResult.data,
+        { roomVibe: getTopReactionLabels(todayReactionsResult.data) },
       ),
     });
   } catch (error) {

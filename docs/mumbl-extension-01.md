@@ -464,6 +464,13 @@ the team already loves it and wants to go further.
 ---
 
 ## build order — ship fast, ship whole
+## Current Build Additions
+
+- Daily mumbl prompt: one optional rotating prompt at the top of the feed, persisted by date.
+- Room vibe bar: today's top reaction labels across the room, shown as aggregate mood only.
+- Heartbeat visual card: a screenshot-worthy weekly card for sharing the room's vibe without exposing posts or people.
+- Operational hardening: post/reaction rate limits, queued heartbeat generation, and Supabase Pooler guidance for future direct Postgres workers.
+
 
 the old v1/v2/v3 split is gone. with Codex, the constraint isn't build speed
 — it's clarity. most features that were previously deferred to v2 or v3 are

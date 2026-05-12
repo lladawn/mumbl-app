@@ -12,8 +12,12 @@ export function notFound(message = "not found") {
   return NextResponse.json({ error: message }, { status: 404 });
 }
 
+export function rateLimited(message = "too many requests") {
+  return NextResponse.json({ error: message }, { status: 429 });
+}
+
 export function serverError(error) {
   const message = error instanceof Error ? error.message : "unexpected backend error";
-  const status = message.startsWith("Missing backend environment variables") ? 503 : 500;
+  const status = error?.status || (message.startsWith("Missing backend environment variables") ? 503 : 500);
   return NextResponse.json({ error: message }, { status });
 }

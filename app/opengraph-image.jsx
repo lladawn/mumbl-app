@@ -76,7 +76,7 @@ function ShareImage() {
             say the thing you've been mumbling all week.
           </div>
           <div style={{ marginTop: 28, fontSize: 30, lineHeight: 1.35, color: "#5f5952", maxWidth: 760 }}>
-            a living team room for honest engineering thoughts, reactions, wins, rants, and the monday heartbeat.
+              where engineering teams actually talk. anonymous, no signup, just the team being real.
           </div>
         </div>
         <div
@@ -92,7 +92,7 @@ function ShareImage() {
             gap: 18,
           }}
         >
-          <CardLine title="rant" text="the ticket lied about its own size" color="#edcec4" />
+          <CardLine title="rant" text="one more meeting and i'm going feral" color="#edcec4" />
           <CardLine title="win" text="the build is green and so are we" color="#f8dda0" />
           <CardLine title="heartbeat" text="heavy but alive" color="#d8e8ff" />
         </div>

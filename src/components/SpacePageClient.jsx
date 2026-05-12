@@ -11,6 +11,7 @@ import LoadingMark from "./LoadingMark";
 import PostCard from "./space/PostCard";
 import SharePanel from "./space/SharePanel";
 import PublicSpacePanel from "./space/PublicSpacePanel";
+import RoomVibeBar from "./space/RoomVibeBar";
 import Toast from "./Toast";
 
 export default function SpacePageClient({ slug, tab }) {
@@ -90,6 +91,7 @@ export default function SpacePageClient({ slug, tab }) {
 
           {activeTab === "feed" && (
             <>
+              <RoomVibeBar labels={space.roomVibe} />
               <ComposeBox
                 space={space}
                 postTypes={postTypes}
