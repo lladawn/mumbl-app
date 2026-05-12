@@ -21,7 +21,7 @@ export const vibes = {
     label: "gremlin mode",
     hint: "dry, weird, useful",
     placeholder: "i need to say this somewhere safe...",
-    reactions: ["therapy needed", "we are not worthy", "the ticket lied"],
+    reactions: ["therapy needed", "we are not worthy", "logging this as a bug"],
   },
 };
 

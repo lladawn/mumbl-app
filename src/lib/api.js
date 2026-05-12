@@ -22,7 +22,7 @@ export async function createRemoteSpace({ name, vibe }) {
   return data;
 }
 
-export async function createRemotePost({ slug, type, content, isAnonymous, displayName }) {
+export async function createRemotePost({ slug, type, content, isAnonymous, displayName, promptId }) {
   const response = await fetch(`/api/spaces/${slug}/posts`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -31,6 +31,7 @@ export async function createRemotePost({ slug, type, content, isAnonymous, displ
       content,
       isAnonymous,
       displayName,
+      promptId,
       sessionToken: loadSession(),
     }),
   });

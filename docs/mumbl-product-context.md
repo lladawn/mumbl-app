@@ -267,6 +267,13 @@ are part of the product's personality. They can vary by vibe setting.
 
 ---
 
+## Daily Prompt, Room Vibe, And Heartbeat Cards
+
+- The feed can show one optional daily mumbl prompt, rotated every 24 hours and stored in the backend. Responding is voluntary.
+- The room vibe bar is a small aggregate signal from today's most-used reactions across the space. It shows labels only, not people counts.
+- Weekly heartbeats should be shareable as a visual card with vibe word, top theme, energy level, and a one-liner.
+- These features must reinforce the product rule that posts and resonance are the identity of a space, not member tracking.
+
 ## the weekly heartbeat (AI-generated, every Monday)
 
 The full Monday output is three things generated in one AI call:

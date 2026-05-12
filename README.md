@@ -92,6 +92,10 @@ Release flow and safety checks live in [docs/release-checklist.md](/Users/dawn/C
 
 GitHub Actions runs `npm ci` and `npm run build` on pushes and pull requests to `dev` and `main`. The workflow lives at `.github/workflows/ci.yml`.
 
+## Scaling
+
+Prompt rotation, heartbeat job queueing, rate limits, and pooler notes are documented in [docs/scaling.md](/Users/dawn/Code/mumbl-app/docs/scaling.md).
+
 ## Current Stack
 
 - Next.js
@@ -102,3 +106,14 @@ GitHub Actions runs `npm ci` and `npm run build` on pushes and pull requests to 
 ## Domain
 
 Canonical product domain: `https://mumbl.wtf`. Use `NEXT_PUBLIC_APP_URL=https://mumbl.wtf` in production once the domain is pointed at Vercel.
+
+
+## Heartbeat testing
+
+With the local app running, trigger a heartbeat batch with:
+
+```bash
+npm run heartbeat:test
+```
+
+Use `npm run heartbeat:test -- https://your-deployment-url` to test a deployed environment.

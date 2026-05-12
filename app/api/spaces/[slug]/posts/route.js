@@ -1,4 +1,5 @@
 import { badRequest, notFound, ok, serverError } from "../../../../../src/server/http";
+import { enforceRateLimit } from "../../../../../src/server/rateLimit";
 import { hashToken } from "../../../../../src/server/hash";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
 import { cleanString, isValidPostType } from "../../../../../src/server/validation";
@@ -12,12 +13,16 @@ export async function POST(request, { params }) {
     const isAnonymous = body.isAnonymous !== false;
     const displayName = isAnonymous ? null : cleanString(body.displayName, 48) || "someone brave";
     const sessionToken = cleanString(body.sessionToken, 256);
+    const promptId = cleanString(body.promptId, 64) || null;
 
     if (!slug) return badRequest("space slug is required");
     if (!isValidPostType(type)) return badRequest("unsupported post type");
     if (!content) return badRequest("post content is required");
+    if (!sessionToken) return badRequest("session token is required");
 
     const supabase = getSupabaseAdmin();
+    await enforceRateLimit({ supabase, action: "post", sessionToken });
+
     const { data: space, error: spaceError } = await supabase.from("spaces").select("id").eq("slug", slug).single();
     if (spaceError?.code === "PGRST116") return notFound("space not found");
     if (spaceError) throw spaceError;
@@ -26,6 +31,7 @@ export async function POST(request, { params }) {
       .from("posts")
       .insert({
         space_id: space.id,
+        prompt_id: promptId,
         type,
         content,
         is_anonymous: isAnonymous,

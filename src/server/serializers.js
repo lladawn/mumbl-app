@@ -1,4 +1,4 @@
-export function serializeSpace(space, posts = [], heartbeats = [], reactionRows = [], activeReactionRows = []) {
+export function serializeSpace(space, posts = [], heartbeats = [], reactionRows = [], activeReactionRows = [], extras = {}) {
   const activeReactionKeys = new Set(activeReactionRows.map((row) => `${row.post_id}:${row.label}`));
 
   return {
@@ -10,8 +10,21 @@ export function serializeSpace(space, posts = [], heartbeats = [], reactionRows 
     isPublic: space.is_public || false,
     publicName: space.public_name || "",
     createdAt: new Date(space.created_at).getTime(),
+    dailyPrompt: extras.dailyPrompt ? serializePrompt(extras.dailyPrompt) : null,
+    roomVibe: extras.roomVibe || [],
     posts: posts.map((post) => serializePost(post, reactionRows, activeReactionKeys)),
     heartbeats: heartbeats.map(serializeHeartbeat),
+  };
+}
+
+function serializePrompt(prompt) {
+  return {
+    id: prompt.id,
+    persistedId: prompt.id,
+    date: prompt.prompt_date,
+    text: prompt.prompt_text,
+    tone: prompt.tone,
+    isShuffled: false,
   };
 }
 
@@ -33,6 +46,7 @@ export function serializePost(post, reactionRows = [], activeReactionKeys = new 
     content: post.content,
     isAnonymous: post.is_anonymous,
     displayName: post.display_name || "",
+    promptId: post.prompt_id || "",
     createdAt: new Date(post.created_at).getTime(),
     reactions,
     activeReactions,
@@ -46,6 +60,10 @@ export function serializeHeartbeat(heartbeat) {
     vibeRead: heartbeat.vibe_read,
     digest: heartbeat.digest,
     uplift: heartbeat.uplift,
+    vibeWord: heartbeat.vibe_word || "alive",
+    topTheme: heartbeat.top_theme || "general work weather",
+    energyLevel: heartbeat.energy_level ?? 50,
+    cardLine: heartbeat.card_line || heartbeat.vibe_read,
     createdAt: new Date(heartbeat.created_at).getTime(),
   };
 }

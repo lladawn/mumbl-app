@@ -1,4 +1,5 @@
 import { makeHeartbeat } from "../../lib/heartbeat";
+import HeartbeatShareCard from "./HeartbeatShareCard";
 
 export default function HeartbeatView({ space }) {
   const heartbeats = space.heartbeats?.length ? space.heartbeats : [makeHeartbeat(space)];
@@ -13,6 +14,10 @@ export default function HeartbeatView({ space }) {
         <span>for the team, not management</span>
       </div>
       <div className="heartbeat-stack">
+        <HeartbeatShareCard heartbeat={heartbeat} />
+        <a className="share-button primary heartbeat-image-link" href={`/r/${space.slug}/heartbeat-card`} target="_blank" rel="noreferrer">
+          open image card
+        </a>
         <article className="heartbeat-card vibe">
           <h3>vibe this week</h3>
           <p>{heartbeat.vibeRead}</p>

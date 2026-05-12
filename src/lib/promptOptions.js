@@ -1,0 +1,16 @@
+export const dailyPromptOptions = [
+  { text: "what part of work felt weirdly harder than it should have today?", tone: "daily" },
+  { text: "what tiny win deserves more noise than it got?", tone: "win" },
+  { text: "what process is quietly eating everyone's patience?", tone: "spicy" },
+  { text: "what did someone do this week that made work less annoying?", tone: "win" },
+  { text: "what are we all pretending is fine?", tone: "spicy" },
+  { text: "what would make tomorrow 10% less cursed?", tone: "quiet" },
+  { text: "what should future-us remember about this week?", tone: "retro" },
+  { text: "what opinion are you only saying here because mumbl exists?", tone: "daily" },
+  { text: "what got shipped, fixed, found, or survived?", tone: "win" },
+  { text: "what meeting could have been a mumbl?", tone: "spicy" },
+  { text: "what felt obvious to everyone except the process?", tone: "spicy" },
+  { text: "what tiny paper cut keeps showing up?", tone: "quiet" },
+  { text: "what deserved a quieter thank-you this week?", tone: "win" },
+  { text: "what are we debugging emotionally, not technically?", tone: "daily" },
+];
