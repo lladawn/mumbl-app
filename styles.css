@@ -1014,6 +1014,253 @@ textarea:focus {
   }
 }
 
+.mission-view {
+  width: min(1160px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 42px 0 82px;
+}
+
+.mission-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  gap: clamp(22px, 5vw, 64px);
+  align-items: end;
+  min-height: calc(76vh - 68px);
+  padding-bottom: 36px;
+}
+
+.mission-hero-copy h1 {
+  max-width: 960px;
+  font-size: clamp(3.2rem, 8.4vw, 7.3rem);
+}
+
+.mission-hero-copy p {
+  max-width: 720px;
+  color: var(--muted);
+  font-size: clamp(1.08rem, 1.8vw, 1.32rem);
+  line-height: 1.55;
+}
+
+.mission-note {
+  display: grid;
+  gap: 12px;
+  padding: clamp(18px, 3vw, 26px);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--gold);
+  box-shadow: 6px 6px 0 var(--ink);
+  rotate: 1.5deg;
+}
+
+.mission-note span,
+.mission-statement span,
+.mission-heartbeat span,
+.mission-promises > p {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 900;
+  text-transform: lowercase;
+}
+
+.mission-note strong {
+  font-size: clamp(1.55rem, 3vw, 2.6rem);
+  line-height: 1.05;
+}
+
+.mission-split {
+  display: grid;
+  grid-template-columns: minmax(0, 0.98fr) minmax(280px, 0.72fr);
+  gap: 18px;
+  align-items: stretch;
+  margin-bottom: 18px;
+}
+
+.mission-statement,
+.mission-proof,
+.mission-belief,
+.mission-heartbeat,
+.mission-promises,
+.mission-closing {
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.mission-statement {
+  padding: clamp(22px, 4vw, 36px);
+  background: var(--blue);
+}
+
+.mission-statement p {
+  margin: 10px 0 0;
+  font-size: clamp(1.5rem, 3vw, 2.55rem);
+  font-weight: 850;
+  line-height: 1.13;
+}
+
+.mission-proof {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+  padding: clamp(20px, 3vw, 30px);
+}
+
+.mission-proof p {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(1rem, 1.6vw, 1.18rem);
+  line-height: 1.5;
+}
+
+.mission-proof p:first-child {
+  color: var(--ink);
+  font-weight: 850;
+}
+
+.mission-beliefs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.mission-belief {
+  padding: 20px;
+}
+
+.mission-belief:nth-child(1) {
+  background: var(--mint);
+}
+
+.mission-belief:nth-child(2) {
+  background: #fff8e4;
+}
+
+.mission-belief:nth-child(3) {
+  background: var(--clay);
+}
+
+.mission-belief h2 {
+  margin-bottom: 12px;
+  font-size: clamp(1.55rem, 2.8vw, 2.35rem);
+  line-height: 1;
+}
+
+.mission-belief p {
+  margin-bottom: 0;
+  color: rgba(22, 20, 18, 0.76);
+  line-height: 1.5;
+}
+
+.mission-heartbeat {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(280px, 1fr);
+  gap: clamp(18px, 4vw, 46px);
+  align-items: center;
+  margin-bottom: 18px;
+  padding: clamp(22px, 4vw, 38px);
+  background: var(--ink);
+  color: white;
+  box-shadow: 5px 5px 0 #9f8060;
+}
+
+.mission-heartbeat span {
+  color: var(--gold);
+}
+
+.mission-heartbeat h2 {
+  margin: 10px 0 0;
+  font-size: clamp(2rem, 4vw, 4rem);
+  line-height: 0.98;
+}
+
+.mission-heartbeat p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: clamp(1.05rem, 1.7vw, 1.24rem);
+  line-height: 1.56;
+}
+
+.mission-promises {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+  padding: 20px;
+  background: #fffefa;
+}
+
+.mission-promises > p {
+  margin: 8px 0 0;
+}
+
+.mission-promises div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mission-promises span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: 2px 2px 0 var(--ink);
+  font-size: 0.88rem;
+  font-weight: 850;
+}
+
+.mission-closing {
+  display: grid;
+  justify-items: start;
+  padding: clamp(24px, 5vw, 54px);
+  background: var(--violet);
+}
+
+.mission-closing h2 {
+  max-width: 840px;
+  margin-bottom: 12px;
+  font-size: clamp(2.55rem, 6vw, 5.8rem);
+  line-height: 0.9;
+}
+
+.mission-closing p {
+  max-width: 720px;
+  margin-bottom: 24px;
+  color: rgba(22, 20, 18, 0.76);
+  font-size: clamp(1.04rem, 1.8vw, 1.25rem);
+  line-height: 1.55;
+}
+
+@media (max-width: 860px) {
+  .mission-hero,
+  .mission-split,
+  .mission-heartbeat {
+    grid-template-columns: 1fr;
+  }
+
+  .mission-hero {
+    min-height: auto;
+  }
+
+  .mission-note {
+    rotate: 0deg;
+  }
+
+  .mission-beliefs {
+    grid-template-columns: 1fr;
+  }
+
+  .mission-promises {
+    grid-template-columns: 1fr;
+  }
+}
+
 .button-with-loader {
   display: inline-flex;
   align-items: center;

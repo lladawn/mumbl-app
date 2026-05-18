@@ -21,6 +21,9 @@ export default function AppShell({ children }) {
           <span>mumbl</span>
         </Link>
         <div className="topbar-actions">
+          <Link className="ghost-button button-link" href="/mission">
+            mission
+          </Link>
           <Link className="ghost-button button-link" href="/explore">
             explore
           </Link>
