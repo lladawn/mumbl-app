@@ -138,6 +138,13 @@ a {
   box-shadow: 2px 2px 0 #9f8060;
 }
 
+.share-button.saved {
+  border-color: var(--line-strong);
+  background: var(--panel);
+  color: var(--muted);
+  box-shadow: none;
+}
+
 .ghost-button {
   background: transparent;
   box-shadow: none;
@@ -1383,6 +1390,11 @@ input:disabled,
 textarea:disabled {
   cursor: wait;
   opacity: 0.68;
+}
+
+.share-button.saved:disabled {
+  cursor: default;
+  opacity: 1;
 }
 
 button:disabled:hover {

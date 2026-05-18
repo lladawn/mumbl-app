@@ -6,13 +6,24 @@ import { trackEvent } from "../../lib/analytics";
 export default function PublicSpacePanel({ space, updateVisibility, onToast }) {
   const [isPublic, setIsPublic] = useState(space.isPublic);
   const [publicName, setPublicName] = useState(space.publicName || space.name);
+  const [savedSettings, setSavedSettings] = useState({
+    isPublic: space.isPublic,
+    publicName: space.publicName || space.name,
+  });
   const [isSaving, setIsSaving] = useState(false);
+  const cleanPublicName = publicName.trim();
+  const hasChanges =
+    isPublic !== savedSettings.isPublic ||
+    (isPublic && cleanPublicName !== savedSettings.publicName);
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (!hasChanges) return;
+
     setIsSaving(true);
     try {
-      await updateVisibility({ isPublic, publicName });
+      await updateVisibility({ isPublic, publicName: cleanPublicName });
+      setSavedSettings({ isPublic, publicName: cleanPublicName });
       trackEvent("public_space_saved", { enabled: isPublic });
       onToast(isPublic ? "this space now contributes anonymised themes." : "this space is private again.");
     } catch (error) {
@@ -41,9 +52,9 @@ export default function PublicSpacePanel({ space, updateVisibility, onToast }) {
         public display name
         <input value={publicName} onChange={(event) => setPublicName(event.target.value)} placeholder={space.name} disabled={isSaving} />
       </label>
-      <button className="share-button primary button-with-loader" type="submit" disabled={isSaving}>
+      <button className={`share-button primary button-with-loader ${hasChanges ? "" : "saved"}`} type="submit" disabled={isSaving || !hasChanges}>
         {isSaving && <span className="mini-loader" aria-hidden="true" />}
-        {isSaving ? "saving..." : "save"}
+        {isSaving ? "saving..." : hasChanges ? "save changes" : "saved"}
       </button>
     </form>
   );

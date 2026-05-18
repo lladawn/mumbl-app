@@ -24,9 +24,6 @@ export default function AppShell({ children }) {
           <Link className="ghost-button button-link" href="/mission">
             mission
           </Link>
-          <Link className="ghost-button button-link" href="/explore">
-            explore
-          </Link>
           <button className="ghost-button" type="button" onClick={() => setJoinOpen(true)}>
             join a space
           </button>
