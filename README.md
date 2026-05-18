@@ -41,12 +41,14 @@ http://127.0.0.1:3000/
 - Share-copy actions for link, Slack, X, and WhatsApp
 - Aggregate-only `/explore` page for public-space culture pulse
 - Open demo room at `/r/it-works-on-my-machine` for trying Mumbl before creating a team space
+- Side Quests: short-lived anonymous 2-person backchannels inside a room
 
 ## Product Principles
 
 - Anonymous by default. Users opt into identity, not out of it.
 - The heartbeat is for the team, not management.
 - Reactions are signal, not decoration.
+- Side Quests are same-room only, anonymous, temporary, and never a member or visitor count.
 - The product should sound like a trusted engineer, not HR software.
 
 ## Backend Direction
@@ -71,7 +73,7 @@ The frontend now uses these backend route handlers for spaces, posts, reactions,
 
 1. Create a Supabase project.
 2. Copy `.env.example` to `.env.local`.
-3. Fill in `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `MUMBL_TOKEN_HASH_SECRET`, and `CRON_SECRET`.
+3. Fill in `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `MUMBL_TOKEN_HASH_SECRET`, `MUMBL_SIDE_QUEST_ENCRYPTION_KEY`, and `CRON_SECRET`.
 4. Authenticate the Supabase CLI with `npx supabase login`.
 5. Run `npm run db:link -- your-project-ref` or `npm run db:link -- https://your-project.supabase.co`.
    `npm run db:link:staging` reads `.env.local`; `npm run db:link:prod` reads `.env.production.local`.
@@ -98,6 +100,7 @@ GitHub Actions runs `npm ci` and `npm run build` on pushes and pull requests to 
 ## Scaling
 
 Prompt rotation, heartbeat job queueing, rate limits, and pooler notes are documented in [docs/scaling.md](/Users/dawn/Code/mumbl-app/docs/scaling.md).
+Free-tier tradeoffs and future upgrade paths are documented in [docs/free-tier-compromises.md](/Users/dawn/Code/mumbl-app/docs/free-tier-compromises.md).
 
 ## Current Stack
 

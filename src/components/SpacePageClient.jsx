@@ -13,6 +13,7 @@ import PostCard from "./space/PostCard";
 import SharePanel from "./space/SharePanel";
 import PublicSpacePanel from "./space/PublicSpacePanel";
 import RoomVibeBar from "./space/RoomVibeBar";
+import SideQuestsPanel from "./space/SideQuestsPanel";
 import Toast from "./Toast";
 
 export default function SpacePageClient({ slug, tab }) {
@@ -143,6 +144,7 @@ export default function SpacePageClient({ slug, tab }) {
           {activeTab === "heartbeat" && <HeartbeatView space={space} />}
         </div>
         <aside className="side-panel">
+          <SideQuestsPanel space={space} onToast={setToast} />
           <SharePanel space={space} copyText={copyText} />
           <div className="note-card">
             <h3>for the team</h3>
