@@ -35,10 +35,10 @@ const beliefs = [
 ];
 
 const promises = [
-  "no manager-only dashboard",
-  "no individual posts on explore",
-  "no visitor, join, or lurker tracking",
-  "no corporate wellness voice",
+  "no secret manager room",
+  "no public wall of private posts",
+  "no tracking who peeked in",
+  "no wellness theater",
 ];
 
 export default function MissionPage() {
@@ -103,9 +103,10 @@ export default function MissionPage() {
         </p>
       </div>
 
-      <div className="mission-promises" aria-label="mumbl will not do these things">
-        <p>the product line we keep</p>
+      <div className="mission-promises" aria-label="the line mumbl does not cross">
+        <p>the line we do not cross</p>
         <div>
+          <strong>If it makes people feel watched, scored, or managed, it stays out.</strong>
           {promises.map((promise) => (
             <span key={promise}>{promise}</span>
           ))}

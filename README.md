@@ -40,6 +40,7 @@ http://127.0.0.1:3000/
 - Heartbeat tab with weekly history and vibe-over-time from anonymised backend data
 - Share-copy actions for link, Slack, X, and WhatsApp
 - Aggregate-only `/explore` page for public-space culture pulse
+- Open demo room at `/r/it-works-on-my-machine` for trying Mumbl before creating a team space
 
 ## Product Principles
 
@@ -55,6 +56,8 @@ Use Supabase Postgres behind Next.js route handlers. Keep writes server-mediated
 ## Public Spaces
 
 Spaces are private by default. Creators can opt in from the room sidebar to contribute anonymised aggregate themes to Mumbl Explore. Individual posts are never shown publicly, and public names are optional.
+
+The open demo room is the intentional exception: `/r/it-works-on-my-machine` is public by design so people can try the product without a team invite. Team spaces stay private by default, and `/explore` stays aggregate-only.
 
 ## Heartbeats
 

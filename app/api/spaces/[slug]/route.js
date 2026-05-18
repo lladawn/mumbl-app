@@ -1,5 +1,6 @@
 import { badRequest, notFound, ok, serverError } from "../../../../src/server/http";
 import { hashToken } from "../../../../src/server/hash";
+import { getOrCreatePublicDemoRoom } from "../../../../src/server/demoRoom";
 import { getTopReactionLabels, startOfTodayIso } from "../../../../src/server/roomVibe";
 import { serializeSpace, summariseReactions } from "../../../../src/server/serializers";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
@@ -15,8 +16,12 @@ export async function GET(request, { params }) {
     const sessionTokenHash = sessionToken ? hashToken(sessionToken) : null;
     const supabase = getSupabaseAdmin();
 
-    const { data: space, error: spaceError } = await supabase.from("spaces").select("*").eq("slug", slug).single();
-    if (spaceError?.code === "PGRST116") return notFound("space not found");
+    let { data: space, error: spaceError } = await supabase.from("spaces").select("*").eq("slug", slug).single();
+    if (spaceError?.code === "PGRST116") {
+      space = await getOrCreatePublicDemoRoom(supabase, slug);
+      if (!space) return notFound("space not found");
+      spaceError = null;
+    }
     if (spaceError) throw spaceError;
 
     const { data: posts, error: postsError } = await supabase

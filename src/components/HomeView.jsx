@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useRecentSlug } from "../hooks/useRecentSlug";
+import { publicDemoRoom } from "../lib/constants";
 import JoinModal from "./JoinModal";
 
 export default function HomeView() {
@@ -25,10 +26,18 @@ export default function HomeView() {
             <Link className="solid-button button-link" href="/create">
               create your space
             </Link>
+            <Link className="ghost-button button-link" href={publicDemoRoom.href}>
+              try the open room
+            </Link>
             <button className="ghost-button" type="button" onClick={() => setJoinOpen(true)}>
               already have a link?
             </button>
           </div>
+          <Link className="open-room-strip" href={publicDemoRoom.href} aria-label={`try the ${publicDemoRoom.name} public room`}>
+            <span>public demo room</span>
+            <strong>{publicDemoRoom.slug}</strong>
+            <em>anonymous by default · public by choice</em>
+          </Link>
         </div>
         <div className="artifact-board" aria-label="mumbl room preview">
           <div className="artifact feed">
@@ -49,6 +58,14 @@ export default function HomeView() {
             <strong>drop it on mumbl</strong>
             <p className="muted">someone else is probably already thinking it.</p>
           </div>
+          <Link className="artifact open-room" href={publicDemoRoom.href} aria-label={`open ${publicDemoRoom.name}`}>
+            <div className="artifact-title">
+              <span>open room</span>
+              <span>public</span>
+            </div>
+            <strong>{publicDemoRoom.slug}</strong>
+            <p className="muted">peek in. post once. leave no badge behind.</p>
+          </Link>
         </div>
       </section>
 

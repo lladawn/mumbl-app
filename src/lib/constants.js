@@ -34,3 +34,10 @@ export const postTypes = {
 };
 
 export const validTabs = ["feed", "wins", "heartbeat"];
+
+export const publicDemoRoom = {
+  slug: "it-works-on-my-machine",
+  name: "it works on my machine",
+  href: "/r/it-works-on-my-machine",
+  tagline: "the public room for tiny rants, weird finds, and safe test mumbles.",
+};

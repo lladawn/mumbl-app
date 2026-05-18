@@ -210,6 +210,16 @@ breaking everything their product is built on. this is mumbl's permanent moat.
 this is a v2 feature. do not build it in v1. but design the data model to
 support it from day one (see schema additions below).
 
+### public demo room — the one exception
+
+`/r/it-works-on-my-machine` is the intentional open room for trying mumbl
+without a team invite. It is public by design, clearly labelled as public, and
+seeded with a few anonymous starter posts so the room does not feel dead.
+
+This does not change the private-room promise. Team spaces are still private by
+default. `/explore` is still aggregate-only and must not show individual public
+posts. The demo room is a front door, not a new analytics or community surface.
+
 ### what it is
 
 spaces are private by default. creators can opt in to make their space public.

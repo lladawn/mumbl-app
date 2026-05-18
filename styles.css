@@ -245,6 +245,41 @@ h1 {
   padding: 0 18px;
 }
 
+.open-room-strip {
+  display: grid;
+  width: min(100%, 560px);
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  background: #fffefa;
+  box-shadow: 3px 3px 0 var(--ink);
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.open-room-strip:hover {
+  background: var(--mint);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.open-room-strip span,
+.open-room-strip em,
+.join-open-room span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 900;
+  text-transform: lowercase;
+}
+
+.open-room-strip strong {
+  margin: 4px 0;
+  font-size: clamp(1.3rem, 2.8vw, 2.05rem);
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
 .artifact-board {
   position: relative;
   min-height: 560px;
@@ -280,6 +315,27 @@ h1 {
   padding: 16px;
   rotate: -5deg;
   background: var(--mint);
+}
+
+.artifact.open-room {
+  right: 22px;
+  top: 220px;
+  width: min(76%, 360px);
+  padding: 16px;
+  background: var(--clay);
+  rotate: 2deg;
+}
+
+.artifact.open-room strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: clamp(1.2rem, 2.8vw, 1.75rem);
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.artifact.open-room p {
+  margin-bottom: 0;
 }
 
 .artifact-title {
@@ -762,6 +818,34 @@ textarea:focus {
   width: min(520px, 100%);
 }
 
+.join-open-room {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: #fffefa;
+}
+
+.join-open-room strong {
+  font-size: clamp(1.15rem, 4vw, 1.55rem);
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.join-open-room p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.join-open-room .ghost-button {
+  width: fit-content;
+  margin-top: 2px;
+}
+
 .toast {
   position: fixed;
   right: 18px;
@@ -822,8 +906,18 @@ textarea:focus {
     display: none;
   }
 
-  .topbar-actions .ghost-button {
+  .topbar-actions button.ghost-button {
     display: none;
+  }
+
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  .topbar-actions .button-link {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 0.86rem;
   }
 
   .vibe-grid,
@@ -841,6 +935,14 @@ textarea:focus {
 
   .artifact.heartbeat {
     width: 88%;
+  }
+
+  .artifact.open-room {
+    left: 72px;
+    right: 0;
+    top: 212px;
+    width: auto;
+    rotate: 0deg;
   }
 
   .post-card {
@@ -1200,6 +1302,14 @@ textarea:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.mission-promises strong {
+  flex: 1 0 100%;
+  max-width: 680px;
+  margin-bottom: 4px;
+  font-size: clamp(1.18rem, 2.3vw, 1.75rem);
+  line-height: 1.12;
 }
 
 .mission-promises span {
