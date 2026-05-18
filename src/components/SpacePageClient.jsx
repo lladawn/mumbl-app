@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trackEvent } from "../lib/analytics";
 import { postTypes, validTabs, vibes } from "../lib/constants";
+import { getCreatorToken } from "../lib/storage";
 import { useRemoteSpace } from "../hooks/useRemoteSpace";
 import ComposeBox from "./space/ComposeBox";
 import HeartbeatView from "./space/HeartbeatView";
@@ -18,7 +19,12 @@ export default function SpacePageClient({ slug, tab }) {
   const { space, status, error, submitPost, toggleReaction, dismissFirstPost, updateVisibility } = useRemoteSpace(slug);
   const [selectedType, setSelectedType] = useState("thought");
   const [composeAnonymous, setComposeAnonymous] = useState(true);
+  const [hasCreatorToken, setHasCreatorToken] = useState(false);
   const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    setHasCreatorToken(Boolean(getCreatorToken(slug)));
+  }, [slug]);
 
   async function copyText(text, message, target = "copy") {
     try {
@@ -142,7 +148,7 @@ export default function SpacePageClient({ slug, tab }) {
             <h3>for the team</h3>
             <p>the heartbeat is generated from anonymised posts and reactions. no manager cave, no separate dashboard.</p>
           </div>
-          <PublicSpacePanel space={space} updateVisibility={updateVisibility} onToast={setToast} />
+          {hasCreatorToken && <PublicSpacePanel space={space} updateVisibility={updateVisibility} onToast={setToast} />}
         </aside>
       </div>
 

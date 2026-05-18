@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { publicDemoRoom } from "../lib/constants";
 
 export default function JoinModal({ recentSlug, navigate, close }) {
   const [joinValue, setJoinValue] = useState("");
@@ -43,6 +44,21 @@ export default function JoinModal({ recentSlug, navigate, close }) {
             )}
           </div>
         </form>
+        <div className="join-open-room">
+          <span>no invite yet?</span>
+          <strong>{publicDemoRoom.slug}</strong>
+          <p>try mumbl in the open. this room is public; team rooms stay private by default.</p>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => {
+              navigate(publicDemoRoom.href);
+              close();
+            }}
+          >
+            enter open room
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -15,10 +15,10 @@ export default function sitemap() {
       priority: 0.8,
     },
     {
-      url: `${appUrl}/explore`,
+      url: `${appUrl}/mission`,
       lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 0.7,
+      changeFrequency: "monthly",
+      priority: 0.8,
     },
   ];
 }
