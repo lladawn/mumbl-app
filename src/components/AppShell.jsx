@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useRecentSlug } from "../hooks/useRecentSlug";
+import { feedbackRoom } from "../lib/constants";
 import JoinModal from "./JoinModal";
 
 export default function AppShell({ children }) {
@@ -23,6 +24,9 @@ export default function AppShell({ children }) {
         <div className="topbar-actions">
           <Link className="ghost-button button-link" href="/mission">
             mission
+          </Link>
+          <Link className="ghost-button button-link topbar-feedback" href={feedbackRoom.href}>
+            help shape mumbl
           </Link>
           <button className="ghost-button" type="button" onClick={() => setJoinOpen(true)}>
             join a space

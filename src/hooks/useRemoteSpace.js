@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createRemotePost, dismissRemoteFirstPost, fetchSpace, toggleRemoteReaction, updateRemoteSpaceVisibility } from "../lib/api";
+import {
+  createRemotePost,
+  dismissRemoteFirstPost,
+  fetchSpace,
+  toggleRemoteReaction,
+  updateRemoteSpaceDescription,
+  updateRemoteSpaceVisibility,
+} from "../lib/api";
 
 export function useRemoteSpace(slug) {
   const [space, setSpace] = useState(null);
@@ -46,6 +53,11 @@ export function useRemoteSpace(slug) {
     await refresh();
   }
 
+  async function updateDescription(input) {
+    await updateRemoteSpaceDescription({ slug, ...input });
+    await refresh();
+  }
+
   return {
     space,
     status,
@@ -55,5 +67,6 @@ export function useRemoteSpace(slug) {
     toggleReaction,
     dismissFirstPost,
     updateVisibility,
+    updateDescription,
   };
 }

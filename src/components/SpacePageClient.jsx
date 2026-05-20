@@ -12,12 +12,13 @@ import LoadingMark from "./LoadingMark";
 import PostCard from "./space/PostCard";
 import SharePanel from "./space/SharePanel";
 import PublicSpacePanel from "./space/PublicSpacePanel";
+import RoomDescriptionPanel from "./space/RoomDescriptionPanel";
 import RoomVibeBar from "./space/RoomVibeBar";
 import SideQuestsPanel from "./space/SideQuestsPanel";
 import Toast from "./Toast";
 
 export default function SpacePageClient({ slug, tab }) {
-  const { space, status, error, submitPost, toggleReaction, dismissFirstPost, updateVisibility } = useRemoteSpace(slug);
+  const { space, status, error, submitPost, toggleReaction, dismissFirstPost, updateVisibility, updateDescription } = useRemoteSpace(slug);
   const [selectedType, setSelectedType] = useState("thought");
   const [composeAnonymous, setComposeAnonymous] = useState(true);
   const [hasCreatorToken, setHasCreatorToken] = useState(false);
@@ -78,6 +79,7 @@ export default function SpacePageClient({ slug, tab }) {
         <div className="space-title">
           <h1>{space.name}</h1>
           <p>{vibes[space.vibe].label} · created {formatCreatedDate(space.createdAt)}</p>
+          {space.description && <p className={`space-description vibe-${space.vibe}`}>{space.description}</p>}
           {space.isPublic && <span className="public-badge">contributing to mumbl explore</span>}
         </div>
       </div>
@@ -150,6 +152,7 @@ export default function SpacePageClient({ slug, tab }) {
             <h3>for the team</h3>
             <p>the heartbeat is generated from anonymised posts and reactions. no manager cave, no separate dashboard.</p>
           </div>
+          {hasCreatorToken && <RoomDescriptionPanel space={space} updateDescription={updateDescription} onToast={setToast} />}
           {hasCreatorToken && <PublicSpacePanel space={space} updateVisibility={updateVisibility} onToast={setToast} />}
         </aside>
       </div>

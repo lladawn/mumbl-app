@@ -51,6 +51,18 @@ export async function updateRemoteSpaceVisibility({ slug, isPublic, publicName }
   return parseJson(response);
 }
 
+export async function updateRemoteSpaceDescription({ slug, description }) {
+  const response = await fetch(`/api/spaces/${slug}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      creatorToken: getCreatorToken(slug),
+      description,
+    }),
+  });
+  return parseJson(response);
+}
+
 export async function dismissRemoteFirstPost(slug) {
   const response = await fetch(`/api/spaces/${slug}/first-post-dismissed`, {
     method: "POST",

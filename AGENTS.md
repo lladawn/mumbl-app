@@ -107,6 +107,7 @@ Mumbl is currently designed and operated against free-tier services where practi
 Build the usable product surface, not a marketing shell.
 
 - Match the existing visual system and plain CSS approach.
+- When adding a new element to an existing page, design it as part of that page's current theme, rhythm, and hierarchy. Think like a designer-builder: notice spacing, density, typography, color, interaction states, and the job the page is already doing before introducing a new control, panel, badge, or section.
 - Keep workflows direct and low-friction.
 - Do not add explanatory in-app text about how features work unless the user needs it to proceed.
 - Avoid dashboard-like analytics UI unless it is explicitly aggregate and product-approved.

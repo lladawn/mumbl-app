@@ -1,6 +1,6 @@
 import { badRequest, notFound, ok, serverError } from "../../../../src/server/http";
 import { hashToken } from "../../../../src/server/hash";
-import { getOrCreatePublicDemoRoom } from "../../../../src/server/demoRoom";
+import { getOrCreateKnownPublicRoom } from "../../../../src/server/demoRoom";
 import { getTopReactionLabels, startOfTodayIso } from "../../../../src/server/roomVibe";
 import { serializeSpace, summariseReactions } from "../../../../src/server/serializers";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
@@ -18,7 +18,7 @@ export async function GET(request, { params }) {
 
     let { data: space, error: spaceError } = await supabase.from("spaces").select("*").eq("slug", slug).single();
     if (spaceError?.code === "PGRST116") {
-      space = await getOrCreatePublicDemoRoom(supabase, slug);
+      space = await getOrCreateKnownPublicRoom(supabase, slug);
       if (!space) return notFound("space not found");
       spaceError = null;
     }
@@ -70,11 +70,21 @@ export async function PATCH(request, { params }) {
     const { slug } = await params;
     const body = await request.json();
     const creatorToken = cleanString(body.creatorToken, 256);
-    const isPublic = body.isPublic === true;
-    const publicName = isPublic ? cleanString(body.publicName, 80) || null : null;
+    const updates = {};
+
+    if (Object.hasOwn(body, "isPublic")) {
+      const isPublic = body.isPublic === true;
+      updates.is_public = isPublic;
+      updates.public_name = isPublic ? cleanString(body.publicName, 80) || null : null;
+    }
+
+    if (Object.hasOwn(body, "description")) {
+      updates.description = cleanString(body.description, 180) || null;
+    }
 
     if (!slug) return badRequest("space slug is required");
     if (!creatorToken) return badRequest("creator token is required");
+    if (!Object.keys(updates).length) return badRequest("no space settings to update");
 
     const supabase = getSupabaseAdmin();
     const { data: space, error: spaceError } = await supabase
@@ -91,7 +101,7 @@ export async function PATCH(request, { params }) {
 
     const { data: updatedSpace, error: updateError } = await supabase
       .from("spaces")
-      .update({ is_public: isPublic, public_name: publicName })
+      .update(updates)
       .eq("id", space.id)
       .select("*")
       .single();

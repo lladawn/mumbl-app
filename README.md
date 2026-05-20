@@ -33,6 +33,7 @@ http://127.0.0.1:3000/
 - Create-space flow with vibe picker
 - Real routes for `/create` and `/r/:slug/:tab`
 - Creator-first post prompt before sharing
+- Optional creator-managed room note after creation
 - Space feed with post types: `thought`, `rant`, `win`, `find`, `lol`
 - Anonymous-first compose flow with optional display handle
 - Phrase-based reactions with local session dedupe

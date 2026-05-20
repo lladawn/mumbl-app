@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { publicDemoRoom } from "../lib/constants";
+import { feedbackRoom, publicDemoRoom } from "../lib/constants";
 
 export default function JoinModal({ recentSlug, navigate, close }) {
   const [joinValue, setJoinValue] = useState("");
@@ -57,6 +57,16 @@ export default function JoinModal({ recentSlug, navigate, close }) {
             }}
           >
             enter open room
+          </button>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => {
+              navigate(feedbackRoom.href);
+              close();
+            }}
+          >
+            help shape mumbl
           </button>
         </div>
       </div>
