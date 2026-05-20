@@ -48,6 +48,13 @@ textarea {
   font: inherit;
 }
 
+button,
+input,
+textarea,
+a {
+  touch-action: manipulation;
+}
+
 button {
   cursor: pointer;
 }
@@ -485,6 +492,7 @@ textarea {
   border-radius: var(--radius);
   background: #fffefa;
   color: var(--ink);
+  font-size: 16px;
   outline: none;
 }
 
@@ -735,6 +743,39 @@ textarea:focus {
   margin-top: 16px;
 }
 
+.feed-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 0 4px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.feed-pagination span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.feed-pagination .ghost-button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 0.82rem;
+}
+
+.feed-pagination .ghost-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.feed-end {
+  color: var(--faint);
+}
+
 .post-card {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
@@ -922,7 +963,6 @@ textarea:focus {
 .side-quest-form textarea,
 .tiny-room-compose textarea {
   min-height: 72px;
-  font-size: 0.9rem;
 }
 
 .side-quest-list {
@@ -1271,10 +1311,15 @@ textarea:focus {
   .vibe-grid,
   .type-grid,
   .share-link-row,
-  .feed-actions {
+  .feed-actions,
+  .feed-pagination {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .feed-pagination .ghost-button {
+    width: 100%;
   }
 
   .artifact.feed {

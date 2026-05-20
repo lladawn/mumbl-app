@@ -16,6 +16,13 @@ export function serializeSpace(space, posts = [], heartbeats = [], reactionRows 
     createdAt: new Date(space.created_at).getTime(),
     dailyPrompt: extras.dailyPrompt ? serializePrompt(extras.dailyPrompt) : null,
     roomVibe: extras.roomVibe || [],
+    postsPage: extras.postsPage || {
+      limit: posts.length,
+      count: posts.length,
+      hasMore: false,
+      nextCursor: "",
+      type: "",
+    },
     posts: posts.map((post) => serializePost(post, reactionRows, activeReactionKeys)),
     heartbeats: heartbeats.map(serializeHeartbeat),
   };

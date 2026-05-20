@@ -26,12 +26,6 @@ export default function HomeView() {
             <Link className="solid-button button-link" href="/create">
               create your space
             </Link>
-            <Link className="ghost-button button-link" href={publicDemoRoom.href}>
-              try the open room
-            </Link>
-            <Link className="ghost-button button-link" href={feedbackRoom.href}>
-              help shape mumbl
-            </Link>
             <button className="ghost-button" type="button" onClick={() => setJoinOpen(true)}>
               already have a link?
             </button>

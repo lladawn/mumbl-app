@@ -1,8 +1,13 @@
 import { getCreatorToken, loadSession, rememberRecentSlug, saveCreatorToken } from "./storage";
 
-export async function fetchSpace(slug) {
+export async function fetchSpace(slug, { limit, before, type } = {}) {
   const sessionToken = loadSession();
-  const response = await fetch(`/api/spaces/${slug}?sessionToken=${encodeURIComponent(sessionToken)}`, {
+  const params = new URLSearchParams({ sessionToken });
+  if (limit) params.set("limit", String(limit));
+  if (before) params.set("before", before);
+  if (type) params.set("type", type);
+
+  const response = await fetch(`/api/spaces/${slug}?${params.toString()}`, {
     cache: "no-store",
   });
   const data = await parseJson(response);

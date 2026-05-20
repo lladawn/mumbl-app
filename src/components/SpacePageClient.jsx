@@ -18,7 +18,20 @@ import SideQuestsPanel from "./space/SideQuestsPanel";
 import Toast from "./Toast";
 
 export default function SpacePageClient({ slug, tab }) {
-  const { space, status, error, submitPost, toggleReaction, dismissFirstPost, updateVisibility, updateDescription } = useRemoteSpace(slug);
+  const activeTab = validTabs.includes(tab) ? tab : "feed";
+  const postTypeFilter = activeTab === "wins" ? "win" : "";
+  const {
+    space,
+    status,
+    pageStatus,
+    error,
+    submitPost,
+    toggleReaction,
+    loadOlderPosts,
+    dismissFirstPost,
+    updateVisibility,
+    updateDescription,
+  } = useRemoteSpace(slug, postTypeFilter);
   const [selectedType, setSelectedType] = useState("thought");
   const [composeAnonymous, setComposeAnonymous] = useState(true);
   const [hasCreatorToken, setHasCreatorToken] = useState(false);
@@ -69,9 +82,19 @@ export default function SpacePageClient({ slug, tab }) {
     );
   }
 
-  const activeTab = validTabs.includes(tab) ? tab : "feed";
+  if (status === "loading" && (space.postsPage?.type || "") !== postTypeFilter) {
+    return (
+      <section className="create-view">
+        <div className="panel loading-panel" aria-live="polite" aria-busy="true">
+          <LoadingMark />
+          <h2>pulling that slice.</h2>
+          <p className="panel-copy">keeping the room light while the older mumbls stay close.</p>
+        </div>
+      </section>
+    );
+  }
+
   const posts = [...space.posts].sort((a, b) => b.createdAt - a.createdAt);
-  const wins = posts.filter((post) => post.type === "win");
 
   return (
     <section className="space-view">
@@ -139,12 +162,24 @@ export default function SpacePageClient({ slug, tab }) {
                   }
                 }}
               />
-              <PostList posts={posts} space={space} toggleReaction={toggleReactionWithToast(toggleReaction, setToast)} />
+              <PostList
+                posts={posts}
+                space={space}
+                toggleReaction={toggleReactionWithToast(toggleReaction, setToast)}
+                loadOlderPosts={loadOlderPosts}
+                pageStatus={pageStatus}
+              />
             </>
           )}
 
           {activeTab === "wins" && (
-            <WinsView posts={wins} space={space} toggleReaction={toggleReactionWithToast(toggleReaction, setToast)} />
+            <WinsView
+              posts={posts}
+              space={space}
+              toggleReaction={toggleReactionWithToast(toggleReaction, setToast)}
+              loadOlderPosts={loadOlderPosts}
+              pageStatus={pageStatus}
+            />
           )}
 
           {activeTab === "heartbeat" && <HeartbeatView space={space} />}
@@ -174,15 +209,36 @@ function TabLink({ slug, tab, activeTab, children }) {
   );
 }
 
-function WinsView({ posts, space, toggleReaction }) {
-  return <PostList posts={posts} space={space} toggleReaction={toggleReaction} emptyText="no wins yet. rude of the week, honestly." />;
+function WinsView({ posts, space, toggleReaction, loadOlderPosts, pageStatus }) {
+  return (
+    <PostList
+      posts={posts}
+      space={space}
+      toggleReaction={toggleReaction}
+      loadOlderPosts={loadOlderPosts}
+      pageStatus={pageStatus}
+      emptyText="no wins yet. rude of the week, honestly."
+    />
+  );
 }
 
 function formatCreatedDate(timestamp) {
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(timestamp));
 }
 
-function PostList({ posts, space, toggleReaction, emptyText = "quiet room. dangerous. drop the first mumbl." }) {
+function PostList({
+  posts,
+  space,
+  toggleReaction,
+  loadOlderPosts,
+  pageStatus,
+  emptyText = "quiet room. dangerous. drop the first mumbl.",
+}) {
+  const page = space.postsPage || {};
+  const hasMore = Boolean(page.hasMore);
+  const loadedCount = posts.length;
+  const totalCount = page.count || loadedCount;
+
   return (
     <div className="feed-list">
       {posts.length ? (
@@ -190,6 +246,26 @@ function PostList({ posts, space, toggleReaction, emptyText = "quiet room. dange
       ) : (
         <div className="empty-state">{emptyText}</div>
       )}
+      {posts.length ? (
+        <div className="feed-pagination" aria-live="polite">
+          <span>
+            showing {loadedCount} of {totalCount} mumbl{totalCount === 1 ? "" : "s"}
+          </span>
+          {hasMore ? (
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={loadOlderPosts}
+              disabled={pageStatus === "loading"}
+              aria-busy={pageStatus === "loading"}
+            >
+              {pageStatus === "loading" ? "loading older..." : "load older"}
+            </button>
+          ) : (
+            <span className="feed-end">you hit the basement</span>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
