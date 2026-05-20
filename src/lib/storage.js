@@ -5,7 +5,7 @@ export const CREATOR_TOKEN_PREFIX = "mumbl:creator-token:";
 export function loadSession() {
   const existing = window.localStorage.getItem(SESSION_KEY);
   if (existing) return existing;
-  const created = window.crypto.randomUUID();
+  const created = createSessionToken();
   window.localStorage.setItem(SESSION_KEY, created);
   return created;
 }
@@ -35,4 +35,19 @@ export function timeAgo(timestamp) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+function createSessionToken() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+
+  if (window.crypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
+  return `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }

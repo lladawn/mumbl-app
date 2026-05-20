@@ -108,6 +108,8 @@ Build the usable product surface, not a marketing shell.
 
 - Match the existing visual system and plain CSS approach.
 - When adding a new element to an existing page, design it as part of that page's current theme, rhythm, and hierarchy. Think like a designer-builder: notice spacing, density, typography, color, interaction states, and the job the page is already doing before introducing a new control, panel, badge, or section.
+- Design every feature for both desktop and mobile from the start. Decide where the workflow lives at wide widths and at narrow widths, verify controls remain discoverable and reachable in both, and avoid making a desktop sidebar the only access point for a core action on mobile.
+- For new product concepts, teach through in-context affordances: clear labels, one-line job-to-be-done copy, useful empty states, and progressive disclosure near the action. Do not add broad Product/Features nav or explanatory pages unless discovery cannot be solved inside the actual workflow.
 - Keep workflows direct and low-friction.
 - Do not add explanatory in-app text about how features work unless the user needs it to proceed.
 - Avoid dashboard-like analytics UI unless it is explicitly aggregate and product-approved.

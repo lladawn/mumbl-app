@@ -97,6 +97,10 @@ export default function SpacePageClient({ slug, tab }) {
               heartbeat
             </TabLink>
           </div>
+          <a className="side-quest-mobile-link" href="#side-quests">
+            <span>side quests</span>
+            <small>tiny anonymous room with someone here</small>
+          </a>
 
           {activeTab === "feed" && (
             <>

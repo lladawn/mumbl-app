@@ -181,13 +181,18 @@ export default function SideQuestsPanel({ space, onToast }) {
       const { message: created } = await sendSideQuestMessage({ roomId: room.id, message: trimmed });
       setRoom({ ...room, messages: [...room.messages, created] });
       setMessage("");
-      trackEvent("side_quest_message_sent");
     } catch (error) {
-      trackEvent("side_quest_message_failed");
       onToast(error.message || "message bounced.");
     } finally {
       setIsSending(false);
     }
+  }
+
+  function handleMessageKeyDown(event) {
+    if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.nativeEvent?.isComposing) return;
+    event.preventDefault();
+    handleSend(event);
   }
 
   async function closeRoom(action) {
@@ -216,17 +221,26 @@ export default function SideQuestsPanel({ space, onToast }) {
   }
 
   return (
-    <section className="panel side-quests-panel" aria-live="polite">
+    <section className="panel side-quests-panel" id="side-quests" aria-live="polite">
       <div className="side-quests-header">
         <div>
           <h3>side quests</h3>
-          <p>{room ? "two-person mumbl. expires before it gets weird." : "tiny anonymous backchannels for this room."}</p>
+          <p>{room ? "two-person mumbl. expires before it gets weird." : "tiny anonymous rooms with someone in this space."}</p>
         </div>
         <span>{room ? "room" : ownedCards.length ? "live" : "board"}</span>
       </div>
 
       {room ? (
-        <TinyRoom room={room} message={message} setMessage={setMessage} isBusy={isBusy || isSending} onSend={handleSend} onLeave={() => closeRoom("leave")} onReport={() => closeRoom("report")} />
+        <TinyRoom
+          room={room}
+          message={message}
+          setMessage={setMessage}
+          isBusy={isBusy || isSending}
+          onSend={handleSend}
+          onMessageKeyDown={handleMessageKeyDown}
+          onLeave={() => closeRoom("leave")}
+          onReport={() => closeRoom("report")}
+        />
       ) : (
         <>
           <form className="side-quest-form" onSubmit={handleCreate}>
@@ -247,7 +261,7 @@ export default function SideQuestsPanel({ space, onToast }) {
             />
             <button className="share-button primary button-with-loader" type="submit" disabled={isBusy}>
               {isBusy && <span className="mini-loader" aria-hidden="true" />}
-              {kind === "need" ? "post side quest" : "pin yourself up"}
+              {kind === "need" ? "need a tiny room" : "open to a tiny room"}
             </button>
           </form>
 
@@ -259,7 +273,7 @@ export default function SideQuestsPanel({ space, onToast }) {
                 <QuestCard card={card} key={card.id} isBusy={isBusy} onPick={() => handlePick(card)} onAccept={() => handleAccept(card)} onCancel={() => handleCancel(card)} />
               ))
             ) : (
-              <div className="side-quest-empty">no quests on the board. suspiciously peaceful.</div>
+              <div className="side-quest-empty">nothing on the board. start one when a thought needs one other human, not the whole feed.</div>
             )}
           </div>
         </>
@@ -270,7 +284,7 @@ export default function SideQuestsPanel({ space, onToast }) {
 
 function QuestCard({ card, isBusy, onPick, onAccept, onCancel }) {
   const title = card.kind === "need" ? "needs a side quest" : "open for side quests";
-  const action = card.kind === "need" ? "pick this up" : "borrow this brain";
+  const action = "pick this up";
   return (
     <article className={`side-quest-card ${card.mine ? "mine" : ""}`}>
       <div className="side-quest-card-top">
@@ -297,7 +311,7 @@ function QuestCard({ card, isBusy, onPick, onAccept, onCancel }) {
   );
 }
 
-function TinyRoom({ room, message, setMessage, isBusy, onSend, onLeave, onReport }) {
+function TinyRoom({ room, message, setMessage, isBusy, onSend, onMessageKeyDown, onLeave, onReport }) {
   return (
     <div className="tiny-room">
       <div className="tiny-room-top">
@@ -316,7 +330,15 @@ function TinyRoom({ room, message, setMessage, isBusy, onSend, onLeave, onReport
         )}
       </div>
       <form className="tiny-room-compose" onSubmit={onSend}>
-        <textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={360} placeholder="drop the tiny mumbl..." disabled={isBusy} required />
+        <textarea
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          onKeyDown={onMessageKeyDown}
+          maxLength={360}
+          placeholder="drop the tiny mumbl..."
+          disabled={isBusy}
+          required
+        />
         <button className="share-button primary" type="submit" disabled={isBusy || !message.trim()}>
           send
         </button>
