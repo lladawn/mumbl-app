@@ -13,7 +13,8 @@
     "db:link:prod": "node scripts/supabase-link.mjs .env.production.local",
     "db:push": "supabase db push",
     "db:status": "supabase migration list --linked",
-    "heartbeat:test": "node scripts/heartbeat-test.mjs"
+    "heartbeat:test": "node scripts/heartbeat-test.mjs",
+    "side-quests:smoke": "node scripts/side-quests-smoke.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",

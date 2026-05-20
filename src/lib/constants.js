@@ -40,4 +40,14 @@ export const publicDemoRoom = {
   name: "it works on my machine",
   href: "/r/it-works-on-my-machine",
   tagline: "the public room for tiny rants, weird finds, and safe test mumbles.",
+  description: "Public demo room. Try a tiny rant, weird find, or half-formed thought here; team rooms stay private by default.",
+};
+
+export const feedbackRoom = {
+  slug: "help-shape-mumbl",
+  name: "help shape mumbl",
+  href: "/r/help-shape-mumbl",
+  tagline: "the public room for beta thoughts, tiny bugs, and sharp product wishes.",
+  description:
+    "this is the room for the version of mumbl that earns a place in your team. tell us what felt useful, what felt off, and what you actually want.",
 };

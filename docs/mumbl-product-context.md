@@ -189,6 +189,10 @@ Anyone can create a team space on mumbl.wtf with no signup required. They:
 No email. No password. No waiting. The vibe setting shapes the tone of the
 space — the copy, the placeholder text, the weekly digest personality.
 
+Creators can add a short room note after the room exists. Do not put this in
+the create flow; the first room should still take about 30 seconds. The note is
+for lightweight context once someone opens the link, not for onboarding theater.
+
 ### 2. share the link
 
 The creator shares the link directly with teammates via:

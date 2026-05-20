@@ -1,10 +1,14 @@
+import { feedbackRoom, publicDemoRoom } from "../lib/constants";
+
 export function serializeSpace(space, posts = [], heartbeats = [], reactionRows = [], activeReactionRows = [], extras = {}) {
   const activeReactionKeys = new Set(activeReactionRows.map((row) => `${row.post_id}:${row.label}`));
+  const knownRoomDescription = getKnownRoomDescription(space.slug);
 
   return {
     id: space.id,
     slug: space.slug,
     name: space.name,
+    description: space.description || knownRoomDescription || "",
     vibe: space.vibe,
     firstPostDone: space.first_post_done,
     isPublic: space.is_public || false,
@@ -12,9 +16,22 @@ export function serializeSpace(space, posts = [], heartbeats = [], reactionRows 
     createdAt: new Date(space.created_at).getTime(),
     dailyPrompt: extras.dailyPrompt ? serializePrompt(extras.dailyPrompt) : null,
     roomVibe: extras.roomVibe || [],
+    postsPage: extras.postsPage || {
+      limit: posts.length,
+      count: posts.length,
+      hasMore: false,
+      nextCursor: "",
+      type: "",
+    },
     posts: posts.map((post) => serializePost(post, reactionRows, activeReactionKeys)),
     heartbeats: heartbeats.map(serializeHeartbeat),
   };
+}
+
+function getKnownRoomDescription(slug) {
+  if (slug === publicDemoRoom.slug) return publicDemoRoom.description;
+  if (slug === feedbackRoom.slug) return feedbackRoom.description;
+  return "";
 }
 
 function serializePrompt(prompt) {

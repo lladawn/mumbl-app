@@ -22,6 +22,7 @@ create table spaces (
   id uuid primary key default gen_random_uuid(),
   slug text unique not null,
   name text not null,
+  description text,
   vibe text not null default 'chill',
   creator_token_hash text not null,
   created_at timestamptz not null default now()
