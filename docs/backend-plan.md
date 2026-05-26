@@ -89,6 +89,18 @@ create table anon_audit (
 - `POST /api/spaces/:slug/first-post-dismissed` marks the creator-first prompt as dismissed.
 - `POST /api/cron/heartbeats` generates weekly heartbeats from anonymised post data.
 
+## Dump V1
+
+The dump feature keeps the no-signup model. Private dump entries are owned by the same browser session token pattern, but the database stores only `session_token_hash`, never the raw token. A dump is private on creation and cannot be posted directly into a room.
+
+Team reads show only approved field notes. The flow is: select private dumps, request an OpenAI draft through a server route, save the draft in `field_notes`, let the author edit it, then publish it as `posts.type = 'field_note'`. The old raw-dump team endpoint is intentionally blocked so private dumps stay for dumping thoughts, not public reading.
+
+`OPENAI_API_KEY`, `OPENAI_MODEL_FIELD_NOTE`, and `OPENAI_MAX_DAILY_DRAFTS` are server-only. The default model should stay cost-sensitive, currently `gpt-5.4-nano`, and the draft route sends only selected dumps, capped at 10 per request. Field-note drafting should produce publishable working-process notes: specific, human, readable, and useful enough for team reads or a public profile, while staying grounded only in the selected dumps.
+
+Public profiles and account migration are not in this implementation yet. When identity lands, signup must migrate existing dump rows and field-note drafts without changing visibility.
+
+Prototype public profiles now exist as a no-signup bridge: a browser session can claim one public handle and selectively add already-published field notes to `mumbl.wtf/@handle`. Private dumps and field-note drafts never appear there. This is intentionally per-note opt-in and should be replaced or migrated carefully when full identity arrives.
+
 ## Local Setup
 
 1. Create a Supabase project.

@@ -9,14 +9,17 @@ export async function POST(request, { params }) {
     const { slug } = await params;
     const body = await request.json();
     const type = cleanString(body.type, 24);
-    const content = cleanString(body.content, 420);
+    const content = cleanString(body.content, type === "dump" || type === "field_note" ? 4000 : 420);
     const isAnonymous = body.isAnonymous !== false;
     const displayName = isAnonymous ? null : cleanString(body.displayName, 48) || "someone brave";
     const sessionToken = cleanString(body.sessionToken, 256);
     const promptId = cleanString(body.promptId, 64) || null;
+    const dumpId = cleanString(body.dumpId, 64) || null;
+    const fieldNoteTitle = type === "field_note" ? cleanString(body.title, 120) : null;
 
     if (!slug) return badRequest("space slug is required");
     if (!isValidPostType(type)) return badRequest("unsupported post type");
+    if (type === "dump") return badRequest("raw dumps stay private. publish a field note to team reads instead.");
     if (!content) return badRequest("post content is required");
     if (!sessionToken) return badRequest("session token is required");
 
@@ -32,6 +35,8 @@ export async function POST(request, { params }) {
       .insert({
         space_id: space.id,
         prompt_id: promptId,
+        dump_id: dumpId,
+        field_note_title: fieldNoteTitle,
         type,
         content,
         is_anonymous: isAnonymous,

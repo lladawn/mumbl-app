@@ -31,9 +31,11 @@ export const postTypes = {
   win: { label: "win", hint: "brag or shoutout", placeholder: "okay i need to brag for one second..." },
   find: { label: "find", hint: "link, tool, paper", placeholder: "sharing something useful i found..." },
   lol: { label: "lol", hint: "work got weird", placeholder: "this just happened and i cannot..." },
+  dump: { label: "dump", hint: "longer, messier, real", placeholder: "what are you actually thinking about right now?" },
+  field_note: { label: "field note", hint: "drafted from dumps", placeholder: "the week, made readable..." },
 };
 
-export const validTabs = ["feed", "wins", "heartbeat"];
+export const validTabs = ["feed", "wins", "reads", "heartbeat"];
 
 export const publicDemoRoom = {
   slug: "it-works-on-my-machine",

@@ -6,6 +6,10 @@ export function getServerEnv() {
     tokenHashSecret: process.env.MUMBL_TOKEN_HASH_SECRET,
     sideQuestEncryptionKey: process.env.MUMBL_SIDE_QUEST_ENCRYPTION_KEY,
     cronSecret: process.env.CRON_SECRET,
+    openAiApiKey: process.env.OPENAI_API_KEY,
+    openAiFieldNoteModel: process.env.OPENAI_MODEL_FIELD_NOTE || "gpt-5.4-nano",
+    openAiMaxDailyDrafts: Number.parseInt(process.env.OPENAI_MAX_DAILY_DRAFTS || "20", 10),
+    supermemoryApiKey: process.env.SUPERMEMORY_API_KEY,
   };
 }
 

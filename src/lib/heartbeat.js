@@ -48,6 +48,8 @@ export function getReactionLabels(space, post) {
     win: ["legend", "we are not worthy", "ship it"],
     find: ["saving this", "same energy", "worth a look"],
     lol: ["deeply cursed", "same energy", "sending help"],
+    dump: ["i felt this", "sat with this", "quietly true"],
+    field_note: ["sat with this", "quietly true", "worth a reread"],
     thought: vibes[space.vibe].reactions,
   };
   return [...new Set([...(byType[post.type] || vibes[space.vibe].reactions), ...existing])].slice(0, 4);

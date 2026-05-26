@@ -43,6 +43,98 @@ export async function createRemotePost({ slug, type, content, isAnonymous, displ
   return parseJson(response);
 }
 
+export async function fetchDumps() {
+  const sessionToken = loadSession();
+  const response = await fetch(`/api/dumps?sessionToken=${encodeURIComponent(sessionToken)}`, {
+    cache: "no-store",
+  });
+  return parseJson(response);
+}
+
+export async function fetchDumpMap({ includePrivateDumps = false } = {}) {
+  const sessionToken = loadSession();
+  const params = new URLSearchParams({ sessionToken });
+  if (includePrivateDumps) params.set("includePrivateDumps", "true");
+  const response = await fetch(`/api/dumps/map?${params.toString()}`, {
+    cache: "no-store",
+  });
+  return parseJson(response);
+}
+
+export async function createDump({ content, wantsReflection = false }) {
+  const response = await fetch("/api/dumps", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ content, wantsReflection, sessionToken: loadSession() }),
+  });
+  return parseJson(response);
+}
+
+export async function updateDump({ dumpId, content, wantsReflection = false }) {
+  const response = await fetch(`/api/dumps/${dumpId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ content, wantsReflection, sessionToken: loadSession() }),
+  });
+  return parseJson(response);
+}
+
+export async function deleteDump(dumpId) {
+  const response = await fetch(`/api/dumps/${dumpId}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sessionToken: loadSession() }),
+  });
+  return parseJson(response);
+}
+
+export async function shareDumpToRoom({ dumpId, slug, isAnonymous = true, displayName = "" }) {
+  const response = await fetch(`/api/dumps/${dumpId}/team`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ slug, isAnonymous, displayName, sessionToken: loadSession() }),
+  });
+  return parseJson(response);
+}
+
+export async function draftFieldNote({ dumpIds }) {
+  const response = await fetch("/api/dumps/field-notes/draft", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ dumpIds, sessionToken: loadSession() }),
+  });
+  return parseJson(response);
+}
+
+export async function publishFieldNote({ fieldNoteId, slug, title, content, isAnonymous = true, displayName = "" }) {
+  const response = await fetch(`/api/dumps/field-notes/${fieldNoteId}/publish`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ slug, title, content, isAnonymous, displayName, sessionToken: loadSession() }),
+  });
+  const data = await parseJson(response);
+  rememberRecentSlug(slug);
+  return data;
+}
+
+export async function updateFieldNote({ fieldNoteId, title, content }) {
+  const response = await fetch(`/api/dumps/field-notes/${fieldNoteId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title, content, sessionToken: loadSession() }),
+  });
+  return parseJson(response);
+}
+
+export async function deleteFieldNote(fieldNoteId) {
+  const response = await fetch(`/api/dumps/field-notes/${fieldNoteId}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sessionToken: loadSession() }),
+  });
+  return parseJson(response);
+}
+
 export async function updateRemoteSpaceVisibility({ slug, isPublic, publicName }) {
   const response = await fetch(`/api/spaces/${slug}`, {
     method: "PATCH",
@@ -174,8 +266,42 @@ export async function reportSideQuestRoom(roomId) {
   return parseJson(response);
 }
 
+export async function fetchPublicProfileForSession() {
+  const response = await fetch(`/api/public-profiles?sessionToken=${encodeURIComponent(loadSession())}`, {
+    cache: "no-store",
+  });
+  return parseJson(response);
+}
+
+export async function savePublicProfile({ handle, displayName = "", bio = "" }) {
+  const response = await fetch("/api/public-profiles", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ handle, displayName, bio, sessionToken: loadSession() }),
+  });
+  return parseJson(response);
+}
+
+export async function setFieldNotePublic({ fieldNoteId, isPublic, handle }) {
+  const response = await fetch(`/api/dumps/field-notes/${fieldNoteId}/public`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ isPublic, handle, sessionToken: loadSession() }),
+  });
+  return parseJson(response);
+}
+
 async function parseJson(response) {
-  const data = await response.json();
+  const contentType = response.headers.get("content-type") || "";
+  const isJson = contentType.includes("application/json");
+  const data = isJson ? await response.json() : null;
+
+  if (!isJson) {
+    const text = await response.text().catch(() => "");
+    const fallback = response.ok ? "mumbl expected JSON but got a non-JSON response" : "mumbl api request returned a non-JSON error";
+    throw new Error(`${fallback} (${response.status} ${response.url})${text.includes("<!DOCTYPE") ? "" : `: ${text.slice(0, 160)}`}`);
+  }
+
   if (!response.ok) {
     throw new Error(data.error || "mumbl api request failed");
   }

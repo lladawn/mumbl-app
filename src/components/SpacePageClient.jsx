@@ -19,7 +19,7 @@ import Toast from "./Toast";
 
 export default function SpacePageClient({ slug, tab }) {
   const activeTab = validTabs.includes(tab) ? tab : "feed";
-  const postTypeFilter = activeTab === "wins" ? "win" : "";
+  const postTypeFilter = activeTab === "wins" ? "win" : activeTab === "reads" ? "reads" : "";
   const {
     space,
     status,
@@ -116,6 +116,9 @@ export default function SpacePageClient({ slug, tab }) {
             <TabLink slug={space.slug} tab="wins" activeTab={activeTab}>
               wins
             </TabLink>
+            <TabLink slug={space.slug} tab="reads" activeTab={activeTab}>
+              reads
+            </TabLink>
             <TabLink slug={space.slug} tab="heartbeat" activeTab={activeTab}>
               heartbeat
             </TabLink>
@@ -182,6 +185,8 @@ export default function SpacePageClient({ slug, tab }) {
             />
           )}
 
+          {activeTab === "reads" && <ReadsView posts={posts} space={space} loadOlderPosts={loadOlderPosts} pageStatus={pageStatus} />}
+
           {activeTab === "heartbeat" && <HeartbeatView space={space} />}
         </div>
         <aside className="side-panel">
@@ -222,6 +227,29 @@ function WinsView({ posts, space, toggleReaction, loadOlderPosts, pageStatus }) 
   );
 }
 
+function ReadsView({ posts, space, loadOlderPosts, pageStatus }) {
+  return (
+    <>
+      <div className="reads-intro">
+        <span>team reads</span>
+        <p>Published field notes from teammates. Drafted from private dumps, approved by the person who wrote them.</p>
+        <Link className="ghost-button button-link" href="/dump">
+          open your dump
+        </Link>
+      </div>
+      <PostList
+        posts={posts}
+        space={space}
+        toggleReaction={async () => {}}
+        loadOlderPosts={loadOlderPosts}
+        pageStatus={pageStatus}
+        emptyText="no one has dropped anything here yet. share a dump with the team."
+        showReactions={false}
+      />
+    </>
+  );
+}
+
 function formatCreatedDate(timestamp) {
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(timestamp));
 }
@@ -233,6 +261,7 @@ function PostList({
   loadOlderPosts,
   pageStatus,
   emptyText = "quiet room. dangerous. drop the first mumbl.",
+  showReactions = true,
 }) {
   const page = space.postsPage || {};
   const hasMore = Boolean(page.hasMore);
@@ -242,7 +271,9 @@ function PostList({
   return (
     <div className="feed-list">
       {posts.length ? (
-        posts.map((post) => <PostCard post={post} space={space} toggleReaction={toggleReaction} key={post.id} />)
+        posts.map((post) => (
+          <PostCard post={post} space={space} toggleReaction={toggleReaction} showReactions={showReactions} key={post.id} />
+        ))
       ) : (
         <div className="empty-state">{emptyText}</div>
       )}

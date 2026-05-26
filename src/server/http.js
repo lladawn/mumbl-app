@@ -17,7 +17,10 @@ export function rateLimited(message = "too many requests") {
 }
 
 export function serverError(error) {
-  const message = error instanceof Error ? error.message : "unexpected backend error";
+  const message =
+    error instanceof Error
+      ? error.message
+      : error?.message || error?.details || error?.hint || error?.code || "unexpected backend error";
   const status = error?.status || (message.startsWith("Missing backend environment variables") ? 503 : 500);
   return NextResponse.json({ error: message }, { status });
 }
