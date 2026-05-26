@@ -25,6 +25,9 @@ export default function AppShell({ children }) {
           <Link className="ghost-button button-link" href="/mission">
             mission
           </Link>
+          <Link className="ghost-button button-link" href="/dump">
+            dump
+          </Link>
           <Link className="ghost-button button-link topbar-feedback" href={feedbackRoom.href}>
             help shape mumbl
           </Link>

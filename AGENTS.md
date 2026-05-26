@@ -34,6 +34,7 @@ When deciding whether to add a feature, ask whether it makes Mumbl feel more lik
 Work like a senior engineer:
 
 - Inspect existing patterns before adding new ones.
+- Use TypeScript for new code going forward. When touching existing JavaScript files, opportunistically migrate them to TypeScript only when it is low-risk, keeps the change scoped, and does not break existing behavior. Prefer explicit local types for API payloads, server responses, and component props as files are migrated.
 - Keep changes tightly scoped to the request.
 - Prefer simple modules and explicit data flow over clever abstractions.
 - Add abstractions only when they remove real duplication or match an existing local pattern.

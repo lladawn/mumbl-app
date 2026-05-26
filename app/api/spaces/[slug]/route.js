@@ -8,7 +8,7 @@ import { cleanString } from "../../../../src/server/validation";
 
 const DEFAULT_POST_LIMIT = 20;
 const MAX_POST_LIMIT = 40;
-const POST_TYPES = new Set(["find", "thought", "rant", "win", "lol"]);
+const POST_TYPES = new Set(["find", "thought", "rant", "win", "lol", "dump", "field_note"]);
 
 export async function GET(request, { params }) {
   try {
@@ -39,7 +39,10 @@ export async function GET(request, { params }) {
       .limit(postLimit + 1);
     let postCountQuery = supabase.from("posts").select("id", { count: "exact", head: true }).eq("space_id", space.id);
 
-    if (postType) {
+    if (postType === "reads") {
+      postsQuery = postsQuery.eq("type", "field_note");
+      postCountQuery = postCountQuery.eq("type", "field_note");
+    } else if (postType) {
       postsQuery = postsQuery.eq("type", postType);
       postCountQuery = postCountQuery.eq("type", postType);
     }
@@ -121,6 +124,7 @@ function parsePostCursor(value) {
 }
 
 function parsePostType(value) {
+  if (value === "reads") return "reads";
   return POST_TYPES.has(value) ? value : "";
 }
 

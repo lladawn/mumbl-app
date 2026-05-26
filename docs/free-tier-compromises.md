@@ -53,3 +53,19 @@ Current compromise:
 Future improvements:
 - Use daily culture snapshots once public-space volume grows.
 - Generate public culture summaries in a scheduled job instead of on-demand reads.
+
+## Dump
+
+Current compromise:
+- Per-entry AI reflection uses a deterministic local reflector in the route handler, not an external AI provider.
+- Team field-note drafting uses OpenAI only when the user clicks draft, sends selected dumps only, caps selection size, and rate-limits drafts per session with `OPENAI_MAX_DAILY_DRAFTS`.
+- The private map is rendered from the user's fetched dump text in the browser, with no weekly insight cron yet.
+- Team reads reuse the existing posts infrastructure, but only for approved `field_note` posts. Raw dumps are blocked from reads.
+
+Why:
+- External AI calls and weekly insight jobs would add cost, secrets, and retry behavior before the core private dump loop is proven.
+- The v1 promise is explicit visibility control and low-cost drafting, not model quality.
+
+Future improvements:
+- Add provider-backed reflection behind an opt-in toggle once budget and privacy copy are settled.
+- Generate `dump_insights` weekly for users with enough dumps, using a daily-or-weekly cron posture compatible with the current free-tier lane.

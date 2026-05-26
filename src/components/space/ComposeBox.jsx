@@ -78,7 +78,9 @@ export default function ComposeBox({
         />
       </label>
       <div className="type-grid">
-        {Object.entries(postTypes).map(([key, type]) => (
+        {Object.entries(postTypes)
+          .filter(([key]) => key !== "dump")
+          .map(([key, type]) => (
           <button
             className={`type-button ${selectedType === key ? "active" : ""}`}
             type="button"

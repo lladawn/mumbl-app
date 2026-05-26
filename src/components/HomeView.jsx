@@ -23,6 +23,9 @@ export default function HomeView() {
             no polished survey energy.
           </p>
           <div className="hero-actions">
+            <Link className="solid-button button-link" href="/dump">
+              start your dump
+            </Link>
             <Link className="solid-button button-link" href="/create">
               create your space
             </Link>
@@ -59,8 +62,8 @@ export default function HomeView() {
             <p className="muted">the ticket lied, the tests recovered, and people absolutely noticed.</p>
           </div>
           <div className="artifact post-it">
-            <strong>drop it on mumbl</strong>
-            <p className="muted">someone else is probably already thinking it.</p>
+            <strong>your dump</strong>
+            <p className="muted">private first. team-readable only when you choose.</p>
           </div>
           <Link className="artifact open-room" href={publicDemoRoom.href} aria-label={`open ${publicDemoRoom.name}`}>
             <div className="artifact-title">
