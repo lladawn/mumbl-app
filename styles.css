@@ -3856,7 +3856,7 @@ textarea:focus {
   border: 1px solid var(--ink);
   border-radius: var(--radius);
   background: var(--gold);
-  box-shadow: 6px 6px 0 var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
   rotate: 1.5deg;
 }
 
@@ -3872,6 +3872,7 @@ textarea:focus {
 
 .mission-note strong {
   font-size: clamp(1.55rem, 3vw, 2.6rem);
+  font-weight: 760;
   line-height: 1.05;
 }
 
@@ -3903,7 +3904,7 @@ textarea:focus {
 .mission-statement p {
   margin: 10px 0 0;
   font-size: clamp(1.5rem, 3vw, 2.55rem);
-  font-weight: 850;
+  font-weight: 760;
   line-height: 1.13;
 }
 
@@ -3923,7 +3924,7 @@ textarea:focus {
 
 .mission-proof p:first-child {
   color: var(--ink);
-  font-weight: 850;
+  font-weight: 760;
 }
 
 .mission-beliefs {
@@ -4015,6 +4016,7 @@ textarea:focus {
   max-width: 680px;
   margin-bottom: 4px;
   font-size: clamp(1.18rem, 2.3vw, 1.75rem);
+  font-weight: 760;
   line-height: 1.12;
 }
 
@@ -4028,7 +4030,7 @@ textarea:focus {
   background: var(--panel);
   box-shadow: 2px 2px 0 var(--ink);
   font-size: 0.88rem;
-  font-weight: 850;
+  font-weight: 760;
 }
 
 .mission-closing {
