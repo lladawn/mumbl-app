@@ -8,7 +8,7 @@ const analyticsEnabled = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === "true";
 const umamiScriptSrc = process.env.NEXT_PUBLIC_UMAMI_SRC || "https://breathe-umami.vercel.app/script.js";
 const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID || "";
 const description =
-  "An anonymous-first team room for engineers to say the thing they've been mumbling all week.";
+  "Mumbl is the working-memory layer for teams: private dumps, team reads, and anonymous rooms for the messy middle of work.";
 
 export const metadata = {
   metadataBase: new URL(appUrl),
