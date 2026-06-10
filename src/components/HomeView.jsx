@@ -66,7 +66,7 @@ const objections = [
   {
     question: "is this more documentation work?",
     answer:
-      "no. mumbl starts smaller than a doc. say or type the messy version first, then clean up only the part that became useful.",
+      "mumbl starts smaller than a doc. say or type the messy version first, then clean up only the part that became useful.",
   },
   {
     question: "who sees my private dumps?",
@@ -74,22 +74,22 @@ const objections = [
       "only you. private dumps do not become team memory unless you choose to shape and share them.",
   },
   {
-    question: "does this become a manager dashboard?",
+    question: "who is mumbl for?",
     answer:
-      "no. mumbl is for team memory, not people tracking. no manager view, no member analytics, no \"who is engaged\" score.",
+      "the team. mumbl gives engineers a place to keep the rough thinking behind the work: private first, shared only when useful. the heartbeat and reads go back to everyone who lived the week.",
   },
   {
     question: "will engineers actually write this?",
     answer:
-      "they will not write a polished lesson every day. they might save a rough thought in ten seconds, especially if it starts private and can be spoken instead of formatted.",
+      "they might save a rough thought in ten seconds, especially if it starts private and can be spoken instead of formatted. the polished lesson can come later, if there is one.",
   },
 ];
 
 const memoryStripItems = [
   "private by default",
   "the path before the polished doc",
-  "good writing should not get buried in tickets",
-  "the team lore should not live in dms",
+  "good writing gets a second life",
+  "team lore becomes findable",
   "know the human behind the feature",
   "work feels better when people feel less hidden",
   "read how your coworkers actually think",
@@ -140,7 +140,7 @@ export default function HomeView() {
       <div className="home-view">
         <section className="hero landing-hero">
           <div className="hero-copy landing-hero-copy">
-            <p className="eyebrow">team memory, not surveillance</p>
+            <p className="eyebrow">private memory for the messy middle</p>
             <h1>your team remembers what shipped. mumbl remembers how it happened.</h1>
             <p>
               mumbl keeps the rough notes, wrong turns, and lessons that never make it into tickets or docs.
@@ -187,7 +187,7 @@ export default function HomeView() {
             <div className="landing-proof-strip" aria-label="mumbl promises">
               <span>private first</span>
               <span>shared by choice</span>
-              <span>no manager dashboard</span>
+              <span>team memory that compounds</span>
             </div>
           </div>
 
@@ -242,7 +242,7 @@ export default function HomeView() {
               <aside className="room-memory-rail" aria-label="example room memory">
                 <span>room memory</span>
                 <strong>wrong turns, ownership lessons, and one useful fix path.</strong>
-                <p>shared by choice. no manager dashboard.</p>
+                <p>shared by choice, useful when the team needs the trail.</p>
               </aside>
             </div>
           </div>
