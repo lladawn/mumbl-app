@@ -248,6 +248,17 @@ export function ephemeralLink({ text, url, label }) {
   };
 }
 
+export async function postSlackResponse(responseUrl, payload) {
+  const cleanedUrl = cleanString(responseUrl, 2000);
+  if (!cleanedUrl) return;
+
+  await fetch(cleanedUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export function verifySlackState(state) {
   const decoded = decodeState(state);
   if (!decoded?.nonce || !decoded?.iat || Math.abs(Date.now() - decoded.iat) > 10 * 60 * 1000) {

@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { ok, serverError } from "../../../../src/server/http";
 import {
   connectSlackUser,
@@ -9,6 +10,7 @@ import {
   findSlackConnection,
   getSlackUserEmail,
   parseVerifiedSlackForm,
+  postSlackResponse,
   saveSlackDump,
   slackConnectUrl,
 } from "../../../../src/server/slack";
@@ -38,16 +40,16 @@ export async function POST(request) {
       ts: cleanString(payload.message?.ts, 80),
     };
 
-    const result = await saveOrConnect({ teamId, slackUserId, content, sourceMeta });
-    if (payload.response_url) {
-      await fetch(payload.response_url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(result),
-      });
-      return ok({});
-    }
-    return ok(result);
+    after(async () => {
+      try {
+        const result = await saveOrConnect({ teamId, slackUserId, content, sourceMeta });
+        await postSlackResponse(payload.response_url, result);
+      } catch (error) {
+        await postSlackResponse(payload.response_url, ephemeralText(error.message || "couldn't save that to mumbl yet."));
+      }
+    });
+
+    return ok({});
   } catch (error) {
     return serverError(error);
   }

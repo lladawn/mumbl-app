@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { ok, serverError } from "../../../../src/server/http";
 import {
   connectSlackUser,
@@ -9,6 +10,7 @@ import {
   findSlackConnection,
   getSlackUserEmail,
   parseVerifiedSlackForm,
+  postSlackResponse,
   saveSlackDump,
   slackConnectUrl,
 } from "../../../../src/server/slack";
@@ -20,12 +22,21 @@ export async function POST(request) {
     const teamId = cleanString(form.get("team_id"), 80);
     const slackUserId = cleanString(form.get("user_id"), 80);
     const text = cleanString(form.get("text"), 4000);
+    const responseUrl = cleanString(form.get("response_url"), 2000);
 
     if (!teamId || !slackUserId) return ok(ephemeralText("couldn't tell which Slack workspace this came from."));
     if (!text) return ok(ephemeralText("drop a thought after `/mumbl`, like `/mumbl deployment felt cursed today`."));
 
-    const result = await saveOrConnect({ teamId, slackUserId, content: text, sourceMeta: { trigger: "slash_command" } });
-    return ok(result);
+    after(async () => {
+      try {
+        const result = await saveOrConnect({ teamId, slackUserId, content: text, sourceMeta: { trigger: "slash_command" } });
+        await postSlackResponse(responseUrl, result);
+      } catch (error) {
+        await postSlackResponse(responseUrl, ephemeralText(error.message || "couldn't save that to mumbl yet."));
+      }
+    });
+
+    return ok(ephemeralText("saving to mumbl..."));
   } catch (error) {
     return serverError(error);
   }
