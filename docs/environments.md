@@ -85,8 +85,12 @@ The helper derives the project ref from `NEXT_PUBLIC_SUPABASE_URL`, so the URL i
 Use different values per environment:
 
 - Development: local-only values in `.env.local`
-- Preview / `dev`: staging Supabase URL, staging service role key, staging cron secret
-- Production / `main`: production Supabase URL, production service role key, production cron secret
+- Preview / `dev`: staging Supabase URL, anon key, service role key, staging cron secret
+- Production / `main`: production Supabase URL, anon key, service role key, production cron secret
+
+Supabase Auth needs environment-specific redirect URLs in the Supabase dashboard. Add each lane's callback URL, such as `http://127.0.0.1:3000/auth/callback`, the Vercel Preview callback URL, and `https://mumbl.wtf/auth/callback`.
+
+For Google login, enable the Google provider in Supabase Auth for each Supabase project and use environment-specific Google OAuth client credentials. The Google OAuth client must allow the Supabase callback URL shown in that project's Google provider settings.
 
 Analytics should be opt-in per environment:
 

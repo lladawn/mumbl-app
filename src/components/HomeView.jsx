@@ -4,147 +4,190 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useRecentSlug } from "../hooks/useRecentSlug";
-import { feedbackRoom, publicDemoRoom } from "../lib/constants";
+import { joinWaitlist } from "../lib/api";
+import { publicDemoRoom } from "../lib/constants";
 import JoinModal from "./JoinModal";
 
 const contactEmail = "mumbl.wtf@gmail.com";
 const teamNeedsMailHref = `mailto:${contactEmail}?subject=What%20my%20team%20needs`;
 const calendlyHref = "https://calendly.com/lladawn";
 
-const dumpLayers = [
+const disappearingSignals = [
+  "the wrong turns before the fix",
+  "the judgment before the decision",
+  "the emotion before burnout",
+  "the quiet signal before someone checks out",
+];
+
+const loopSteps = [
   {
-    label: "private dump",
-    title: "write the messy middle while it is still happening.",
-    copy: "one sentence, five paragraphs, a debugging trail, the thing you did not say in standup.",
+    label: "1. quick dump",
+    title: "say the messy thought before it disappears.",
+    copy: "type it or speak it. one line is enough. it stays private.",
   },
   {
-    label: "field notes",
-    title: "turn the useful thread into something teammates can learn from.",
-    copy: "not a design doc. not a status update. the actual working process.",
+    label: "2. field note",
+    title: "shape what becomes useful.",
+    copy: "select the rough notes that matter, make them readable, then decide where they belong.",
   },
   {
-    label: "team reads",
-    title: "build an internal feed of how people actually work.",
-    copy: "the in-between: tradeoffs, rough days, taste, judgment, and tiny lessons. a read can become a public profile note only if the writer chooses.",
+    label: "3. team read",
+    title: "share team memory by choice.",
+    copy: "coworkers see the path, tradeoffs, taste, and human context behind the work.",
   },
 ];
 
-const adoptionSteps = [
+const demoRoomPosts = [
   {
-    time: "day 1",
-    title: "someone starts dumping privately",
-    copy: "no rollout. no training. just the thought they already had, saved somewhere it can become useful later.",
-  },
-  {
-    time: "week 1",
-    title: "a useful field note appears",
-    copy: "a debugging path, a rough sprint lesson, a decision trail. the team reads the process, not just the outcome.",
-  },
-  {
-    time: "week 4",
-    title: "the room has memory",
-    copy: "patterns start showing up. people feel less alone. the team has human context that Slack never held.",
-  },
-];
-
-const teamSpacePosts = [
-  {
-    label: "anonymous engineer",
-    type: "debugging read",
-    text: "debugged auth for two days. here is the path and the tiny fix.",
+    label: "field note",
+    title: "auth fix: the three wrong turns",
+    copy: "the timeout bug was easy once we stopped blaming oauth. useful path, saved.",
     meta: "useful · 12",
   },
   {
-    label: "anonymous engineer",
-    type: "sprint read",
-    text: "this sprint was not heavy because of code. it was unclear ownership.",
+    label: "team read",
+    title: "why this sprint felt heavy",
+    copy: "not code volume. fuzzy ownership. next time: one owner before kickoff.",
     meta: "i felt this · 9",
-  },
-  {
-    label: "anonymous engineer",
-    type: "people read",
-    text: "remote work got quiet. we need fewer meetings and more honest async context.",
-    meta: "same here · 6",
   },
 ];
 
 const objections = [
   {
-    question: "how is mumbl different from docs, tickets, or Slack?",
+    question: "what would someone actually dump?",
     answer:
-      "docs keep decisions. tickets keep tasks. Slack keeps messages. mumbl keeps the messy middle: the rough thinking, debugging trails, tradeoffs, and human context behind the feature.",
+      "the thought before it becomes polished: why a fix was harder than expected, what felt unclear, the tradeoff behind a decision, or the lesson you do not want the next person to relearn.",
   },
   {
-    question: "why would people write here?",
+    question: "why not just write this in slack?",
     answer:
-      "because the first step is private. people can dump while the thought is still rough, then share only the part that becomes useful for the room.",
+      "slack is for the conversation happening now. mumbl is for the useful trail after the moment passes. a quick dump can stay private, become a field note, or turn into a team read when it is worth keeping.",
   },
   {
-    question: "will anonymous writing create chaos?",
+    question: "is this more documentation work?",
     answer:
-      "private dumps stay private. team reads are deliberate. the room measures resonance, not people, and there is no manager analytics view.",
+      "mumbl starts smaller than a doc. say or type the messy version first, then clean up only the part that became useful.",
   },
   {
-    question: "what does mumbl give a team?",
+    question: "who sees my private dumps?",
     answer:
-      "an internal feed of how work actually happened: the dead ends, taste, context, small wins, and human patterns that usually disappear between docs and shipped features.",
+      "only you. private dumps do not become team memory unless you choose to shape and share them.",
   },
-];
-
-const collabPaths = [
-  "engineering teams willing to test Mumbl internally",
-  "founders and managers who want culture without surveillance",
-  "operators who can help with distribution into real teams",
-  "builders/designers who care about making work feel human",
+  {
+    question: "who is mumbl for?",
+    answer:
+      "the team. mumbl gives engineers a place to keep the rough thinking behind the work: private first, shared only when useful. the heartbeat and reads go back to everyone who lived the week.",
+  },
+  {
+    question: "will engineers actually write this?",
+    answer:
+      "they might save a rough thought in ten seconds, especially if it starts private and can be spoken instead of formatted. the polished lesson can come later, if there is one.",
+  },
 ];
 
 const memoryStripItems = [
   "private by default",
   "the path before the polished doc",
-  "good writing should not get buried in tickets",
-  "the team lore should not live in DMs",
+  "good writing gets a second life",
+  "team lore becomes findable",
   "know the human behind the feature",
   "work feels better when people feel less hidden",
   "read how your coworkers actually think",
   "the internal feed between tickets and shipped features",
   "a living feed of the work behind the work",
   "write it while it is still messy",
-  "Slack is where work talks. mumbl is where work remembers.",
+  "slack is where work talks. mumbl is where work remembers.",
 ];
 
 export default function HomeView() {
   const router = useRouter();
   const [joinOpen, setJoinOpen] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistStatus, setWaitlistStatus] = useState("idle");
+  const [waitlistMessage, setWaitlistMessage] = useState("");
   const recentSlug = useRecentSlug();
+
+  async function handleWaitlistSubmit(event) {
+    event.preventDefault();
+    const email = waitlistEmail.trim();
+
+    setWaitlistMessage("");
+    if (!email) {
+      setWaitlistStatus("error");
+      setWaitlistMessage("drop your email in first.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setWaitlistStatus("error");
+      setWaitlistMessage("drop in a real email and we'll save your spot.");
+      return;
+    }
+
+    setWaitlistStatus("submitting");
+    try {
+      await joinWaitlist({ email });
+      setWaitlistEmail("");
+      setWaitlistStatus("success");
+      setWaitlistMessage("you're on it. we'll keep it useful.");
+    } catch (error) {
+      setWaitlistStatus("error");
+      setWaitlistMessage(error.message || "couldn't join the waitlist yet. try again in a minute.");
+    }
+  }
 
   return (
     <>
       <div className="home-view">
         <section className="hero landing-hero">
           <div className="hero-copy landing-hero-copy">
-            <p className="eyebrow">the working-memory layer for teams</p>
-            <h1>turn messy engineering work into team memory.</h1>
+            <p className="eyebrow">private memory for the messy middle</p>
+            <h1>your team remembers what shipped. mumbl remembers how it happened.</h1>
             <p>
-              engineers dump privately, share field notes by choice, and build a feed of how work actually happened.
+              mumbl keeps the rough notes, wrong turns, and lessons that never make it into tickets or docs.
             </p>
+            <form id="waitlist" className="waitlist-form" onSubmit={handleWaitlistSubmit} noValidate>
+              <div>
+                <label htmlFor="waitlist-email">join the waitlist</label>
+                <p>we'll send the useful bits when mumbl is ready for more engineering teams.</p>
+              </div>
+              <div className="waitlist-controls">
+                <input
+                  id="waitlist-email"
+                  type="email"
+                  value={waitlistEmail}
+                  onChange={(event) => {
+                    setWaitlistEmail(event.target.value);
+                    if (waitlistStatus !== "submitting") {
+                      setWaitlistStatus("idle");
+                      setWaitlistMessage("");
+                    }
+                  }}
+                  placeholder="you@company.com"
+                  autoComplete="email"
+                  disabled={waitlistStatus === "submitting"}
+                />
+                <button className="solid-button" type="submit" disabled={waitlistStatus === "submitting"}>
+                  {waitlistStatus === "submitting" ? "joining..." : "join waitlist"}
+                </button>
+              </div>
+              {waitlistMessage ? (
+                <p className={`waitlist-message ${waitlistStatus === "success" ? "success" : "error"}`} role="status">
+                  {waitlistMessage}
+                </p>
+              ) : null}
+            </form>
             <div className="hero-actions">
-              <Link className="solid-button button-link" href="/dump">
-                start your dump
-              </Link>
-              <Link className="solid-button button-link" href="/create">
-                create a room
-              </Link>
               <Link className="ghost-button button-link" href={publicDemoRoom.href}>
-                try the demo room
+                try the demo
               </Link>
               <button className="ghost-button" type="button" onClick={() => setJoinOpen(true)}>
                 already have a link?
               </button>
             </div>
             <div className="landing-proof-strip" aria-label="mumbl promises">
-              <span>dump first, share later</span>
-              <span>built for the in-between</span>
-              <span>team memory, not analytics</span>
+              <span>private first</span>
+              <span>shared by choice</span>
+              <span>team memory that compounds</span>
             </div>
           </div>
 
@@ -152,45 +195,88 @@ export default function HomeView() {
             <div className="team-space-topbar">
               <div>
                 <span className="demo-dot" aria-hidden="true" />
-                <strong>backend gremlins</strong>
+                <strong>platform room</strong>
               </div>
-              <span>anonymous room</span>
+              <span>private by default</span>
             </div>
-            <div className="team-space-tabs" aria-label="example room views">
-              <span className="active">team reads</span>
-              <span>private dumps</span>
-              <span>heartbeats</span>
+            <div className="mumbl-room-tabs" aria-label="example mumbl room tabs">
+              <span className="active">quick dump</span>
+              <span>field notes</span>
+              <span>team reads</span>
+              <span>heartbeat</span>
             </div>
-            <div className="team-space-body">
-              <div className="team-feed-preview">
-                {teamSpacePosts.map((post) => (
-                  <article className="team-feed-post" key={post.text}>
-                    <div className="team-post-meta">
-                      <span>{post.label}</span>
-                      <em>{post.type}</em>
-                    </div>
-                    <p>{post.text}</p>
-                    <div className="team-post-footer">
-                      <span>{post.meta}</span>
-                      <span>anonymous reply</span>
-                    </div>
+            <div className="mumbl-room-surface">
+              <section className="quick-dump-composer" aria-label="example quick dump composer">
+                <div className="quick-dump-head">
+                  <span>private dump</span>
+                  <strong>say it before it disappears</strong>
+                </div>
+                <div className="voice-dump-row">
+                  <span className="voice-button" aria-hidden="true">mic</span>
+                  <div className="voice-lines" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                  <p>voice-to-text or typed. messy is fine.</p>
+                </div>
+                <div className="composer-actions">
+                  <span>still private</span>
+                  <button className="ghost-button" type="button">shape into note</button>
+                </div>
+              </section>
+
+              <section className="room-feed-preview" aria-label="example team reads">
+                {demoRoomPosts.map((post) => (
+                  <article className="room-read-card" key={post.title}>
+                    <span>{post.label}</span>
+                    <h3>{post.title}</h3>
+                    <p>{post.copy}</p>
+                    <em>{post.meta}</em>
                   </article>
                 ))}
-              </div>
-              <aside className="team-demo-rail" aria-label="example private dump and heartbeat">
-                <div className="private-dump-card">
-                  <span>private dump</span>
-                  <strong>
-                    i found the timeout fix, but the weird part was three wrong guesses before it.
-                  </strong>
-                  <p>still private. later, the useful trail can become a team read.</p>
-                </div>
-                <div className="heartbeat-preview">
-                  <span>room heartbeat</span>
-                  <strong>debugging trails, fuzzy ownership, and one tiny win everyone nearly missed.</strong>
-                </div>
+              </section>
+
+              <aside className="room-memory-rail" aria-label="example room memory">
+                <span>room memory</span>
+                <strong>wrong turns, ownership lessons, and one useful fix path.</strong>
+                <p>shared by choice, useful when the team needs the trail.</p>
               </aside>
             </div>
+          </div>
+        </section>
+
+        <section className="landing-section problem-section" aria-labelledby="problem-heading">
+          <div>
+            <p className="eyebrow">the gap</p>
+            <h2 id="problem-heading">the human middle of work disappears.</h2>
+            <p>
+              slack keeps messages. docs keep decisions. tickets keep tasks. mumbl keeps the human path between them.
+            </p>
+          </div>
+          <div className="signal-grid" aria-label="what disappears at work">
+            {disappearingSignals.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
+          </div>
+        </section>
+
+        <section className="landing-section landing-dump" aria-labelledby="dump-heading">
+          <div className="landing-section-head">
+            <p className="eyebrow">the loop</p>
+            <h2 id="dump-heading">say it fast. clean it up later. share only if it helps.</h2>
+            <p>quick dumps can be typed or spoken. mumbl starts private, then sharing is deliberate.</p>
+          </div>
+          <div className="dump-layer-grid">
+            {loopSteps.map((layer) => (
+              <article className="dump-layer-card" key={layer.label}>
+                <span>{layer.label}</span>
+                <h3>{layer.title}</h3>
+                <p>{layer.copy}</p>
+              </article>
+            ))}
           </div>
         </section>
 
@@ -205,12 +291,9 @@ export default function HomeView() {
 
         <section className="landing-section demo-video-section" aria-labelledby="demo-video-heading">
           <div className="demo-video-copy">
-            <p className="eyebrow">watch the product</p>
-            <h2 id="demo-video-heading">see how a private dump becomes something a team can read.</h2>
-            <p>
-              watch the actual flow: write privately, shape the useful part, and share it into a room without turning it
-              into a status update.
-            </p>
+            <p className="eyebrow">watch the loop</p>
+            <h2 id="demo-video-heading">watch a quick dump become a team read in under a minute.</h2>
+            <p>voice or type the thought, shape the useful part, and share only what helps the team understand the work.</p>
           </div>
           <div className="demo-video-frame">
             <iframe
@@ -224,122 +307,40 @@ export default function HomeView() {
           </div>
         </section>
 
-        <section className="landing-section landing-dump" aria-labelledby="dump-heading">
-          <div className="landing-section-head">
-            <p className="eyebrow">the loop</p>
-            <h2 id="dump-heading">start private. share when it becomes useful.</h2>
-            <p>docs remember decisions. Slack remembers messages. mumbl remembers how the work actually happened.</p>
-          </div>
-          <div className="dump-layer-grid">
-            {dumpLayers.map((layer) => (
-              <article className="dump-layer-card" key={layer.label}>
-                <span>{layer.label}</span>
-                <h3>{layer.title}</h3>
-                <p>{layer.copy}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="landing-section adoption-strip" aria-labelledby="adoption-heading">
-          <div className="landing-section-head">
-            <p className="eyebrow">how adoption actually starts</p>
-            <h2 id="adoption-heading">not a company initiative. a tiny personal habit that becomes useful.</h2>
-            <p>built for engineering teams where the real context is getting lost.</p>
-          </div>
-          <div className="adoption-steps">
-            {adoptionSteps.map((step) => (
-              <article className="adoption-step" key={step.time}>
-                <span>{step.time}</span>
-                <h3>{step.title}</h3>
-                <p>{step.copy}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
         <section className="landing-section faq-section" aria-labelledby="faq-heading">
           <div>
-            <p className="eyebrow">fair doubts</p>
-            <h2 id="faq-heading">questions teams ask before trying mumbl.</h2>
+            <p className="eyebrow">clear lines</p>
+            <h2 id="faq-heading">honest questions before a team tries mumbl.</h2>
           </div>
           <div className="faq-list">
-            {objections.map((item) => (
-              <article className="faq-card" key={item.question}>
-                <h3>{item.question}</h3>
+            {objections.map((item, index) => (
+              <details className="faq-card" key={item.question} open={index === 0}>
+                <summary>{item.question}</summary>
                 <p>{item.answer}</p>
-              </article>
+              </details>
             ))}
-          </div>
-        </section>
-
-        <section className="landing-section collab-section" aria-labelledby="collab-heading">
-          <div>
-            <p className="eyebrow">early collaborators</p>
-            <h2 id="collab-heading">we are looking for the people who feel this problem before it has a category.</h2>
-          </div>
-          <div className="collab-list">
-            {collabPaths.map((path) => (
-              <span key={path}>{path}</span>
-            ))}
-          </div>
-        </section>
-
-        <section className="landing-section landing-talk" aria-labelledby="talk-heading">
-          <div className="landing-talk-copy">
-            <p className="eyebrow">talk to us</p>
-            <h2 id="talk-heading">want to tell us what your team needs?</h2>
-            <p>
-              bring us the rough workflow, the team moment, or the custom setup you wish existed. we can talk it through
-              async or on a call.
-            </p>
-          </div>
-          <div className="talk-options">
-            <a
-              className="talk-card"
-              href={calendlyHref}
-              rel="noreferrer"
-              target="_blank"
-            >
-              <span>book a call</span>
-              <strong>for pilots, custom company setup, or a deeper culture conversation.</strong>
-              <em>schedule time</em>
-            </a>
-            <a className="talk-card" href={teamNeedsMailHref}>
-              <span>email us</span>
-              <strong>send the team context, company setup question, or moment mumbl should exist for.</strong>
-              <em>{contactEmail}</em>
-            </a>
-            <Link className="talk-card" href={feedbackRoom.href} rel="noreferrer" target="_blank">
-              <span>share a note</span>
-              <strong>drop feedback in the public mumbl room and help shape the product.</strong>
-              <em>open room</em>
-            </Link>
           </div>
         </section>
 
         <section className="landing-section landing-cta" aria-labelledby="cta-heading">
           <div>
-            <p className="eyebrow">start small</p>
-            <h2 id="cta-heading">start with the thought already sitting in your head.</h2>
-            <p>
-              start with your own dump, create a private space for your team, or tell us the missing context your team
-              keeps losing.
-            </p>
+            <p className="eyebrow">early teams</p>
+            <h2 id="cta-heading">help shape mumbl for real engineering teams.</h2>
+            <p>join the waitlist for quick voice dumps, field notes, and team memory.</p>
           </div>
           <div className="cta-panel">
-            <Link className="solid-button button-link" href="/dump">
-              start your dump
-            </Link>
-            <Link className="solid-button button-link" href="/create">
+            <a className="solid-button button-link" href="#waitlist">
+              join the waitlist
+            </a>
+            <Link className="ghost-button button-link" href="/create">
               create a room
             </Link>
             <Link className="ghost-button button-link" href={publicDemoRoom.href}>
-              try the demo room
+              try the demo
             </Link>
-            <Link className="ghost-button button-link" href={feedbackRoom.href}>
-              shape mumbl with us
-            </Link>
+            <a className="ghost-button button-link" href={teamNeedsMailHref}>
+              tell us what your team needs
+            </a>
           </div>
         </section>
 
@@ -374,6 +375,10 @@ export default function HomeView() {
       )}
     </>
   );
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 function MiniPost({ avatar, text, reactions, tint = false }) {

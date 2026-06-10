@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createDump,
   deleteDump,
@@ -16,6 +16,7 @@ import {
   updateDump,
   updateFieldNote,
 } from "../lib/api";
+import { getAuthSession, linkCurrentDumpSession, signInWithGoogle, signOutOfDump } from "../lib/auth";
 import { getDumpMemoryOptIn, getRecentSlug, setDumpMemoryOptIn } from "../lib/storage";
 import Toast from "./Toast";
 
@@ -26,6 +27,8 @@ const placeholders = [
   "what's been sitting in your head all week?",
   "dump it here.",
 ];
+
+const MAX_DUMP_CHARS = 4000;
 
 export default function DumpPageClient({ mode = "home" }) {
   const [dumps, setDumps] = useState([]);
@@ -46,12 +49,20 @@ export default function DumpPageClient({ mode = "home" }) {
   const [publicNameDraft, setPublicNameDraft] = useState("");
   const [publicBioDraft, setPublicBioDraft] = useState("");
   const [publicModalOpen, setPublicModalOpen] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [loginStatus, setLoginStatus] = useState("idle");
+  const [authState, setAuthState] = useState({ status: "checking", email: "" });
   const [selectedDumpIds, setSelectedDumpIds] = useState([]);
   const [pendingDraft, setPendingDraft] = useState(false);
   const [publishingNoteId, setPublishingNoteId] = useState("");
   const [mutatingNoteId, setMutatingNoteId] = useState("");
   const [publicMutatingNoteId, setPublicMutatingNoteId] = useState("");
+  const [speechSupported, setSpeechSupported] = useState(null);
+  const [speechStatus, setSpeechStatus] = useState("idle");
+  const [interimSpeech, setInterimSpeech] = useState("");
   const [toast, setToast] = useState("");
+  const recognitionRef = useRef(null);
+  const ignoreSpeechResultsRef = useRef(false);
   const placeholder = placeholders[(dumps.length + content.length) % placeholders.length];
 
   useEffect(() => {
@@ -59,28 +70,22 @@ export default function DumpPageClient({ mode = "home" }) {
   }, []);
 
   useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    setSpeechSupported(Boolean(SpeechRecognition));
+
+    return () => {
+      ignoreSpeechResultsRef.current = true;
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
     async function load() {
-      try {
-        const [result, profileResult] = await Promise.all([fetchDumps(), fetchPublicProfileForSession()]);
-        if (!mounted) return;
-        setDumps(result.dumps || []);
-        setFieldNotes(result.fieldNotes || []);
-        const nextProfile = profileResult.profile || null;
-        setPublicProfile(nextProfile);
-        setPublicProfileStatus(profileResult.migrationRequired ? "migration" : "ready");
-        if (nextProfile) {
-          setPublicHandleDraft(nextProfile.handle || "");
-          setPublicNameDraft(nextProfile.displayName || "");
-          setPublicBioDraft(nextProfile.bio || "");
-        }
-        setStatus("ready");
-      } catch (error) {
-        if (!mounted) return;
-        setStatus("error");
-        setPublicProfileStatus("error");
-        setToast(error.message || "couldn't open your dump yet.");
-      }
+      await Promise.all([refreshAuthState(() => mounted), loadDumpState(() => mounted)]);
     }
     load();
     return () => {
@@ -93,6 +98,7 @@ export default function DumpPageClient({ mode = "home" }) {
 
   async function handleSave(event) {
     event.preventDefault();
+    stopSpeechRecognition({ discardResults: true });
     const trimmed = content.trim();
     if (!trimmed || isSaving) return;
 
@@ -109,6 +115,45 @@ export default function DumpPageClient({ mode = "home" }) {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function handleGoogleLogin() {
+    if (loginStatus === "sending") return;
+
+    setLoginStatus("sending");
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      setLoginStatus("idle");
+      setToast(error.message || "couldn't start Google login.");
+    }
+  }
+
+  async function handleLogout() {
+    if (loginStatus === "sending") return;
+
+    setLoginStatus("sending");
+    try {
+      await signOutOfDump();
+      setAuthState({ status: "anonymous", email: "" });
+      closeLoginModal();
+      setStatus("loading");
+      await loadDumpState(() => true);
+      setToast("logged out. this browser is anonymous again.");
+    } catch (error) {
+      setLoginStatus("idle");
+      setToast(error.message || "couldn't log out.");
+    }
+  }
+
+  function openLoginModal() {
+    setLoginStatus("idle");
+    setLoginModalOpen(true);
+  }
+
+  function closeLoginModal() {
+    setLoginModalOpen(false);
+    setLoginStatus("idle");
   }
 
   async function handleUpdateDump(dump, nextContent, nextWantsReflection) {
@@ -260,6 +305,114 @@ export default function DumpPageClient({ mode = "home" }) {
     );
   }
 
+  function startSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setSpeechSupported(false);
+      setSpeechStatus("unsupported");
+      setToast("mic not available here. typing still works.");
+      return;
+    }
+
+    if (isSaving) return;
+
+    stopSpeechRecognition({ discardResults: true });
+    ignoreSpeechResultsRef.current = false;
+    setInterimSpeech("");
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || "en-US";
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setSpeechStatus("listening");
+    };
+
+    recognition.onresult = (event) => {
+      if (ignoreSpeechResultsRef.current) return;
+
+      let finalTranscript = "";
+      let nextInterim = "";
+
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        const transcript = result?.[0]?.transcript || "";
+        if (result.isFinal) {
+          finalTranscript += transcript;
+        } else {
+          nextInterim += transcript;
+        }
+      }
+
+      if (finalTranscript.trim()) {
+        setContent((current) => appendSpeechTranscript(current, finalTranscript));
+      }
+
+      setInterimSpeech(nextInterim.trim());
+    };
+
+    recognition.onerror = (event) => {
+      ignoreSpeechResultsRef.current = true;
+      recognitionRef.current = null;
+      setInterimSpeech("");
+      setSpeechStatus(event.error === "not-allowed" || event.error === "service-not-allowed" ? "blocked" : "error");
+      setToast(speechErrorMessage(event.error));
+    };
+
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      setInterimSpeech("");
+      setSpeechStatus((current) => (current === "blocked" || current === "error" || current === "unsupported" ? current : "idle"));
+      ignoreSpeechResultsRef.current = false;
+    };
+
+    recognitionRef.current = recognition;
+
+    try {
+      recognition.start();
+    } catch {
+      recognitionRef.current = null;
+      setSpeechStatus("error");
+      setToast("couldn't start the mic. try again in a second.");
+    }
+  }
+
+  function stopSpeechRecognition({ discardResults = false } = {}) {
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+      setInterimSpeech("");
+      if (speechStatus === "listening" || speechStatus === "stopping") setSpeechStatus("idle");
+      return;
+    }
+
+    ignoreSpeechResultsRef.current = discardResults;
+    setInterimSpeech("");
+    setSpeechStatus("stopping");
+
+    try {
+      if (discardResults) {
+        recognition.abort();
+      } else {
+        recognition.stop();
+      }
+    } catch {
+      recognitionRef.current = null;
+      setSpeechStatus("idle");
+    }
+  }
+
+  function toggleSpeechRecognition() {
+    if (speechStatus === "listening" || speechStatus === "stopping") {
+      stopSpeechRecognition();
+      return;
+    }
+
+    startSpeechRecognition();
+  }
+
   if (mode === "map") {
     return <DumpMap dumps={dumps} fieldNotes={fieldNotes} map={map} status={status} toast={toast} setToast={setToast} />;
   }
@@ -276,6 +429,9 @@ export default function DumpPageClient({ mode = "home" }) {
           <Link className="ghost-button button-link" href="/dump/map">
             see the map
           </Link>
+          <button className="ghost-button" type="button" onClick={openLoginModal}>
+            {authState.status === "authenticated" ? "logged in" : "log in"}
+          </button>
           <button className="ghost-button" type="button" onClick={() => setPublicModalOpen(true)}>
             go public
           </button>
@@ -292,12 +448,15 @@ export default function DumpPageClient({ mode = "home" }) {
           <textarea
             value={content}
             onChange={(event) => setContent(event.target.value)}
-            maxLength={4000}
+            maxLength={MAX_DUMP_CHARS}
             placeholder={placeholder}
             autoFocus={mode === "new"}
             disabled={isSaving}
             required
           />
+          <div className={`dump-voice-draft ${interimSpeech ? "active" : ""}`} aria-live="polite">
+            {interimSpeech ? interimSpeech : "voice draft appears here while you talk."}
+          </div>
           <div className="dump-composer-bottom">
             <label className="reflection-toggle">
               <input
@@ -308,7 +467,19 @@ export default function DumpPageClient({ mode = "home" }) {
               />
               reflect after saving
             </label>
-            <span>{content.trim().length} chars</span>
+            <div className="dump-composer-meta">
+              <button
+                className={`voice-dump-button ${speechStatus === "listening" ? "listening" : ""}`}
+                type="button"
+                onClick={toggleSpeechRecognition}
+                disabled={isSaving || speechStatus === "stopping" || speechSupported === false}
+                aria-pressed={speechStatus === "listening"}
+              >
+                <span className="voice-dump-dot" aria-hidden="true" />
+                {speechButtonLabel({ speechSupported, speechStatus })}
+              </button>
+              <span>{content.trim().length} chars</span>
+            </div>
           </div>
           <div className="dump-actions">
             <button className="solid-button button-with-loader" type="submit" disabled={isSaving}>
@@ -413,9 +584,130 @@ export default function DumpPageClient({ mode = "home" }) {
         />
       )}
 
+      {loginModalOpen && (
+        <LoginModal
+          status={loginStatus}
+          authState={authState}
+          close={closeLoginModal}
+          logout={handleLogout}
+          loginWithGoogle={handleGoogleLogin}
+        />
+      )}
+
       {toast && <Toast message={toast} onDone={() => setToast("")} />}
     </section>
   );
+
+  async function refreshAuthState(isMounted = () => true) {
+    const session = await getAuthSession();
+    if (!isMounted()) return;
+    setAuthState(
+      session?.user
+        ? { status: "authenticated", email: session.user.email || "" }
+        : { status: "anonymous", email: "" },
+    );
+  }
+
+  async function loadDumpState(isMounted = () => true) {
+    try {
+      await repairLoggedInSessionLink();
+      const [result, profileResult] = await Promise.all([fetchDumps(), fetchPublicProfileForSession()]);
+      if (!isMounted()) return;
+      setDumps(result.dumps || []);
+      setFieldNotes(result.fieldNotes || []);
+      const nextProfile = profileResult.profile || null;
+      setPublicProfile(nextProfile);
+      setPublicProfileStatus(profileResult.migrationRequired ? "migration" : "ready");
+      if (nextProfile) {
+        setPublicHandleDraft(nextProfile.handle || "");
+        setPublicNameDraft(nextProfile.displayName || "");
+        setPublicBioDraft(nextProfile.bio || "");
+      }
+      setStatus("ready");
+    } catch (error) {
+      if (!isMounted()) return;
+      setStatus("error");
+      setPublicProfileStatus("error");
+      setToast(error.message || "couldn't open your dump yet.");
+    }
+  }
+
+  async function repairLoggedInSessionLink() {
+    try {
+      await linkCurrentDumpSession();
+    } catch {
+      // The following fetch will surface auth/migration errors in the normal page flow.
+    }
+  }
+}
+
+function LoginModal({ status, authState, close, logout, loginWithGoogle }) {
+  const isSending = status === "sending";
+  const isAuthenticated = authState.status === "authenticated";
+
+  return (
+    <div className="modal-backdrop" onClick={close}>
+      <div className="modal login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title" onClick={(event) => event.stopPropagation()}>
+        <div className="login-modal-head">
+          <p className="eyebrow">login</p>
+          <h2 id="login-title">{isAuthenticated ? "you're logged in" : "keep your dump"}</h2>
+          <p>
+            {isAuthenticated
+              ? "Your private dump follows this login. Rooms still stay anonymous."
+              : "Use Google to save or restore your private dump. Rooms stay anonymous."}
+          </p>
+        </div>
+        {isAuthenticated && (
+          <div className="login-signed-in">
+            {authState.email && <small>{authState.email}</small>}
+            <div className="login-actions">
+              <button className="ghost-button" type="button" onClick={logout} disabled={isSending}>
+                {isSending ? "logging out..." : "log out"}
+              </button>
+              <button className="solid-button" type="button" onClick={close} disabled={isSending}>
+                done
+              </button>
+            </div>
+          </div>
+        )}
+        {!isAuthenticated && (
+          <div className="login-options">
+            <button className="solid-button button-with-loader google-login-button" type="button" onClick={loginWithGoogle} disabled={isSending}>
+              {isSending && <span className="mini-loader" aria-hidden="true" />}
+              {isSending ? "opening Google..." : "continue with Google"}
+            </button>
+            <button className="ghost-button" type="button" onClick={close} disabled={isSending}>
+              not now
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function appendSpeechTranscript(current, transcript) {
+  const cleanTranscript = transcript.replace(/\s+/g, " ").trim();
+  if (!cleanTranscript) return current;
+
+  const needsSpace = current && !/\s$/.test(current);
+  const nextText = `${current}${needsSpace ? " " : ""}${cleanTranscript}`;
+  return nextText.slice(0, MAX_DUMP_CHARS);
+}
+
+function speechButtonLabel({ speechSupported, speechStatus }) {
+  if (speechSupported === false || speechStatus === "unsupported") return "mic not available here";
+  if (speechStatus === "listening") return "listening...";
+  if (speechStatus === "stopping") return "catching that...";
+  return "talk it out";
+}
+
+function speechErrorMessage(error) {
+  if (error === "not-allowed" || error === "service-not-allowed") return "mic permission was blocked. typing still works.";
+  if (error === "no-speech") return "didn't catch anything. try talking a little closer.";
+  if (error === "audio-capture") return "couldn't find a mic on this device.";
+  if (error === "network") return "speech service dropped. your typed dump is still safe.";
+  return "voice stopped. typing still works.";
 }
 
 function DumpCard({ dump, expanded, setExpandedId, selected, toggleSelected, updateDump, deleteDump }) {

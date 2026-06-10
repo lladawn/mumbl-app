@@ -1,5 +1,5 @@
 import { badRequest, ok, serverError } from "../../../../src/server/http";
-import { hashToken } from "../../../../src/server/hash";
+import { applyOwnerFilter, assertExpectedAuthenticatedOwner, resolveRequestOwner } from "../../../../src/server/auth";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 import { cleanString } from "../../../../src/server/validation";
 import {
@@ -68,23 +68,18 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const sessionToken = cleanString(url.searchParams.get("sessionToken"), 256);
     const includePrivateDumps = url.searchParams.get("includePrivateDumps") === "true";
+    const expectsAuthenticatedOwner = url.searchParams.get("expectsAuthenticatedOwner") === "true";
     if (!sessionToken) return badRequest("session token is required");
 
     const supabase = getSupabaseAdmin();
-    const sessionTokenHash = hashToken(sessionToken);
+    const owner = await resolveRequestOwner({ request, sessionToken });
+    assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner);
+    const sessionTokenHash = owner.sessionTokenHash;
     const [{ data: dumps, error }, { data: fieldNotes, error: fieldNotesError }] = await Promise.all([
-      supabase
-        .from("dumps")
-        .select("id, content, created_at, supermemory_id, supermemory_status")
-        .eq("session_token_hash", sessionTokenHash)
+      applyOwnerFilter(supabase.from("dumps").select("id, content, created_at, supermemory_id, supermemory_status"), owner)
         .order("created_at", { ascending: false })
         .limit(80),
-      supabase
-        .from("field_notes")
-        .select("*")
-        .eq("session_token_hash", sessionTokenHash)
-        .order("created_at", { ascending: false })
-        .limit(50),
+      applyOwnerFilter(supabase.from("field_notes").select("*"), owner).order("created_at", { ascending: false }).limit(50),
     ]);
     const hasFieldNoteSupermemoryColumns = !isMissingColumnError(fieldNotesError);
     if (isMissingTableError(error) || isMissingTableError(fieldNotesError)) {
@@ -95,7 +90,7 @@ export async function GET(request: Request) {
 
     const fallbackFieldNotes = hasFieldNoteSupermemoryColumns
       ? fieldNotes || []
-      : await loadFieldNotesWithoutSupermemoryColumns({ supabase, sessionTokenHash });
+      : await loadFieldNotesWithoutSupermemoryColumns({ supabase, owner });
 
     const dumpRows = dumps || [];
     const fieldNoteRows = fallbackFieldNotes;
@@ -251,15 +246,15 @@ function isMissingColumnError(error: unknown) {
 
 async function loadFieldNotesWithoutSupermemoryColumns({
   supabase,
-  sessionTokenHash,
+  owner,
 }: {
   supabase: SupabaseAdmin;
-  sessionTokenHash: string;
+  owner: Awaited<ReturnType<typeof resolveRequestOwner>>;
 }) {
-  const { data, error } = await supabase
-    .from("field_notes")
-    .select("id, title, content, source_dump_ids, is_published, published_at, created_at")
-    .eq("session_token_hash", sessionTokenHash)
+  const { data, error } = await applyOwnerFilter(
+    supabase.from("field_notes").select("id, title, content, source_dump_ids, is_published, published_at, created_at"),
+    owner,
+  )
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) throw error;
@@ -296,8 +291,7 @@ async function syncMissingFieldNotes({
         supermemory_status: result.status,
         supermemory_synced_at: new Date().toISOString(),
       })
-      .eq("id", fieldNote.id)
-      .eq("session_token_hash", sessionTokenHash);
+      .eq("id", fieldNote.id);
     if (error) throw error;
 
     fieldNote.supermemory_id = result.id;
@@ -329,8 +323,7 @@ async function syncOptedInPrivateDumps({
         supermemory_status: result.status,
         supermemory_synced_at: new Date().toISOString(),
       })
-      .eq("id", dump.id)
-      .eq("session_token_hash", sessionTokenHash);
+      .eq("id", dump.id);
     if (error) throw error;
 
     dump.supermemory_id = result.id;

@@ -88,6 +88,13 @@ create table anon_audit (
 - `POST /api/posts/:id/reactions` toggles a phrase reaction using a hashed session token.
 - `POST /api/spaces/:slug/first-post-dismissed` marks the creator-first prompt as dismissed.
 - `POST /api/cron/heartbeats` generates weekly heartbeats from anonymised post data.
+- `POST /api/waitlist` records an explicit landing-page email opt-in and returns success for duplicates.
+
+## Waitlist
+
+The landing-page waitlist stores only explicit email signups in `waitlist_signups`: normalized email, source, and creation time. It must not store IP address, user agent, session token, room slug, visitor data, or any other implicit tracking field.
+
+Duplicate emails should be treated as success so people can resubmit harmlessly. The table is written only through the server route and has row-level security enabled.
 
 ## Dump V1
 
@@ -100,6 +107,8 @@ Team reads show only approved field notes. The flow is: select private dumps, re
 Public profiles and account migration are not in this implementation yet. When identity lands, signup must migrate existing dump rows and field-note drafts without changing visibility.
 
 Prototype public profiles now exist as a no-signup bridge: a browser session can claim one public handle and selectively add already-published field notes to `mumbl.wtf/@handle`. Private dumps and field-note drafts never appear there. This is intentionally per-note opt-in and should be replaced or migrated carefully when full identity arrives.
+
+Email magic-link login now exists only for private dump persistence. Anonymous dumping still works without signup. When a user logs in, Mumbl links the current browser session's dumps, field-note drafts, public profile, and dump insights to the Supabase Auth user id. Visibility does not change, and room posts/reactions continue to use the anonymous browser session token so auth never becomes room identity.
 
 ## Local Setup
 

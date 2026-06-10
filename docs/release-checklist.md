@@ -47,6 +47,7 @@ Use this every time we move work from `dev` to `main`.
 ## Environment variables to keep separate
 
 - `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `MUMBL_TOKEN_HASH_SECRET`
 - `CRON_SECRET`
