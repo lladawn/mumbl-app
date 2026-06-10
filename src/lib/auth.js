@@ -41,9 +41,9 @@ export async function requestMagicLink(email) {
   if (error) throw error;
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(next = "/dump") {
   const supabase = await getBrowserSupabase();
-  const redirectTo = `${window.location.origin}/auth/callback?next=/dump`;
+  const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {

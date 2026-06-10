@@ -69,3 +69,15 @@ Why:
 Future improvements:
 - Add provider-backed reflection behind an opt-in toggle once budget and privacy copy are settled.
 - Generate `dump_insights` weekly for users with enough dumps, using a daily-or-weekly cron posture compatible with the current free-tier lane.
+
+## Slack Beta
+
+Current compromise:
+- Slack is free during beta. There is no 30-day countdown, no credit card, and no usage gate.
+- The beta supports only explicit user actions: `/mumbl [text]` and the `save_to_mumbl` message shortcut.
+- The Slack app requests `commands`, `users:read`, and `users:read.email` only. It does not request channel history or message history scopes.
+- Slack daily check-in reminders are deferred because a 15-minute scheduler does not fit the free-tier posture.
+
+Future improvements:
+- Add pricing and workspace plan gates after beta usage proves the integration is worth charging for.
+- Add opt-in daily reminders only if the scheduling/cost tradeoff is explicitly approved.

@@ -85,6 +85,21 @@ For dump login, enable Supabase Google OAuth and allow `/auth/callback` in the S
 
 Until those variables exist, API routes return a setup `503`.
 
+## Slack Beta Setup
+
+The Slack app is a free beta entry point for private dumps. It supports `/mumbl [text]` and a `save_to_mumbl` message shortcut, and it does not read channel history.
+
+In Slack app settings:
+
+- OAuth redirect URL: `https://mumbl.wtf/api/slack/oauth/callback`
+- Slash command request URL: `https://mumbl.wtf/api/slack/commands`
+- Interactivity request URL: `https://mumbl.wtf/api/slack/interactions`
+- Bot scopes: `commands`, `users:read`, `users:read.email`
+
+Set `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`, and `MUMBL_SLACK_TOKEN_ENCRYPTION_KEY` in the deployment environment. Install through `/api/slack/install`.
+
+Slack reminders are intentionally not part of the beta because frequent scheduling does not fit the current free-tier posture.
+
 ## Branches And Environments
 
 Use `main` for production and `dev` for shared staging / preview work.
