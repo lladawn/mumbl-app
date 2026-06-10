@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createRemoteSpace } from "../lib/api";
-import { trackEvent } from "../lib/analytics";
+import { trackConversionEvent, trackEvent } from "../lib/analytics";
 import { vibes } from "../lib/constants";
 import Toast from "./Toast";
 
@@ -23,10 +23,10 @@ export default function CreatePageClient() {
     setToast("");
     try {
       const { slug } = await createRemoteSpace({ name, vibe: selectedVibe });
-      trackEvent("space_created", { vibe: selectedVibe });
+      trackConversionEvent("space_created", { vibe: selectedVibe });
       router.push(`/r/${slug}`);
     } catch (error) {
-      trackEvent("space_create_failed", { vibe: selectedVibe });
+      trackConversionEvent("space_create_failed", { vibe: selectedVibe });
       setToast(error.message || "couldn't create that mumbl yet.");
       setIsCreating(false);
     }
@@ -62,7 +62,10 @@ export default function CreatePageClient() {
                     className={`pill-button ${selectedVibe === key ? "active" : ""}`}
                     type="button"
                     key={key}
-                    onClick={() => setSelectedVibe(key)}
+                    onClick={() => {
+                      setSelectedVibe(key);
+                      trackEvent("space_vibe_selected", { vibe: key });
+                    }}
                     disabled={isCreating}
                   >
                     <strong>{vibe.label}</strong>

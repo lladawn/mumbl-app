@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useRecentSlug } from "../hooks/useRecentSlug";
 import { joinWaitlist } from "../lib/api";
+import { trackConversionEvent, trackDemoEntry, trackPublicCta } from "../lib/analytics";
 import { publicDemoRoom } from "../lib/constants";
 import JoinModal from "./JoinModal";
 
@@ -113,11 +114,13 @@ export default function HomeView() {
 
     setWaitlistMessage("");
     if (!email) {
+      trackConversionEvent("waitlist_submit_failed", { reason: "empty" });
       setWaitlistStatus("error");
       setWaitlistMessage("drop your email in first.");
       return;
     }
     if (!isValidEmail(email)) {
+      trackConversionEvent("waitlist_submit_failed", { reason: "invalid" });
       setWaitlistStatus("error");
       setWaitlistMessage("drop in a real email and we'll save your spot.");
       return;
@@ -126,10 +129,12 @@ export default function HomeView() {
     setWaitlistStatus("submitting");
     try {
       await joinWaitlist({ email });
+      trackConversionEvent("waitlist_submitted", { source: "landing" });
       setWaitlistEmail("");
       setWaitlistStatus("success");
       setWaitlistMessage("you're on it. we'll keep it useful.");
     } catch (error) {
+      trackConversionEvent("waitlist_submit_failed", { reason: "api" });
       setWaitlistStatus("error");
       setWaitlistMessage(error.message || "couldn't join the waitlist yet. try again in a minute.");
     }
@@ -177,10 +182,17 @@ export default function HomeView() {
               ) : null}
             </form>
             <div className="hero-actions">
-              <Link className="ghost-button button-link" href={publicDemoRoom.href}>
+              <Link className="ghost-button button-link" href={publicDemoRoom.href} onClick={() => trackDemoEntry("hero")}>
                 try the demo
               </Link>
-              <button className="ghost-button" type="button" onClick={() => setJoinOpen(true)}>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => {
+                  trackPublicCta("join_existing_room", { source: "hero" });
+                  setJoinOpen(true);
+                }}
+              >
                 already have a link?
               </button>
             </div>
@@ -329,16 +341,16 @@ export default function HomeView() {
             <p>join the waitlist for quick voice dumps, field notes, and team memory.</p>
           </div>
           <div className="cta-panel">
-            <a className="solid-button button-link" href="#waitlist">
+            <a className="solid-button button-link" href="#waitlist" onClick={() => trackPublicCta("waitlist_anchor", { source: "bottom_cta" })}>
               join the waitlist
             </a>
-            <Link className="ghost-button button-link" href="/create">
+            <Link className="ghost-button button-link" href="/create" onClick={() => trackPublicCta("create_room", { source: "bottom_cta" })}>
               create a room
             </Link>
-            <Link className="ghost-button button-link" href={publicDemoRoom.href}>
+            <Link className="ghost-button button-link" href={publicDemoRoom.href} onClick={() => trackDemoEntry("bottom_cta")}>
               try the demo
             </Link>
-            <a className="ghost-button button-link" href={teamNeedsMailHref}>
+            <a className="ghost-button button-link" href={teamNeedsMailHref} onClick={() => trackPublicCta("email_team_needs", { source: "bottom_cta" })}>
               tell us what your team needs
             </a>
           </div>
@@ -355,11 +367,11 @@ export default function HomeView() {
             <p>private dumps become team reads, so the work between docs and shipped features does not disappear.</p>
           </div>
           <nav aria-label="mumbl footer links">
-            <a href="https://twitter.com/lla_dawn" rel="noreferrer" target="_blank">
+            <a href="https://twitter.com/lla_dawn" rel="noreferrer" target="_blank" onClick={() => trackPublicCta("twitter_outbound", { source: "footer" })}>
               twitter @lla_dawn
             </a>
-            <a href={teamNeedsMailHref}>mumbl.wtf@gmail.com</a>
-            <a href={calendlyHref} rel="noreferrer" target="_blank">
+            <a href={teamNeedsMailHref} onClick={() => trackPublicCta("email_outbound", { source: "footer" })}>mumbl.wtf@gmail.com</a>
+            <a href={calendlyHref} rel="noreferrer" target="_blank" onClick={() => trackPublicCta("calendly_outbound", { source: "footer" })}>
               book a call
             </a>
           </nav>
