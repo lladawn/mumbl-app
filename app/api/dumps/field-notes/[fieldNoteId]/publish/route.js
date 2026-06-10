@@ -1,6 +1,6 @@
 import { badRequest, notFound, ok, serverError } from "../../../../../../src/server/http";
 import { enforceRateLimit } from "../../../../../../src/server/rateLimit";
-import { hashToken } from "../../../../../../src/server/hash";
+import { applyOwnerFilter, resolveRequestOwner } from "../../../../../../src/server/auth";
 import { serializeFieldNote } from "../../../../../../src/server/dumps";
 import { getSupabaseAdmin } from "../../../../../../src/server/supabase";
 import { cleanString } from "../../../../../../src/server/validation";
@@ -24,10 +24,10 @@ export async function POST(request, { params }) {
 
     const supabase = getSupabaseAdmin();
     await enforceRateLimit({ supabase, action: "post", sessionToken });
-    const sessionTokenHash = hashToken(sessionToken);
+    const owner = await resolveRequestOwner({ request, sessionToken });
 
     const [{ data: fieldNote, error: noteError }, { data: space, error: spaceError }] = await Promise.all([
-      supabase.from("field_notes").select("*").eq("id", fieldNoteId).eq("session_token_hash", sessionTokenHash).single(),
+      applyOwnerFilter(supabase.from("field_notes").select("*").eq("id", fieldNoteId), owner).single(),
       supabase.from("spaces").select("id").eq("slug", slug).single(),
     ]);
     if (noteError?.code === "PGRST116") return notFound("field note not found");
@@ -61,7 +61,6 @@ export async function POST(request, { params }) {
         published_at: new Date().toISOString(),
       })
       .eq("id", fieldNote.id)
-      .eq("session_token_hash", sessionTokenHash)
       .select("*")
       .single();
     if (updateError) throw updateError;
@@ -69,7 +68,7 @@ export async function POST(request, { params }) {
     if (isAnonymous) {
       await supabase.from("anon_audit").insert({
         post_id: post.id,
-        session_token_hash: sessionTokenHash,
+        session_token_hash: owner.sessionTokenHash,
       });
     }
 

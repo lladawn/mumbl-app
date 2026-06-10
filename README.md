@@ -74,12 +74,14 @@ The frontend now uses these backend route handlers for spaces, posts, reactions,
 
 1. Create a Supabase project.
 2. Copy `.env.example` to `.env.local`.
-3. Fill in `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `MUMBL_TOKEN_HASH_SECRET`, `MUMBL_SIDE_QUEST_ENCRYPTION_KEY`, and `CRON_SECRET`.
+3. Fill in `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `MUMBL_TOKEN_HASH_SECRET`, `MUMBL_SIDE_QUEST_ENCRYPTION_KEY`, and `CRON_SECRET`.
 4. Authenticate the Supabase CLI with `npx supabase login`.
 5. Run `npm run db:link -- your-project-ref` or `npm run db:link -- https://your-project.supabase.co`.
    `npm run db:link:staging` reads `.env.local`; `npm run db:link:prod` reads `.env.production.local`.
-6. Run `npm run db:push` to apply `supabase/migrations/0001_initial_schema.sql`.
+6. Run `npm run db:push` to apply the migrations.
 7. Restart `npm run app`.
+
+For dump login, enable Supabase Google OAuth and allow `/auth/callback` in the Supabase Auth redirect URLs for each environment, for example `http://127.0.0.1:3000/auth/callback` locally and `https://mumbl.wtf/auth/callback` in production. Email magic-link code is kept dormant for now; custom SMTP is recommended before exposing it again.
 
 Until those variables exist, API routes return a setup `503`.
 

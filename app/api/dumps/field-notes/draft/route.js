@@ -1,6 +1,6 @@
 import { badRequest, ok, serverError } from "../../../../../src/server/http";
 import { draftFieldNote } from "../../../../../src/server/fieldNotes";
-import { hashToken } from "../../../../../src/server/hash";
+import { applyOwnerFilter, ownerInsertFields, resolveRequestOwner } from "../../../../../src/server/auth";
 import { enforceRateLimit } from "../../../../../src/server/rateLimit";
 import { serializeFieldNote } from "../../../../../src/server/dumps";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
@@ -21,12 +21,8 @@ export async function POST(request) {
     const supabase = getSupabaseAdmin();
     await enforceRateLimit({ supabase, action: "field_note", sessionToken });
 
-    const sessionTokenHash = hashToken(sessionToken);
-    const { data: dumps, error: dumpsError } = await supabase
-      .from("dumps")
-      .select("*")
-      .eq("session_token_hash", sessionTokenHash)
-      .in("id", dumpIds);
+    const owner = await resolveRequestOwner({ request, sessionToken });
+    const { data: dumps, error: dumpsError } = await applyOwnerFilter(supabase.from("dumps").select("*").in("id", dumpIds), owner);
     if (dumpsError) throw dumpsError;
     if (!dumps?.length) return badRequest("no matching private dumps found");
 
@@ -36,7 +32,7 @@ export async function POST(request) {
     const { data: fieldNote, error: noteError } = await supabase
       .from("field_notes")
       .insert({
-        session_token_hash: sessionTokenHash,
+        ...ownerInsertFields(owner),
         source_dump_ids: draft.sourceDumpIds,
         title: draft.title || "field note",
         content: draft.content,

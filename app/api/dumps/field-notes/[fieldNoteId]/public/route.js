@@ -1,5 +1,5 @@
 import { badRequest, notFound, ok, serverError } from "../../../../../../src/server/http";
-import { hashToken } from "../../../../../../src/server/hash";
+import { applyOwnerFilter, resolveRequestOwner } from "../../../../../../src/server/auth";
 import { serializeFieldNote } from "../../../../../../src/server/dumps";
 import { getSupabaseAdmin } from "../../../../../../src/server/supabase";
 import { cleanString } from "../../../../../../src/server/validation";
@@ -18,13 +18,11 @@ export async function PATCH(request, { params }) {
     if (isPublic && !handle) return badRequest("choose a public handle first");
 
     const supabase = getSupabaseAdmin();
-    const sessionTokenHash = hashToken(sessionToken);
-    const { data: fieldNote, error: noteError } = await supabase
-      .from("field_notes")
-      .select("*")
-      .eq("id", fieldNoteId)
-      .eq("session_token_hash", sessionTokenHash)
-      .single();
+    const owner = await resolveRequestOwner({ request, sessionToken });
+    const { data: fieldNote, error: noteError } = await applyOwnerFilter(
+      supabase.from("field_notes").select("*").eq("id", fieldNoteId),
+      owner,
+    ).single();
     if (noteError?.code === "PGRST116") return notFound("field note not found");
     if (isMissingColumnError(noteError) || isMissingTableError(noteError)) return serverError(missingPublicProfileMigrationError());
     if (noteError) throw noteError;
@@ -32,12 +30,10 @@ export async function PATCH(request, { params }) {
 
     let profile = null;
     if (isPublic) {
-      const { data: profileRow, error: profileError } = await supabase
-        .from("public_profiles")
-        .select("*")
-        .eq("session_token_hash", sessionTokenHash)
-        .eq("handle", handle)
-        .single();
+      const { data: profileRow, error: profileError } = await applyOwnerFilter(
+        supabase.from("public_profiles").select("*").eq("handle", handle),
+        owner,
+      ).single();
       if (profileError?.code === "PGRST116") return badRequest("create that public handle first");
       if (isMissingTableError(profileError)) return serverError(missingPublicProfileMigrationError());
       if (profileError) throw profileError;
@@ -60,7 +56,6 @@ export async function PATCH(request, { params }) {
       .from("field_notes")
       .update(updates)
       .eq("id", fieldNote.id)
-      .eq("session_token_hash", sessionTokenHash)
       .select("*")
       .single();
     if (isMissingColumnError(updateError)) return serverError(missingPublicProfileMigrationError());

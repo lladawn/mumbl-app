@@ -1,5 +1,5 @@
 import { badRequest, ok, serverError } from "../../../src/server/http";
-import { hashToken } from "../../../src/server/hash";
+import { applyOwnerFilter, ownerInsertFields, ownerMatches, resolveRequestOwner } from "../../../src/server/auth";
 import { getSupabaseAdmin } from "../../../src/server/supabase";
 import { cleanString } from "../../../src/server/validation";
 import { isValidHandle, normalizeHandle, serializePublicProfile } from "../../../src/server/publicProfiles";
@@ -11,11 +11,8 @@ export async function GET(request) {
     if (!sessionToken) return badRequest("session token is required");
 
     const supabase = getSupabaseAdmin();
-    const sessionTokenHash = hashToken(sessionToken);
-    const { data: profile, error } = await supabase
-      .from("public_profiles")
-      .select("*")
-      .eq("session_token_hash", sessionTokenHash)
+    const owner = await resolveRequestOwner({ request, sessionToken });
+    const { data: profile, error } = await applyOwnerFilter(supabase.from("public_profiles").select("*"), owner)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
@@ -43,7 +40,7 @@ export async function POST(request) {
     if (!isValidHandle(handle)) return badRequest("choose a handle with 2-30 letters, numbers, underscores, or dashes");
 
     const supabase = getSupabaseAdmin();
-    const sessionTokenHash = hashToken(sessionToken);
+    const owner = await resolveRequestOwner({ request, sessionToken });
     const { data: existingForHandle, error: handleError } = await supabase
       .from("public_profiles")
       .select("*")
@@ -51,18 +48,18 @@ export async function POST(request) {
       .maybeSingle();
     if (isMissingTableError(handleError)) return serverError(missingPublicProfileMigrationError());
     if (handleError) throw handleError;
-    if (existingForHandle && existingForHandle.session_token_hash !== sessionTokenHash) {
+    if (existingForHandle && !ownerMatches(existingForHandle, owner)) {
       return badRequest("that handle is already taken");
     }
 
-    const { data: existingForSession, error: sessionError } = await supabase
-      .from("public_profiles")
-      .select("*")
-      .eq("session_token_hash", sessionTokenHash)
+    let { data: existingForSession, error: sessionError } = await applyOwnerFilter(supabase.from("public_profiles").select("*"), owner)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
     if (sessionError) throw sessionError;
+    if (!existingForSession && existingForHandle && ownerMatches(existingForHandle, owner)) {
+      existingForSession = existingForHandle;
+    }
 
     const mutation = existingForSession
       ? supabase
@@ -71,7 +68,7 @@ export async function POST(request) {
           .eq("id", existingForSession.id)
       : supabase
           .from("public_profiles")
-          .insert({ session_token_hash: sessionTokenHash, handle, display_name: displayName || handle, bio });
+          .insert({ ...ownerInsertFields(owner), handle, display_name: displayName || handle, bio });
 
     const { data: profile, error } = await mutation.select("*").single();
     if (error?.code === "23505") return badRequest("that handle is already taken");

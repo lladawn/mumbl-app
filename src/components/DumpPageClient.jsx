@@ -16,6 +16,7 @@ import {
   updateDump,
   updateFieldNote,
 } from "../lib/api";
+import { getAuthSession, signInWithGoogle, signOutOfDump } from "../lib/auth";
 import { getDumpMemoryOptIn, getRecentSlug, setDumpMemoryOptIn } from "../lib/storage";
 import Toast from "./Toast";
 
@@ -46,6 +47,9 @@ export default function DumpPageClient({ mode = "home" }) {
   const [publicNameDraft, setPublicNameDraft] = useState("");
   const [publicBioDraft, setPublicBioDraft] = useState("");
   const [publicModalOpen, setPublicModalOpen] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [loginStatus, setLoginStatus] = useState("idle");
+  const [authState, setAuthState] = useState({ status: "checking", email: "" });
   const [selectedDumpIds, setSelectedDumpIds] = useState([]);
   const [pendingDraft, setPendingDraft] = useState(false);
   const [publishingNoteId, setPublishingNoteId] = useState("");
@@ -61,26 +65,7 @@ export default function DumpPageClient({ mode = "home" }) {
   useEffect(() => {
     let mounted = true;
     async function load() {
-      try {
-        const [result, profileResult] = await Promise.all([fetchDumps(), fetchPublicProfileForSession()]);
-        if (!mounted) return;
-        setDumps(result.dumps || []);
-        setFieldNotes(result.fieldNotes || []);
-        const nextProfile = profileResult.profile || null;
-        setPublicProfile(nextProfile);
-        setPublicProfileStatus(profileResult.migrationRequired ? "migration" : "ready");
-        if (nextProfile) {
-          setPublicHandleDraft(nextProfile.handle || "");
-          setPublicNameDraft(nextProfile.displayName || "");
-          setPublicBioDraft(nextProfile.bio || "");
-        }
-        setStatus("ready");
-      } catch (error) {
-        if (!mounted) return;
-        setStatus("error");
-        setPublicProfileStatus("error");
-        setToast(error.message || "couldn't open your dump yet.");
-      }
+      await Promise.all([refreshAuthState(() => mounted), loadDumpState(() => mounted)]);
     }
     load();
     return () => {
@@ -109,6 +94,45 @@ export default function DumpPageClient({ mode = "home" }) {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function handleGoogleLogin() {
+    if (loginStatus === "sending") return;
+
+    setLoginStatus("sending");
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      setLoginStatus("idle");
+      setToast(error.message || "couldn't start Google login.");
+    }
+  }
+
+  async function handleLogout() {
+    if (loginStatus === "sending") return;
+
+    setLoginStatus("sending");
+    try {
+      await signOutOfDump();
+      setAuthState({ status: "anonymous", email: "" });
+      closeLoginModal();
+      setStatus("loading");
+      await loadDumpState(() => true);
+      setToast("logged out. this browser is anonymous again.");
+    } catch (error) {
+      setLoginStatus("idle");
+      setToast(error.message || "couldn't log out.");
+    }
+  }
+
+  function openLoginModal() {
+    setLoginStatus("idle");
+    setLoginModalOpen(true);
+  }
+
+  function closeLoginModal() {
+    setLoginModalOpen(false);
+    setLoginStatus("idle");
   }
 
   async function handleUpdateDump(dump, nextContent, nextWantsReflection) {
@@ -276,6 +300,9 @@ export default function DumpPageClient({ mode = "home" }) {
           <Link className="ghost-button button-link" href="/dump/map">
             see the map
           </Link>
+          <button className="ghost-button" type="button" onClick={openLoginModal}>
+            {authState.status === "authenticated" ? "logged in" : "log in"}
+          </button>
           <button className="ghost-button" type="button" onClick={() => setPublicModalOpen(true)}>
             go public
           </button>
@@ -413,8 +440,96 @@ export default function DumpPageClient({ mode = "home" }) {
         />
       )}
 
+      {loginModalOpen && (
+        <LoginModal
+          status={loginStatus}
+          authState={authState}
+          close={closeLoginModal}
+          logout={handleLogout}
+          loginWithGoogle={handleGoogleLogin}
+        />
+      )}
+
       {toast && <Toast message={toast} onDone={() => setToast("")} />}
     </section>
+  );
+
+  async function refreshAuthState(isMounted = () => true) {
+    const session = await getAuthSession();
+    if (!isMounted()) return;
+    setAuthState(
+      session?.user
+        ? { status: "authenticated", email: session.user.email || "" }
+        : { status: "anonymous", email: "" },
+    );
+  }
+
+  async function loadDumpState(isMounted = () => true) {
+    try {
+      const [result, profileResult] = await Promise.all([fetchDumps(), fetchPublicProfileForSession()]);
+      if (!isMounted()) return;
+      setDumps(result.dumps || []);
+      setFieldNotes(result.fieldNotes || []);
+      const nextProfile = profileResult.profile || null;
+      setPublicProfile(nextProfile);
+      setPublicProfileStatus(profileResult.migrationRequired ? "migration" : "ready");
+      if (nextProfile) {
+        setPublicHandleDraft(nextProfile.handle || "");
+        setPublicNameDraft(nextProfile.displayName || "");
+        setPublicBioDraft(nextProfile.bio || "");
+      }
+      setStatus("ready");
+    } catch (error) {
+      if (!isMounted()) return;
+      setStatus("error");
+      setPublicProfileStatus("error");
+      setToast(error.message || "couldn't open your dump yet.");
+    }
+  }
+}
+
+function LoginModal({ status, authState, close, logout, loginWithGoogle }) {
+  const isSending = status === "sending";
+  const isAuthenticated = authState.status === "authenticated";
+
+  return (
+    <div className="modal-backdrop" onClick={close}>
+      <div className="modal login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title" onClick={(event) => event.stopPropagation()}>
+        <div className="login-modal-head">
+          <p className="eyebrow">login</p>
+          <h2 id="login-title">{isAuthenticated ? "you're logged in" : "keep your dump"}</h2>
+          <p>
+            {isAuthenticated
+              ? "Your private dump follows this login. Rooms still stay anonymous."
+              : "Use Google to save or restore your private dump. Rooms stay anonymous."}
+          </p>
+        </div>
+        {isAuthenticated && (
+          <div className="login-signed-in">
+            {authState.email && <small>{authState.email}</small>}
+            <div className="login-actions">
+              <button className="ghost-button" type="button" onClick={logout} disabled={isSending}>
+                {isSending ? "logging out..." : "log out"}
+              </button>
+              <button className="solid-button" type="button" onClick={close} disabled={isSending}>
+                done
+              </button>
+            </div>
+          </div>
+        )}
+        {!isAuthenticated && (
+          <div className="login-options">
+            <button className="solid-button button-with-loader google-login-button" type="button" onClick={loginWithGoogle} disabled={isSending}>
+              {isSending && <span className="mini-loader" aria-hidden="true" />}
+              {isSending ? "opening Google..." : "continue with Google"}
+            </button>
+            <button className="ghost-button" type="button" onClick={close} disabled={isSending}>
+              not now
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

@@ -101,6 +101,8 @@ Public profiles and account migration are not in this implementation yet. When i
 
 Prototype public profiles now exist as a no-signup bridge: a browser session can claim one public handle and selectively add already-published field notes to `mumbl.wtf/@handle`. Private dumps and field-note drafts never appear there. This is intentionally per-note opt-in and should be replaced or migrated carefully when full identity arrives.
 
+Email magic-link login now exists only for private dump persistence. Anonymous dumping still works without signup. When a user logs in, Mumbl links the current browser session's dumps, field-note drafts, public profile, and dump insights to the Supabase Auth user id. Visibility does not change, and room posts/reactions continue to use the anonymous browser session token so auth never becomes room identity.
+
 ## Local Setup
 
 1. Create a Supabase project.

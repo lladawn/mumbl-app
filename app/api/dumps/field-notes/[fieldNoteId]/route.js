@@ -1,5 +1,5 @@
 import { badRequest, notFound, ok, serverError } from "../../../../../src/server/http";
-import { hashToken } from "../../../../../src/server/hash";
+import { applyOwnerFilter, resolveRequestOwner } from "../../../../../src/server/auth";
 import { serializeFieldNote } from "../../../../../src/server/dumps";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
 import { cleanString } from "../../../../../src/server/validation";
@@ -18,13 +18,11 @@ export async function PATCH(request, { params }) {
     if (!content) return badRequest("field note content is required");
 
     const supabase = getSupabaseAdmin();
-    const sessionTokenHash = hashToken(sessionToken);
-    const { data: fieldNote, error: noteError } = await supabase
-      .from("field_notes")
-      .select("*")
-      .eq("id", fieldNoteId)
-      .eq("session_token_hash", sessionTokenHash)
-      .single();
+    const owner = await resolveRequestOwner({ request, sessionToken });
+    const { data: fieldNote, error: noteError } = await applyOwnerFilter(
+      supabase.from("field_notes").select("*").eq("id", fieldNoteId),
+      owner,
+    ).single();
     if (noteError?.code === "PGRST116") return notFound("field note not found");
     if (noteError) throw noteError;
 
@@ -33,7 +31,6 @@ export async function PATCH(request, { params }) {
       .from("field_notes")
       .update(updates)
       .eq("id", fieldNote.id)
-      .eq("session_token_hash", sessionTokenHash)
       .select("*")
       .single();
     if (updateError) throw updateError;
@@ -62,13 +59,11 @@ export async function DELETE(request, { params }) {
     if (!sessionToken) return badRequest("session token is required");
 
     const supabase = getSupabaseAdmin();
-    const sessionTokenHash = hashToken(sessionToken);
-    const { data: fieldNote, error: noteError } = await supabase
-      .from("field_notes")
-      .select("*")
-      .eq("id", fieldNoteId)
-      .eq("session_token_hash", sessionTokenHash)
-      .single();
+    const owner = await resolveRequestOwner({ request, sessionToken });
+    const { data: fieldNote, error: noteError } = await applyOwnerFilter(
+      supabase.from("field_notes").select("*").eq("id", fieldNoteId),
+      owner,
+    ).single();
     if (noteError?.code === "PGRST116") return notFound("field note not found");
     if (noteError) throw noteError;
 
@@ -80,8 +75,7 @@ export async function DELETE(request, { params }) {
     const { error: deleteError } = await supabase
       .from("field_notes")
       .delete()
-      .eq("id", fieldNote.id)
-      .eq("session_token_hash", sessionTokenHash);
+      .eq("id", fieldNote.id);
     if (deleteError) throw deleteError;
 
     return ok({ deleted: true });
