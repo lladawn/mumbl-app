@@ -1,6 +1,15 @@
 import { getCreatorToken, loadSession, rememberRecentSlug, saveCreatorToken } from "./storage";
 import { authRequestContext } from "./auth";
 
+export async function joinWaitlist({ email }) {
+  const response = await fetch("/api/waitlist", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  return parseJson(response);
+}
+
 export async function fetchSpace(slug, { limit, before, type } = {}) {
   const sessionToken = loadSession();
   const params = new URLSearchParams({ sessionToken });

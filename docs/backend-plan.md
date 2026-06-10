@@ -88,6 +88,13 @@ create table anon_audit (
 - `POST /api/posts/:id/reactions` toggles a phrase reaction using a hashed session token.
 - `POST /api/spaces/:slug/first-post-dismissed` marks the creator-first prompt as dismissed.
 - `POST /api/cron/heartbeats` generates weekly heartbeats from anonymised post data.
+- `POST /api/waitlist` records an explicit landing-page email opt-in and returns success for duplicates.
+
+## Waitlist
+
+The landing-page waitlist stores only explicit email signups in `waitlist_signups`: normalized email, source, and creation time. It must not store IP address, user agent, session token, room slug, visitor data, or any other implicit tracking field.
+
+Duplicate emails should be treated as success so people can resubmit harmlessly. The table is written only through the server route and has row-level security enabled.
 
 ## Dump V1
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useRecentSlug } from "../hooks/useRecentSlug";
+import { joinWaitlist } from "../lib/api";
 import { feedbackRoom, publicDemoRoom } from "../lib/constants";
 import JoinModal from "./JoinModal";
 
@@ -115,7 +116,38 @@ const memoryStripItems = [
 export default function HomeView() {
   const router = useRouter();
   const [joinOpen, setJoinOpen] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistStatus, setWaitlistStatus] = useState("idle");
+  const [waitlistMessage, setWaitlistMessage] = useState("");
   const recentSlug = useRecentSlug();
+
+  async function handleWaitlistSubmit(event) {
+    event.preventDefault();
+    const email = waitlistEmail.trim();
+
+    setWaitlistMessage("");
+    if (!email) {
+      setWaitlistStatus("error");
+      setWaitlistMessage("drop your email in first.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setWaitlistStatus("error");
+      setWaitlistMessage("drop in a real email and we'll save your spot.");
+      return;
+    }
+
+    setWaitlistStatus("submitting");
+    try {
+      await joinWaitlist({ email });
+      setWaitlistEmail("");
+      setWaitlistStatus("success");
+      setWaitlistMessage("you're on it. we'll keep it useful.");
+    } catch (error) {
+      setWaitlistStatus("error");
+      setWaitlistMessage(error.message || "couldn't join the waitlist yet. try again in a minute.");
+    }
+  }
 
   return (
     <>
@@ -141,6 +173,37 @@ export default function HomeView() {
                 already have a link?
               </button>
             </div>
+            <form className="waitlist-form" onSubmit={handleWaitlistSubmit} noValidate>
+              <div>
+                <label htmlFor="waitlist-email">join the waitlist</label>
+                <p>we'll send the useful bits when mumbl is ready for more teams.</p>
+              </div>
+              <div className="waitlist-controls">
+                <input
+                  id="waitlist-email"
+                  type="email"
+                  value={waitlistEmail}
+                  onChange={(event) => {
+                    setWaitlistEmail(event.target.value);
+                    if (waitlistStatus !== "submitting") {
+                      setWaitlistStatus("idle");
+                      setWaitlistMessage("");
+                    }
+                  }}
+                  placeholder="you@company.com"
+                  autoComplete="email"
+                  disabled={waitlistStatus === "submitting"}
+                />
+                <button className="solid-button" type="submit" disabled={waitlistStatus === "submitting"}>
+                  {waitlistStatus === "submitting" ? "joining..." : "join waitlist"}
+                </button>
+              </div>
+              {waitlistMessage ? (
+                <p className={`waitlist-message ${waitlistStatus === "success" ? "success" : "error"}`} role="status">
+                  {waitlistMessage}
+                </p>
+              ) : null}
+            </form>
             <div className="landing-proof-strip" aria-label="mumbl promises">
               <span>dump first, share later</span>
               <span>built for the in-between</span>
@@ -374,6 +437,10 @@ export default function HomeView() {
       )}
     </>
   );
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 function MiniPost({ avatar, text, reactions, tint = false }) {
