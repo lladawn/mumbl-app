@@ -80,6 +80,27 @@ export async function authHeader() {
   return accessToken ? { authorization: `Bearer ${accessToken}` } : {};
 }
 
+export async function authRequestContext() {
+  try {
+    const supabase = await getBrowserSupabase();
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return { headers: {}, expectsAuthenticatedOwner: false };
+    const accessToken = data.session?.access_token || "";
+    return {
+      headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {},
+      expectsAuthenticatedOwner: Boolean(data.session?.user?.id),
+    };
+  } catch {
+    return { headers: {}, expectsAuthenticatedOwner: false };
+  }
+}
+
+export async function linkCurrentDumpSession() {
+  const accessToken = await getAuthAccessToken();
+  if (!accessToken) return null;
+  return linkCurrentBrowserSession(accessToken);
+}
+
 export async function signOutOfDump() {
   const supabase = await getBrowserSupabase();
   const { error } = await supabase.auth.signOut();

@@ -1,5 +1,5 @@
 import { badRequest, ok, serverError } from "../../../src/server/http";
-import { applyOwnerFilter, ownerInsertFields, ownerMatches, resolveRequestOwner } from "../../../src/server/auth";
+import { applyOwnerFilter, assertExpectedAuthenticatedOwner, ownerInsertFields, ownerMatches, resolveRequestOwner } from "../../../src/server/auth";
 import { getSupabaseAdmin } from "../../../src/server/supabase";
 import { cleanString } from "../../../src/server/validation";
 import { isValidHandle, normalizeHandle, serializePublicProfile } from "../../../src/server/publicProfiles";
@@ -8,10 +8,12 @@ export async function GET(request) {
   try {
     const url = new URL(request.url);
     const sessionToken = cleanString(url.searchParams.get("sessionToken"), 256);
+    const expectsAuthenticatedOwner = url.searchParams.get("expectsAuthenticatedOwner") === "true";
     if (!sessionToken) return badRequest("session token is required");
 
     const supabase = getSupabaseAdmin();
     const owner = await resolveRequestOwner({ request, sessionToken });
+    assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner);
     const { data: profile, error } = await applyOwnerFilter(supabase.from("public_profiles").select("*"), owner)
       .order("created_at", { ascending: true })
       .limit(1)
@@ -35,12 +37,14 @@ export async function POST(request) {
     const handle = normalizeHandle(body.handle);
     const displayName = cleanString(body.displayName || handle, 80);
     const bio = cleanString(body.bio, 220);
+    const expectsAuthenticatedOwner = body.expectsAuthenticatedOwner === true;
 
     if (!sessionToken) return badRequest("session token is required");
     if (!isValidHandle(handle)) return badRequest("choose a handle with 2-30 letters, numbers, underscores, or dashes");
 
     const supabase = getSupabaseAdmin();
     const owner = await resolveRequestOwner({ request, sessionToken });
+    assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner);
     const { data: existingForHandle, error: handleError } = await supabase
       .from("public_profiles")
       .select("*")

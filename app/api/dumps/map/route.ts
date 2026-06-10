@@ -1,5 +1,5 @@
 import { badRequest, ok, serverError } from "../../../../src/server/http";
-import { applyOwnerFilter, resolveRequestOwner } from "../../../../src/server/auth";
+import { applyOwnerFilter, assertExpectedAuthenticatedOwner, resolveRequestOwner } from "../../../../src/server/auth";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 import { cleanString } from "../../../../src/server/validation";
 import {
@@ -68,10 +68,12 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const sessionToken = cleanString(url.searchParams.get("sessionToken"), 256);
     const includePrivateDumps = url.searchParams.get("includePrivateDumps") === "true";
+    const expectsAuthenticatedOwner = url.searchParams.get("expectsAuthenticatedOwner") === "true";
     if (!sessionToken) return badRequest("session token is required");
 
     const supabase = getSupabaseAdmin();
     const owner = await resolveRequestOwner({ request, sessionToken });
+    assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner);
     const sessionTokenHash = owner.sessionTokenHash;
     const [{ data: dumps, error }, { data: fieldNotes, error: fieldNotesError }] = await Promise.all([
       applyOwnerFilter(supabase.from("dumps").select("id, content, created_at, supermemory_id, supermemory_status"), owner)

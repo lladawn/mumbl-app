@@ -16,7 +16,7 @@ import {
   updateDump,
   updateFieldNote,
 } from "../lib/api";
-import { getAuthSession, signInWithGoogle, signOutOfDump } from "../lib/auth";
+import { getAuthSession, linkCurrentDumpSession, signInWithGoogle, signOutOfDump } from "../lib/auth";
 import { getDumpMemoryOptIn, getRecentSlug, setDumpMemoryOptIn } from "../lib/storage";
 import Toast from "./Toast";
 
@@ -466,6 +466,7 @@ export default function DumpPageClient({ mode = "home" }) {
 
   async function loadDumpState(isMounted = () => true) {
     try {
+      await repairLoggedInSessionLink();
       const [result, profileResult] = await Promise.all([fetchDumps(), fetchPublicProfileForSession()]);
       if (!isMounted()) return;
       setDumps(result.dumps || []);
@@ -484,6 +485,14 @@ export default function DumpPageClient({ mode = "home" }) {
       setStatus("error");
       setPublicProfileStatus("error");
       setToast(error.message || "couldn't open your dump yet.");
+    }
+  }
+
+  async function repairLoggedInSessionLink() {
+    try {
+      await linkCurrentDumpSession();
+    } catch {
+      // The following fetch will surface auth/migration errors in the normal page flow.
     }
   }
 }

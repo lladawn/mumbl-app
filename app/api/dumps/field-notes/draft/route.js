@@ -1,6 +1,6 @@
 import { badRequest, ok, serverError } from "../../../../../src/server/http";
 import { draftFieldNote } from "../../../../../src/server/fieldNotes";
-import { applyOwnerFilter, ownerInsertFields, resolveRequestOwner } from "../../../../../src/server/auth";
+import { applyOwnerFilter, assertExpectedAuthenticatedOwner, ownerInsertFields, resolveRequestOwner } from "../../../../../src/server/auth";
 import { enforceRateLimit } from "../../../../../src/server/rateLimit";
 import { serializeFieldNote } from "../../../../../src/server/dumps";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
@@ -13,6 +13,7 @@ export async function POST(request) {
     const body = await request.json();
     const sessionToken = cleanString(body.sessionToken, 256);
     const dumpIds = Array.isArray(body.dumpIds) ? body.dumpIds.map((id) => cleanString(id, 64)).filter(Boolean) : [];
+    const expectsAuthenticatedOwner = body.expectsAuthenticatedOwner === true;
 
     if (!sessionToken) return badRequest("session token is required");
     if (!dumpIds.length) return badRequest("choose at least one dump");
@@ -22,6 +23,7 @@ export async function POST(request) {
     await enforceRateLimit({ supabase, action: "field_note", sessionToken });
 
     const owner = await resolveRequestOwner({ request, sessionToken });
+    assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner);
     const { data: dumps, error: dumpsError } = await applyOwnerFilter(supabase.from("dumps").select("*").in("id", dumpIds), owner);
     if (dumpsError) throw dumpsError;
     if (!dumps?.length) return badRequest("no matching private dumps found");

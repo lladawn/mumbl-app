@@ -1,5 +1,5 @@
 import { getCreatorToken, loadSession, rememberRecentSlug, saveCreatorToken } from "./storage";
-import { authHeader } from "./auth";
+import { authRequestContext } from "./auth";
 
 export async function fetchSpace(slug, { limit, before, type } = {}) {
   const sessionToken = loadSession();
@@ -46,8 +46,10 @@ export async function createRemotePost({ slug, type, content, isAnonymous, displ
 
 export async function fetchDumps() {
   const sessionToken = loadSession();
-  const response = await fetch(`/api/dumps?sessionToken=${encodeURIComponent(sessionToken)}`, {
-    headers: await authHeader(),
+  const auth = await authRequestContext();
+  const params = privateSessionParams(sessionToken, auth);
+  const response = await fetch(`/api/dumps?${params.toString()}`, {
+    headers: auth.headers,
     cache: "no-store",
   });
   return parseJson(response);
@@ -55,38 +57,42 @@ export async function fetchDumps() {
 
 export async function fetchDumpMap({ includePrivateDumps = false } = {}) {
   const sessionToken = loadSession();
-  const params = new URLSearchParams({ sessionToken });
+  const auth = await authRequestContext();
+  const params = privateSessionParams(sessionToken, auth);
   if (includePrivateDumps) params.set("includePrivateDumps", "true");
   const response = await fetch(`/api/dumps/map?${params.toString()}`, {
-    headers: await authHeader(),
+    headers: auth.headers,
     cache: "no-store",
   });
   return parseJson(response);
 }
 
 export async function createDump({ content, wantsReflection = false }) {
+  const auth = await authRequestContext();
   const response = await fetch("/api/dumps", {
     method: "POST",
-    headers: { "content-type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ content, wantsReflection, sessionToken: loadSession() }),
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ content, wantsReflection, sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
   });
   return parseJson(response);
 }
 
 export async function updateDump({ dumpId, content, wantsReflection = false }) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/dumps/${dumpId}`, {
     method: "PATCH",
-    headers: { "content-type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ content, wantsReflection, sessionToken: loadSession() }),
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ content, wantsReflection, sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
   });
   return parseJson(response);
 }
 
 export async function deleteDump(dumpId) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/dumps/${dumpId}`, {
     method: "DELETE",
-    headers: { "content-type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ sessionToken: loadSession() }),
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
   });
   return parseJson(response);
 }
@@ -101,19 +107,21 @@ export async function shareDumpToRoom({ dumpId, slug, isAnonymous = true, displa
 }
 
 export async function draftFieldNote({ dumpIds }) {
+  const auth = await authRequestContext();
   const response = await fetch("/api/dumps/field-notes/draft", {
     method: "POST",
-    headers: { "content-type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ dumpIds, sessionToken: loadSession() }),
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ dumpIds, sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
   });
   return parseJson(response);
 }
 
 export async function publishFieldNote({ fieldNoteId, slug, title, content, isAnonymous = true, displayName = "" }) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/dumps/field-notes/${fieldNoteId}/publish`, {
     method: "POST",
-    headers: { "content-type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ slug, title, content, isAnonymous, displayName, sessionToken: loadSession() }),
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ slug, title, content, isAnonymous, displayName, sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
   });
   const data = await parseJson(response);
   rememberRecentSlug(slug);
@@ -121,19 +129,21 @@ export async function publishFieldNote({ fieldNoteId, slug, title, content, isAn
 }
 
 export async function updateFieldNote({ fieldNoteId, title, content }) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/dumps/field-notes/${fieldNoteId}`, {
     method: "PATCH",
-    headers: { "content-type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ title, content, sessionToken: loadSession() }),
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ title, content, sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
   });
   return parseJson(response);
 }
 
 export async function deleteFieldNote(fieldNoteId) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/dumps/field-notes/${fieldNoteId}`, {
     method: "DELETE",
-    headers: { "content-type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ sessionToken: loadSession() }),
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
   });
   return parseJson(response);
 }
@@ -270,29 +280,39 @@ export async function reportSideQuestRoom(roomId) {
 }
 
 export async function fetchPublicProfileForSession() {
-  const response = await fetch(`/api/public-profiles?sessionToken=${encodeURIComponent(loadSession())}`, {
-    headers: await authHeader(),
+  const auth = await authRequestContext();
+  const params = privateSessionParams(loadSession(), auth);
+  const response = await fetch(`/api/public-profiles?${params.toString()}`, {
+    headers: auth.headers,
     cache: "no-store",
   });
   return parseJson(response);
 }
 
 export async function savePublicProfile({ handle, displayName = "", bio = "" }) {
+  const auth = await authRequestContext();
   const response = await fetch("/api/public-profiles", {
     method: "POST",
-    headers: { "content-type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ handle, displayName, bio, sessionToken: loadSession() }),
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ handle, displayName, bio, sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
   });
   return parseJson(response);
 }
 
 export async function setFieldNotePublic({ fieldNoteId, isPublic, handle }) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/dumps/field-notes/${fieldNoteId}/public`, {
     method: "PATCH",
-    headers: { "content-type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ isPublic, handle, sessionToken: loadSession() }),
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ isPublic, handle, sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
   });
   return parseJson(response);
+}
+
+function privateSessionParams(sessionToken, auth) {
+  const params = new URLSearchParams({ sessionToken });
+  if (auth.expectsAuthenticatedOwner) params.set("expectsAuthenticatedOwner", "true");
+  return params;
 }
 
 async function parseJson(response) {

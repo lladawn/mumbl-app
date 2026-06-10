@@ -1,6 +1,6 @@
 import { badRequest, notFound, ok, serverError } from "../../../../../../src/server/http";
 import { enforceRateLimit } from "../../../../../../src/server/rateLimit";
-import { applyOwnerFilter, resolveRequestOwner } from "../../../../../../src/server/auth";
+import { applyOwnerFilter, assertExpectedAuthenticatedOwner, resolveRequestOwner } from "../../../../../../src/server/auth";
 import { serializeFieldNote } from "../../../../../../src/server/dumps";
 import { getSupabaseAdmin } from "../../../../../../src/server/supabase";
 import { cleanString } from "../../../../../../src/server/validation";
@@ -15,6 +15,7 @@ export async function POST(request, { params }) {
     const content = cleanString(body.content, 4000);
     const isAnonymous = body.isAnonymous !== false;
     const displayName = isAnonymous ? null : cleanString(body.displayName, 48) || "someone brave";
+    const expectsAuthenticatedOwner = body.expectsAuthenticatedOwner === true;
 
     if (!fieldNoteId) return badRequest("field note id is required");
     if (!slug) return badRequest("space slug is required");
@@ -25,6 +26,7 @@ export async function POST(request, { params }) {
     const supabase = getSupabaseAdmin();
     await enforceRateLimit({ supabase, action: "post", sessionToken });
     const owner = await resolveRequestOwner({ request, sessionToken });
+    assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner);
 
     const [{ data: fieldNote, error: noteError }, { data: space, error: spaceError }] = await Promise.all([
       applyOwnerFilter(supabase.from("field_notes").select("*").eq("id", fieldNoteId), owner).single(),

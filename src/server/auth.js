@@ -32,6 +32,13 @@ export function ownerInsertFields(owner) {
   };
 }
 
+export function assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner) {
+  if (!expectsAuthenticatedOwner || owner.userId) return;
+  const error = new Error("login session expired. sign in again before saving to your dump.");
+  error.status = 401;
+  throw error;
+}
+
 export function ownerMatches(row, owner) {
   if (!row) return false;
   if (owner.userId && row.user_id === owner.userId) return true;

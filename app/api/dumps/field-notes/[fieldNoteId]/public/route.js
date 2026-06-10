@@ -1,5 +1,5 @@
 import { badRequest, notFound, ok, serverError } from "../../../../../../src/server/http";
-import { applyOwnerFilter, resolveRequestOwner } from "../../../../../../src/server/auth";
+import { applyOwnerFilter, assertExpectedAuthenticatedOwner, resolveRequestOwner } from "../../../../../../src/server/auth";
 import { serializeFieldNote } from "../../../../../../src/server/dumps";
 import { getSupabaseAdmin } from "../../../../../../src/server/supabase";
 import { cleanString } from "../../../../../../src/server/validation";
@@ -12,6 +12,7 @@ export async function PATCH(request, { params }) {
     const sessionToken = cleanString(body.sessionToken, 256);
     const isPublic = body.isPublic === true;
     const handle = normalizeHandle(body.handle);
+    const expectsAuthenticatedOwner = body.expectsAuthenticatedOwner === true;
 
     if (!fieldNoteId) return badRequest("field note id is required");
     if (!sessionToken) return badRequest("session token is required");
@@ -19,6 +20,7 @@ export async function PATCH(request, { params }) {
 
     const supabase = getSupabaseAdmin();
     const owner = await resolveRequestOwner({ request, sessionToken });
+    assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner);
     const { data: fieldNote, error: noteError } = await applyOwnerFilter(
       supabase.from("field_notes").select("*").eq("id", fieldNoteId),
       owner,
