@@ -98,6 +98,8 @@ Analytics should be opt-in per environment:
 - preview: optional
 - production: enabled
 
+See `docs/analytics.md` for the tracked event boundary, Umami setup, and the privacy rules that keep analytics aggregate rather than person-level.
+
 ## Important rule
 
 Treat `main` + Vercel Production + production Supabase as one lane.
