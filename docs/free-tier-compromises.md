@@ -58,7 +58,7 @@ Future improvements:
 
 Current compromise:
 - Per-entry AI reflection uses a deterministic local reflector in the route handler, not an external AI provider.
-- Team field-note drafting uses OpenAI only when the user clicks draft, sends selected dumps only, caps selection size, and rate-limits drafts per session with `OPENAI_MAX_DAILY_DRAFTS`.
+- Team field-note drafting uses OpenAI only when the user clicks draft, sends selected dumps only, caps selection size, and rate-limits drafts per session with `OPENAI_MAX_DAILY_DRAFTS`. Draft length adapts to source signal so tiny dumps stay short and honest, while richer selections can become story-shaped reads without costly padding.
 - The private map is rendered from the user's fetched dump text in the browser, with no weekly insight cron yet.
 - Team reads reuse the existing posts infrastructure, but only for approved `field_note` posts. Raw dumps are blocked from reads.
 

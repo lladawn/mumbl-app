@@ -110,7 +110,7 @@ Team reads show only approved field notes. The flow is: select private dumps, re
 
 During the Slack-native beta, `/r/:slug` opens to team reads. Legacy feed and wins routes remain available for compatibility, but they are not the primary room navigation and do not feed the heartbeat.
 
-`OPENAI_API_KEY`, `OPENAI_MODEL_FIELD_NOTE`, and `OPENAI_MAX_DAILY_DRAFTS` are server-only. The default model should stay cost-sensitive, currently `gpt-5.4-nano`, and the draft route sends only selected dumps, capped at 10 per request. Field-note drafting should produce publishable working-process notes: specific, human, readable, and useful enough for team reads or a public profile, while staying grounded only in the selected dumps.
+`OPENAI_API_KEY`, `OPENAI_MODEL_FIELD_NOTE`, and `OPENAI_MAX_DAILY_DRAFTS` are server-only. The default model should stay cost-sensitive, currently `gpt-5.4-nano`, and the draft route sends only selected dumps, capped at 10 per request. Field-note drafting should produce publishable working-process notes: specific, human, readable, and useful enough for team reads or a public profile, while staying grounded only in the selected dumps. Draft length is adaptive: tiny dumps should stay short and honest instead of becoming padded essays, while richer dump selections can become story-shaped reads with a real moment, tension, noticing, and takeaway.
 
 Prototype public profiles now exist as a no-signup bridge: a browser session can claim one public handle and selectively add already-published field notes to `mumbl.wtf/@handle`. Private dumps and field-note drafts never appear there. This is intentionally per-note opt-in and should be replaced or migrated carefully when full identity arrives.
 

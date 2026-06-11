@@ -1,4 +1,5 @@
 import { getServerEnv } from "./env";
+import { FIELD_NOTE_DRAFT_PROFILES, classifyFieldNoteDraftProfile, truncateDraftContent } from "./fieldNoteDraftProfile";
 
 const FIELD_NOTE_SCHEMA = {
   type: "object",
@@ -14,23 +15,29 @@ const FIELD_NOTE_SCHEMA = {
 const FIELD_NOTE_SYSTEM_PROMPT = `
 You turn private messy work dumps from an engineer into a publishable Mumbl field note.
 
-The output should feel like a short working-process blog someone would be happy to publish on a public profile or share with a team:
+The output should feel like a true field note someone would be happy to publish on a public profile or share with a team:
 - specific, human, and useful
 - written in first person when the dumps are personal
 - clear enough for a stranger to understand the working lesson
+- story-shaped when the source supports it: a moment, a tension, a noticing, and what changed in the writer
 - honest without sounding like therapy, HR, LinkedIn, or a productivity guru
 - grounded only in the provided dumps
 
 What to make:
 - a strong title, not a summary label
-- a 350-750 word draft when there is enough material
-- a readable arc: context, what the writer noticed, what changed or became clearer, and what someone else can learn
+- the requested draft length profile, without padding small source material
+- a readable shape: context, what the writer noticed, what changed or became clearer, and what someone else can learn only when the source supports it
+- a draft that is interesting to read, not a status update, summary, or documentation note
 - bullets only where they improve scanning, such as principles, signals, or takeaways
 - short paragraphs with breathing room
 - optional section labels in plain text, not markdown headings, when they help readability
 
 Privacy and taste rules:
 - Do not invent names, outcomes, metrics, tools, teams, or drama.
+- Do not expand a small dump into a fake essay.
+- If the source is tiny, preserve the original emotional signal and make it publishable, not bigger.
+- Never invent context, outcomes, or "lessons learned" to fill space.
+- Never turn uncertainty into certainty; keep doubt, partialness, and unresolved edges when they are the honest signal.
 - Do not preserve overly identifying details unless they are essential to the lesson.
 - Do not flatten the writer's voice into corporate polish.
 - Do not call it a "blog post" inside the draft.
@@ -51,6 +58,7 @@ export async function draftFieldNote({ dumps }) {
     label: `dump ${index + 1}`,
     content: dump.content,
   }));
+  const profile = FIELD_NOTE_DRAFT_PROFILES[classifyFieldNoteDraftProfile(dumps)] || FIELD_NOTE_DRAFT_PROFILES.full;
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -67,7 +75,12 @@ export async function draftFieldNote({ dumps }) {
         },
         {
           role: "user",
-          content: `Create one publishable field note from these work notes. Use every note that adds signal, but do not force weak material in.\n\nReturn JSON only with:
+          content: `Create one publishable field note from these work notes. Use every note that adds signal, but do not force weak material in.
+
+Draft length profile: ${profile.label}
+Target: ${profile.target}
+
+Return JSON only with:
 - title: a specific, compelling title
 - content: the full draft, with paragraphs and bullets where useful
 - visibilityReminder: one short reminder that the author should review before publishing\n\nWork notes:\n${JSON.stringify(selectedDumps)}`,
@@ -81,7 +94,7 @@ export async function draftFieldNote({ dumps }) {
           strict: true,
         },
       },
-      max_output_tokens: 2600,
+      max_output_tokens: profile.maxOutputTokens,
     }),
   });
 
@@ -96,7 +109,7 @@ export async function draftFieldNote({ dumps }) {
   const parsed = JSON.parse(extractResponseText(data));
   return {
     title: String(parsed.title || "").trim().slice(0, 120),
-    content: String(parsed.content || "").trim().slice(0, 4000),
+    content: truncateDraftContent(String(parsed.content || "").trim(), profile.maxContentChars),
     visibilityReminder:
       String(parsed.visibilityReminder || "").trim().slice(0, 180) || "Only publish this if it still feels true.",
     sourceDumpIds: dumps.map((dump) => dump.id),
