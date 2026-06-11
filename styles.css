@@ -524,46 +524,19 @@ h1 {
 }
 
 .slack-logo {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(2, 12px);
-  grid-template-rows: repeat(2, 12px);
   flex: 0 0 auto;
-  gap: 3px;
   width: 30px;
   height: 30px;
-  padding: 2px;
+  padding: 3px;
   border-radius: 8px;
   background: #fffefa;
   box-shadow: inset 0 0 0 1px rgba(22, 20, 18, 0.16);
 }
 
-.slack-logo span {
-  display: block;
-  border-radius: 999px;
-}
-
-.slack-logo span:nth-child(1) {
-  background: #36c5f0;
-}
-
-.slack-logo span:nth-child(2) {
-  background: #2eb67d;
-}
-
-.slack-logo span:nth-child(3) {
-  background: #ecb22e;
-}
-
-.slack-logo span:nth-child(4) {
-  background: #e01e5a;
-}
-
 .cta-slack-logo {
   width: 24px;
   height: 24px;
-  grid-template-columns: repeat(2, 9px);
-  grid-template-rows: repeat(2, 9px);
+  padding: 2px;
 }
 
 .cta-panel .solid-button {
