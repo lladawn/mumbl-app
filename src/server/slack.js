@@ -851,7 +851,7 @@ function slackDumpModal() {
           type: "plain_text_input",
           action_id: "value",
           multiline: true,
-          max_length: 4000,
+          max_length: 3000,
           placeholder: { type: "plain_text", text: "the thing worth keeping" },
         },
       },

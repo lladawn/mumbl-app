@@ -31,23 +31,27 @@ export async function POST(request) {
     const payload = JSON.parse(payloadText);
     if (payload.type === "block_actions") {
       const actionId = cleanString(payload.actions?.[0]?.action_id, 80);
-      if (actionId === "start_room_modal") {
-        await openSlackRoomModal({
-          teamId: cleanString(payload.team?.id, 80),
-          triggerId: cleanString(payload.trigger_id, 200),
-        });
-      }
-      if (actionId === "new_private_dump") {
-        await openSlackDumpModal({
-          teamId: cleanString(payload.team?.id, 80),
-          triggerId: cleanString(payload.trigger_id, 200),
-        });
+      try {
+        if (actionId === "start_room_modal") {
+          await openSlackRoomModal({
+            teamId: slackTeamId(payload),
+            triggerId: cleanString(payload.trigger_id, 200),
+          });
+        }
+        if (actionId === "new_private_dump") {
+          await openSlackDumpModal({
+            teamId: slackTeamId(payload),
+            triggerId: cleanString(payload.trigger_id, 200),
+          });
+        }
+      } catch (error) {
+        console.error("Slack App Home action failed", error);
       }
       return ok({});
     }
 
     if (payload.type === "view_submission" && payload.view?.callback_id === "create_private_dump") {
-      const teamId = cleanString(payload.team?.id, 80);
+      const teamId = slackTeamId(payload);
       const slackUserId = cleanString(payload.user?.id, 80);
       const content = cleanString(payload.view?.state?.values?.dump_content?.value?.value, 4000);
       if (!content) {
@@ -69,7 +73,7 @@ export async function POST(request) {
     }
 
     if (payload.type === "view_submission" && payload.view?.callback_id === "create_mumbl_room") {
-      const teamId = cleanString(payload.team?.id, 80);
+      const teamId = slackTeamId(payload);
       const slackUserId = cleanString(payload.user?.id, 80);
       const roomName = cleanString(payload.view?.state?.values?.room_name?.value?.value, 80);
       if (!roomName) {
@@ -120,6 +124,10 @@ export async function POST(request) {
   } catch (error) {
     return serverError(error);
   }
+}
+
+function slackTeamId(payload) {
+  return cleanString(payload.team?.id || payload.user?.team_id, 80);
 }
 
 async function saveModalDump({ teamId, slackUserId, content }) {
