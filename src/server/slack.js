@@ -475,6 +475,14 @@ export async function openSlackLoadingModal({ teamId, triggerId, title = "loadin
   });
 }
 
+export function slackLoadingModalView({ title = "loading", message = "opening mumbl..." } = {}) {
+  return slackLoadingModal({ title, message });
+}
+
+export function slackRoomModalView({ initialName = "" } = {}) {
+  return slackRoomModal({ initialName });
+}
+
 export async function slackFieldNoteDraftPickerView({ teamId, slackUserId }) {
   try {
     const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
@@ -1170,7 +1178,7 @@ export function slackFieldNoteEditModalView(fieldNote) {
           max_length: 3000,
         },
       },
-      context("Saving keeps this private. Publish to team reads from Mumbl after one last review."),
+      context("Saving keeps this private. Publish to a pinned Mumbl space when it feels ready."),
     ],
   };
 }
@@ -1469,7 +1477,7 @@ function slackFieldNoteReviewModal({ fieldNotes }) {
           options: fieldNotes.map((fieldNote) => fieldNoteOption(fieldNote)),
         },
       },
-      context("Drafts stay private here. Publishing still happens from Mumbl."),
+      context("Drafts stay private here. Publish from Slack or open the draft in Mumbl."),
     ],
   };
 }
