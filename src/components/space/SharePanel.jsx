@@ -1,12 +1,14 @@
 "use client";
 
 export default function SharePanel({ space, copyText }) {
-  const url = typeof window === "undefined" ? `/r/${space.slug}` : `${location.origin}/r/${space.slug}`;
+  const url = typeof window === "undefined" ? `/r/${space.slug}/reads` : `${location.origin}/r/${space.slug}/reads`;
 
   return (
     <div className={`panel share-panel ${space.firstPostDone ? "ready" : ""}`}>
       <h3>invite link</h3>
-      <p className="panel-copy">{space.firstPostDone ? "send it where work thoughts already leak." : "it exists. the first post matters more."}</p>
+      <p className="panel-copy">
+        {space.firstPostDone ? "send people to the reads when something is ready." : "invite teammates when the first team read is ready."}
+      </p>
       <div className="share-link-row">
         <div className="share-link" title={url}>
           {url}
@@ -16,13 +18,13 @@ export default function SharePanel({ space, copyText }) {
         </button>
       </div>
       <div className="share-actions">
-        <button className="share-button" type="button" onClick={() => copyText(`made a mumbl for us: ${url}\n\nanonymous-first. say the thing before it becomes a meeting.`, "slack note copied.", "slack")}>
+        <button className="share-button" type="button" onClick={() => copyText(`made a mumbl for us: ${url}\n\nprivate dumps can become team reads when they are ready.`, "slack note copied.", "slack")}>
           slack
         </button>
-        <button className="share-button" type="button" onClick={() => copyText(`just set up a mumbl for the team - where we can actually be honest at work, anonymously.\n\njoin us: ${url}`, "x post copied.", "x")}>
+        <button className="share-button" type="button" onClick={() => copyText(`just set up a mumbl for the team - private work thoughts, published as team reads by choice.\n\nread with us: ${url}`, "x post copied.", "x")}>
           x post
         </button>
-        <button className="share-button" type="button" onClick={() => copyText(`made us a mumbl: ${url}\n\nanonymous, quick, and hopefully less awkward than another retro.`, "whatsapp note copied.", "whatsapp")}>
+        <button className="share-button" type="button" onClick={() => copyText(`made us a mumbl: ${url}\n\nteam reads and heartbeat, without turning Slack into a diary.`, "whatsapp note copied.", "whatsapp")}>
           whatsapp
         </button>
       </div>

@@ -2,6 +2,8 @@ import { feedbackRoom, publicDemoRoom } from "../lib/constants";
 
 export function serializeSpace(space, posts = [], heartbeats = [], reactionRows = [], activeReactionRows = [], extras = {}) {
   const activeReactionKeys = new Set(activeReactionRows.map((row) => `${row.post_id}:${row.label}`));
+  const accountEditablePostIds = extras.accountEditablePostIds || new Set();
+  const localEditablePostIds = extras.localEditablePostIds || new Set();
   const knownRoomDescription = getKnownRoomDescription(space.slug);
 
   return {
@@ -15,6 +17,8 @@ export function serializeSpace(space, posts = [], heartbeats = [], reactionRows 
     publicName: space.public_name || "",
     createdAt: new Date(space.created_at).getTime(),
     dailyPrompt: extras.dailyPrompt ? serializePrompt(extras.dailyPrompt) : null,
+    slackTeamReads: extras.slackTeamReads ? serializeSlackTeamReads(extras.slackTeamReads) : null,
+    canManage: extras.canManage === true,
     roomVibe: extras.roomVibe || [],
     postsPage: extras.postsPage || {
       limit: posts.length,
@@ -23,8 +27,25 @@ export function serializeSpace(space, posts = [], heartbeats = [], reactionRows 
       nextCursor: "",
       type: "",
     },
-    posts: posts.map((post) => serializePost(post, reactionRows, activeReactionKeys)),
+    posts: posts.map((post) =>
+      serializePost(post, reactionRows, activeReactionKeys, {
+        canAuthorEdit: accountEditablePostIds.has(post.id),
+        localEditTokenAllowed: localEditablePostIds.has(post.id),
+      }),
+    ),
     heartbeats: heartbeats.map(serializeHeartbeat),
+  };
+}
+
+function serializeSlackTeamReads(row) {
+  return {
+    channelId: row.slack_channel_id || "",
+    channelName: row.slack_channel_name || "",
+    postingEnabled: row.posting_enabled === true,
+    isPrivate: row.is_private !== false,
+    lastPostedAt: row.last_posted_at ? new Date(row.last_posted_at).getTime() : null,
+    lastPostError: row.last_post_error || "",
+    lastPostErrorAt: row.last_post_error_at ? new Date(row.last_post_error_at).getTime() : null,
   };
 }
 
@@ -45,7 +66,7 @@ function serializePrompt(prompt) {
   };
 }
 
-export function serializePost(post, reactionRows = [], activeReactionKeys = new Set()) {
+export function serializePost(post, reactionRows = [], activeReactionKeys = new Set(), extras = {}) {
   const reactions = {};
   const activeReactions = [];
 
@@ -69,6 +90,8 @@ export function serializePost(post, reactionRows = [], activeReactionKeys = new 
     createdAt: new Date(post.created_at).getTime(),
     reactions,
     activeReactions,
+    canAuthorEdit: extras.canAuthorEdit === true,
+    localEditTokenAllowed: extras.localEditTokenAllowed === true,
   };
 }
 

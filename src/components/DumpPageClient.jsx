@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createDump,
   deleteDump,
+  deleteDumps,
   deleteFieldNote,
   draftFieldNote,
   fetchDumpMap,
@@ -16,8 +17,9 @@ import {
   updateDump,
   updateFieldNote,
 } from "../lib/api";
-import { getAuthSession, linkCurrentDumpSession, signInWithGoogle, signOutOfDump } from "../lib/auth";
+import { AUTH_CHANGED_EVENT, linkCurrentDumpSession } from "../lib/auth";
 import { getDumpMemoryOptIn, getRecentSlug, setDumpMemoryOptIn } from "../lib/storage";
+import { EditIcon, TrashIcon } from "./ActionIcons";
 import Toast from "./Toast";
 
 const placeholders = [
@@ -49,10 +51,9 @@ export default function DumpPageClient({ mode = "home" }) {
   const [publicNameDraft, setPublicNameDraft] = useState("");
   const [publicBioDraft, setPublicBioDraft] = useState("");
   const [publicModalOpen, setPublicModalOpen] = useState(false);
-  const [loginModalOpen, setLoginModalOpen] = useState(false);
-  const [loginStatus, setLoginStatus] = useState("idle");
-  const [authState, setAuthState] = useState({ status: "checking", email: "" });
   const [selectedDumpIds, setSelectedDumpIds] = useState([]);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [pendingDraft, setPendingDraft] = useState(false);
   const [publishingNoteId, setPublishingNoteId] = useState("");
   const [mutatingNoteId, setMutatingNoteId] = useState("");
@@ -67,6 +68,15 @@ export default function DumpPageClient({ mode = "home" }) {
 
   useEffect(() => {
     setRecentSlug(getRecentSlug(""));
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("fieldNote")) {
+      setActivePanel("notes");
+      setToast("draft ready. review it before it goes anywhere.");
+    }
+    if (params.get("spaceDeleted")) {
+      setToast("room deleted. field notes from it stayed in your dump.");
+      window.history.replaceState({}, "", "/dump");
+    }
   }, []);
 
   useEffect(() => {
@@ -84,12 +94,34 @@ export default function DumpPageClient({ mode = "home" }) {
 
   useEffect(() => {
     let mounted = true;
-    async function load() {
-      await Promise.all([refreshAuthState(() => mounted), loadDumpState(() => mounted)]);
-    }
-    load();
+    loadDumpState(() => mounted);
     return () => {
       mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function handleAuthChanged(event) {
+      if (!mounted) return;
+      setStatus("loading");
+      setSelectedDumpIds([]);
+      setConfirmBulkDelete(false);
+      setExpandedId("");
+      if (event.detail?.status === "anonymous") {
+        setDumps([]);
+        setFieldNotes([]);
+        setPublicProfile(null);
+        setPublicProfileStatus("loading");
+      }
+      await loadDumpState(() => mounted);
+    }
+
+    window.addEventListener(AUTH_CHANGED_EVENT, handleAuthChanged);
+    return () => {
+      mounted = false;
+      window.removeEventListener(AUTH_CHANGED_EVENT, handleAuthChanged);
     };
   }, []);
 
@@ -117,45 +149,6 @@ export default function DumpPageClient({ mode = "home" }) {
     }
   }
 
-  async function handleGoogleLogin() {
-    if (loginStatus === "sending") return;
-
-    setLoginStatus("sending");
-    try {
-      await signInWithGoogle();
-    } catch (error) {
-      setLoginStatus("idle");
-      setToast(error.message || "couldn't start Google login.");
-    }
-  }
-
-  async function handleLogout() {
-    if (loginStatus === "sending") return;
-
-    setLoginStatus("sending");
-    try {
-      await signOutOfDump();
-      setAuthState({ status: "anonymous", email: "" });
-      closeLoginModal();
-      setStatus("loading");
-      await loadDumpState(() => true);
-      setToast("logged out. this browser is anonymous again.");
-    } catch (error) {
-      setLoginStatus("idle");
-      setToast(error.message || "couldn't log out.");
-    }
-  }
-
-  function openLoginModal() {
-    setLoginStatus("idle");
-    setLoginModalOpen(true);
-  }
-
-  function closeLoginModal() {
-    setLoginModalOpen(false);
-    setLoginStatus("idle");
-  }
-
   async function handleUpdateDump(dump, nextContent, nextWantsReflection) {
     try {
       const result = await updateDump({ dumpId: dump.id, content: nextContent, wantsReflection: nextWantsReflection });
@@ -181,9 +174,40 @@ export default function DumpPageClient({ mode = "home" }) {
     }
   }
 
+  async function handleBulkDeleteDumps() {
+    if (!selectedDumpIds.length) {
+      setToast("select dumps to delete first.");
+      return;
+    }
+    if (!confirmBulkDelete) {
+      setConfirmBulkDelete(true);
+      return;
+    }
+
+    setBulkDeleting(true);
+    try {
+      const ids = [...selectedDumpIds];
+      const result = await deleteDumps({ dumpIds: ids });
+      setDumps((current) => current.filter((dump) => !ids.includes(dump.id)));
+      setSelectedDumpIds([]);
+      setExpandedId((current) => (ids.includes(current) ? "" : current));
+      setConfirmBulkDelete(false);
+      const deletedCount = result.deleted ?? ids.length;
+      setToast(`${deletedCount} dump${deletedCount === 1 ? "" : "s"} deleted.`);
+    } catch (error) {
+      setToast(error.message || "couldn't delete those dumps.");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   async function handleDraftFieldNote() {
     if (!selectedDumpIds.length || pendingDraft) {
       setToast("pick one or more dumps first.");
+      return;
+    }
+    if (selectedDumpIds.length > 10) {
+      setToast("draft with 10 dumps or fewer. bulk delete can use the whole selection.");
       return;
     }
 
@@ -199,6 +223,16 @@ export default function DumpPageClient({ mode = "home" }) {
     } finally {
       setPendingDraft(false);
     }
+  }
+
+  function handleSelectAllShown() {
+    setSelectedDumpIds(dumps.map((dump) => dump.id));
+    setConfirmBulkDelete(false);
+  }
+
+  function handleClearSelection() {
+    setSelectedDumpIds([]);
+    setConfirmBulkDelete(false);
   }
 
   async function handlePublishFieldNote(fieldNote, edits) {
@@ -300,8 +334,9 @@ export default function DumpPageClient({ mode = "home" }) {
   }
 
   function toggleSelected(dumpId) {
+    setConfirmBulkDelete(false);
     setSelectedDumpIds((current) =>
-      current.includes(dumpId) ? current.filter((id) => id !== dumpId) : [...current, dumpId].slice(0, 10),
+      current.includes(dumpId) ? current.filter((id) => id !== dumpId) : [...current, dumpId],
     );
   }
 
@@ -429,9 +464,6 @@ export default function DumpPageClient({ mode = "home" }) {
           <Link className="ghost-button button-link" href="/dump/map">
             see the map
           </Link>
-          <button className="ghost-button" type="button" onClick={openLoginModal}>
-            {authState.status === "authenticated" ? "logged in" : "log in"}
-          </button>
           <button className="ghost-button" type="button" onClick={() => setPublicModalOpen(true)}>
             go public
           </button>
@@ -527,7 +559,25 @@ export default function DumpPageClient({ mode = "home" }) {
               <span>history</span>
               <h2>private dumps</h2>
             </div>
-            <small>{dumps.length} saved</small>
+            <div className="dump-history-actions">
+              <small>{selectedDumpIds.length ? `${selectedDumpIds.length} selected` : `${dumps.length} saved`}</small>
+              {dumps.length ? (
+                <div className="dump-bulk-actions">
+                  <button className="ghost-button" type="button" onClick={selectedDumpIds.length === dumps.length ? handleClearSelection : handleSelectAllShown} disabled={bulkDeleting}>
+                    {selectedDumpIds.length === dumps.length ? "clear selection" : "select all shown"}
+                  </button>
+                  <button
+                    className="ghost-button danger button-with-loader"
+                    type="button"
+                    onClick={handleBulkDeleteDumps}
+                    disabled={!selectedDumpIds.length || bulkDeleting}
+                  >
+                    {bulkDeleting && <span className="mini-loader" aria-hidden="true" />}
+                    {confirmBulkDelete ? "delete selected forever" : "delete selected"}
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
           <div className="dump-feed">
             {status === "loading" ? <div className="empty-state">opening your dump...</div> : null}
@@ -584,29 +634,9 @@ export default function DumpPageClient({ mode = "home" }) {
         />
       )}
 
-      {loginModalOpen && (
-        <LoginModal
-          status={loginStatus}
-          authState={authState}
-          close={closeLoginModal}
-          logout={handleLogout}
-          loginWithGoogle={handleGoogleLogin}
-        />
-      )}
-
       {toast && <Toast message={toast} onDone={() => setToast("")} />}
     </section>
   );
-
-  async function refreshAuthState(isMounted = () => true) {
-    const session = await getAuthSession();
-    if (!isMounted()) return;
-    setAuthState(
-      session?.user
-        ? { status: "authenticated", email: session.user.email || "" }
-        : { status: "anonymous", email: "" },
-    );
-  }
 
   async function loadDumpState(isMounted = () => true) {
     try {
@@ -639,51 +669,6 @@ export default function DumpPageClient({ mode = "home" }) {
       // The following fetch will surface auth/migration errors in the normal page flow.
     }
   }
-}
-
-function LoginModal({ status, authState, close, logout, loginWithGoogle }) {
-  const isSending = status === "sending";
-  const isAuthenticated = authState.status === "authenticated";
-
-  return (
-    <div className="modal-backdrop" onClick={close}>
-      <div className="modal login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title" onClick={(event) => event.stopPropagation()}>
-        <div className="login-modal-head">
-          <p className="eyebrow">login</p>
-          <h2 id="login-title">{isAuthenticated ? "you're logged in" : "keep your dump"}</h2>
-          <p>
-            {isAuthenticated
-              ? "Your private dump follows this login. Rooms still stay anonymous."
-              : "Use Google to save or restore your private dump. Rooms stay anonymous."}
-          </p>
-        </div>
-        {isAuthenticated && (
-          <div className="login-signed-in">
-            {authState.email && <small>{authState.email}</small>}
-            <div className="login-actions">
-              <button className="ghost-button" type="button" onClick={logout} disabled={isSending}>
-                {isSending ? "logging out..." : "log out"}
-              </button>
-              <button className="solid-button" type="button" onClick={close} disabled={isSending}>
-                done
-              </button>
-            </div>
-          </div>
-        )}
-        {!isAuthenticated && (
-          <div className="login-options">
-            <button className="solid-button button-with-loader google-login-button" type="button" onClick={loginWithGoogle} disabled={isSending}>
-              {isSending && <span className="mini-loader" aria-hidden="true" />}
-              {isSending ? "opening Google..." : "continue with Google"}
-            </button>
-            <button className="ghost-button" type="button" onClick={close} disabled={isSending}>
-              not now
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function appendSpeechTranscript(current, transcript) {
@@ -805,11 +790,18 @@ function DumpCard({ dump, expanded, setExpandedId, selected, toggleSelected, upd
               </>
             ) : (
               <>
-                <button className="ghost-button" type="button" onClick={() => setIsEditing(true)}>
-                  edit
+                <button className="ghost-button icon-action-button" type="button" onClick={() => setIsEditing(true)} aria-label="edit dump" title="edit dump">
+                  <EditIcon />
                 </button>
-                <button className="ghost-button danger" type="button" onClick={handleDelete} disabled={isMutating}>
-                  {confirmDelete ? "delete forever" : "delete"}
+                <button
+                  className={`ghost-button danger ${confirmDelete ? "" : "icon-action-button"}`}
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={isMutating}
+                  aria-label="delete dump"
+                  title="delete dump"
+                >
+                  {confirmDelete ? "delete forever" : <TrashIcon />}
                 </button>
               </>
             )}
@@ -967,8 +959,15 @@ function FieldNoteDraft({
             </button>
           </>
         ) : (
-          <button className="ghost-button" type="button" onClick={() => setIsEditing(true)} disabled={isMutating}>
-            edit
+          <button
+            className="ghost-button icon-action-button"
+            type="button"
+            onClick={() => setIsEditing(true)}
+            disabled={isMutating}
+            aria-label="edit field note"
+            title="edit field note"
+          >
+            <EditIcon />
           </button>
         )}
         {!isPublished && (
@@ -992,8 +991,15 @@ function FieldNoteDraft({
             </button>
           </>
         )}
-        <button className="ghost-button danger" type="button" onClick={deleteNote} disabled={isMutating}>
-          {confirmDelete ? (isPublished ? "remove forever" : "delete forever") : isPublished ? "remove" : "delete"}
+        <button
+          className={`ghost-button danger ${confirmDelete ? "" : "icon-action-button"}`}
+          type="button"
+          onClick={deleteNote}
+          disabled={isMutating}
+          aria-label={isPublished ? "remove field note" : "delete field note"}
+          title={isPublished ? "remove field note" : "delete field note"}
+        >
+          {confirmDelete ? (isPublished ? "remove forever" : "delete forever") : <TrashIcon />}
         </button>
       </div>
     </article>

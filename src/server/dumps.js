@@ -7,6 +7,8 @@ export function serializeDump(dump) {
     aiReflection: dump.ai_reflection || "",
     supermemoryId: dump.supermemory_id || "",
     supermemoryStatus: dump.supermemory_status || "",
+    source: dump.source || "web",
+    sourceMeta: dump.source_meta || {},
     publishedAt: dump.published_at ? new Date(dump.published_at).getTime() : null,
     createdAt: new Date(dump.created_at).getTime(),
     updatedAt: new Date(dump.updated_at).getTime(),

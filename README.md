@@ -21,7 +21,7 @@ http://127.0.0.1:3000/
 
 - `app/` contains Next.js routes: landing, create, explore, room pages, and API handlers.
 - `src/components/` contains reusable UI components.
-- `src/components/space/` contains room-specific feed, compose, reaction, share, and heartbeat pieces.
+- `src/components/space/` contains room-specific team reads, hidden legacy feed, share, and heartbeat pieces.
 - `src/hooks/` contains client-side state hooks.
 - `src/lib/` contains product constants, API helpers, storage helpers for session/creator tokens, and heartbeat logic.
 - `docs/mumbl-product-context.md` and `docs/mumbl-extension-01.md` are the product source of truth. The extension wins on conflicts.
@@ -32,16 +32,16 @@ http://127.0.0.1:3000/
 - Landing screen with Mumbl's core voice
 - Create-space flow with vibe picker
 - Real routes for `/create` and `/r/:slug/:tab`
-- Creator-first post prompt before sharing
 - Optional creator-managed room note after creation
-- Space feed with post types: `thought`, `rant`, `win`, `find`, `lol`
-- Anonymous-first compose flow with optional display handle
-- Phrase-based reactions with local session dedupe
-- Wins tab with lightweight stats
-- Heartbeat tab with weekly history and vibe-over-time from anonymised backend data
+- Reads-first room view for published field notes, with legacy feed/wins routes kept for compatibility
+- Slack/private-dump to field-note to team-read loop
+- Phrase-based reactions with local or logged-in dedupe
+- Edit/delete for new room posts through per-post edit tokens, with optional logged-in continuity across browsers
+- Private dump and field-note edit/delete, including bulk cleanup for selected private dumps
+- Heartbeat tab with weekly history and vibe-over-time from anonymised published team reads
 - Share-copy actions for link, Slack, X, and WhatsApp
 - Aggregate-only `/explore` page for public-space culture pulse
-- Open demo room at `/r/it-works-on-my-machine` for trying Mumbl before creating a team space
+- Public sample reads at `/r/it-works-on-my-machine/reads` for seeing Mumbl before adding it to Slack
 - Side Quests: short-lived anonymous 2-person backchannels inside a room
 
 ## Product Principles
@@ -66,7 +66,7 @@ The open demo room is the intentional exception: `/r/it-works-on-my-machine` is 
 
 Weekly heartbeat generation is scheduled through Vercel Cron in `vercel.json` and runs every Monday at 09:00 UTC, which stays within Vercel Hobby cron limits. The endpoint is `GET /api/cron/heartbeats` and is protected by `CRON_SECRET`.
 
-The current generator is deterministic/local; the AI provider can replace the generator later while keeping the anonymised payload shape. Heartbeat history and vibe-over-time are displayed from stored heartbeat rows.
+The current generator is deterministic/local and reads only published team-read posts (`posts.type = 'field_note'`). Private dumps, Slack history, hidden feed posts, and presence never feed the heartbeat. An AI provider can replace the generator later while keeping the anonymised published-read payload shape. Heartbeat history and vibe-over-time are displayed from stored heartbeat rows.
 
 ## Backend Setup
 
@@ -81,9 +81,37 @@ The frontend now uses these backend route handlers for spaces, posts, reactions,
 6. Run `npm run db:push` to apply the migrations.
 7. Restart `npm run app`.
 
-For dump login, enable Supabase Google OAuth and allow `/auth/callback` in the Supabase Auth redirect URLs for each environment, for example `http://127.0.0.1:3000/auth/callback` locally and `https://mumbl.wtf/auth/callback` in production. Email magic-link code is kept dormant for now; custom SMTP is recommended before exposing it again.
+For account/session continuity, enable Supabase Google OAuth and allow `/auth/callback` in the Supabase Auth redirect URLs for each environment, for example `http://127.0.0.1:3000/auth/callback` locally and `https://mumbl.wtf/auth/callback` in production. Login is optional but central: it keeps private dumps, field-note drafts, Slack connections, creator rooms, editable room posts, reactions, and public-profile ownership together across browsers. It is not room identity, and anonymous room posting still works without an account or `posts.user_id`. Email magic-link code is kept dormant for now; custom SMTP is recommended before exposing it again.
+
+Creator access starts with the local room creator token. When a logged-in creator presents that token, or opens a Slack-created room handoff while logged in, Mumbl links the room to their auth account so creator controls survive across browsers without tracking normal room membership.
+
+Creators can delete test or unused rooms from the room danger zone. Deleting a room hard-deletes the room reads/feed signal, frees the slug, and leaves user-owned field notes in the author's dump with their room/post linkage cleared.
 
 Until those variables exist, API routes return a setup `503`.
+
+## Slack Beta Setup
+
+The Slack app is a free beta entry point for private dumps. It supports `/mumbl [text]`, `/mumbl room [team name]`, a `save_to_mumbl` message shortcut, App Home private dumping, and App Home field-note drafting/review from recent private dumps. It does not read channel history.
+
+See `docs/slack-app-setup.md` for the full production Slack app setup, scope reasons, deployment steps, and smoke tests.
+
+In Slack app settings:
+
+- OAuth redirect URL: `https://mumbl.wtf/api/slack/oauth/callback`
+- Slash command request URL: `https://mumbl.wtf/api/slack/commands`
+- Interactivity request URL: `https://mumbl.wtf/api/slack/interactions`
+- Event subscriptions request URL: `https://mumbl.wtf/api/slack/events`
+- Core bot scopes: `commands`, `users:read`, `users:read.email`
+- Optional team-read bot scopes: `chat:write`, `groups:write`, `groups:read`
+- Subscribe to bot events: `app_home_opened`, `member_joined_channel`
+
+Set `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`, and `MUMBL_SLACK_TOKEN_ENCRYPTION_KEY` in the deployment environment. Install through `/api/slack/install`.
+
+`/mumbl room platform team` creates a Mumbl room from Slack and returns a one-time creator handoff link for opening the room in a browser. `/mumbl start platform team` remains an alias. Slack-created rooms are auto-pinned and linked to creator ownership when Mumbl can match or later connect the Slack user to a Mumbl login. `/mumbl pin platform-team` explicitly adds a Mumbl room to that Slack user's publish list without tracking room membership, and best-effort invites them into the room's Mumbl-created Slack reads channel when one exists. App Home can draft, review, edit, publish private field notes to pinned Mumbl spaces, and manage personal pinned spaces. Optional team-read Slack posting is creator-enabled per room. If a creator switches it on, Mumbl starts an optional Slack permission upgrade that asks for `chat:write`, `groups:write`, and `groups:read` so it can create one private channel, post published team reads there, and auto-pin that Mumbl room when a connected user joins the Mumbl-created Slack channel. It still does not request Slack history scopes.
+
+Beta default: Slack team-read channels are private. A future public workspace channel option can use admin-approved Slack permissions such as `channels:manage`, only for creating the reads channel and still without history scopes.
+
+Slack reminders are intentionally not part of the beta because frequent scheduling does not fit the current free-tier posture.
 
 ## Branches And Environments
 

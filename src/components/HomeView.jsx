@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useRecentSlug } from "../hooks/useRecentSlug";
 import { joinWaitlist } from "../lib/api";
-import { trackConversionEvent, trackDemoEntry, trackPublicCta } from "../lib/analytics";
-import { publicDemoRoom } from "../lib/constants";
+import { trackConversionEvent, trackPublicCta } from "../lib/analytics";
 import JoinModal from "./JoinModal";
 
 const contactEmail = "mumbl.wtf@gmail.com";
@@ -40,49 +39,59 @@ const loopSteps = [
 
 const demoRoomPosts = [
   {
-    label: "field note",
-    title: "auth fix: the three wrong turns",
-    copy: "the timeout bug was easy once we stopped blaming oauth. useful path, saved.",
-    meta: "useful · 12",
+    label: "private dump",
+    title: "i keep saying it just needs polish...",
+    copy: "but i think i am actually avoiding a rewrite.",
+    meta: "only you",
   },
   {
     label: "team read",
-    title: "why this sprint felt heavy",
-    copy: "not code volume. fuzzy ownership. next time: one owner before kickoff.",
-    meta: "i felt this · 9",
+    title: "naming the rewrite earlier",
+    copy: "the drag was not polish. it was the cost of softening a hard truth until it became rework.",
+    meta: "quietly true · 9",
   },
 ];
 
 const objections = [
   {
-    question: "what would someone actually dump?",
+    question: "why would i use this if we already have slack?",
     answer:
-      "the thought before it becomes polished: why a fix was harder than expected, what felt unclear, the tradeoff behind a decision, or the lesson you do not want the next person to relearn.",
+      "slack is where work talks in public. mumbl is where the thought can land privately first, before it becomes a polished point, a team read, or nothing at all.",
   },
   {
-    question: "why not just write this in slack?",
+    question: "what is mumbl really for?",
     answer:
-      "slack is for the conversation happening now. mumbl is for the useful trail after the moment passes. a quick dump can stay private, become a field note, or turn into a team read when it is worth keeping.",
+      "for the thoughts with signal inside them: the thing you keep almost saying, the concern you are not ready to make political, the lesson behind a weird week, the pattern you only notice after writing it down.",
+  },
+  {
+    question: "do we actually need another tool?",
+    answer:
+      "maybe not if your team already remembers the human context behind work. most teams remember tickets and decisions, but lose the judgment, doubt, pressure, taste, and repair work in between.",
   },
   {
     question: "is this more documentation work?",
     answer:
-      "mumbl starts smaller than a doc. say or type the messy version first, then clean up only the part that became useful.",
+      "no. a mumbl can start as one honest line in slack. the useful ones can become field notes later; the rest can stay private.",
+  },
+  {
+    question: "does mumbl read our slack channels?",
+    answer:
+      "no. mumbl only saves what someone explicitly sends with /mumbl or the message shortcut. no channel history, no passive reading.",
   },
   {
     question: "who sees my private dumps?",
     answer:
-      "only you. private dumps do not become team memory unless you choose to shape and share them.",
+      "only you. a dump becomes a team read only if you shape it into a field note and publish it.",
   },
   {
-    question: "who is mumbl for?",
+    question: "what becomes a team read?",
     answer:
-      "the team. mumbl gives engineers a place to keep the rough thinking behind the work: private first, shared only when useful. the heartbeat and reads go back to everyone who lived the week.",
+      "a field note someone explicitly publishes. it can be anonymous or use a chosen mumbl handle. slack identity is never the author label.",
   },
   {
-    question: "will engineers actually write this?",
+    question: "what is the heartbeat based on?",
     answer:
-      "they might save a rough thought in ten seconds, especially if it starts private and can be spoken instead of formatted. the polished lesson can come later, if there is one.",
+      "published team reads only. not private dumps, not slack history, not who joined, not who lurked.",
   },
 ];
 
@@ -94,8 +103,8 @@ const memoryStripItems = [
   "know the human behind the feature",
   "work feels better when people feel less hidden",
   "read how your coworkers actually think",
-  "the internal feed between tickets and shipped features",
-  "a living feed of the work behind the work",
+  "the team reads between tickets and shipped features",
+  "a living memory of the work behind the work",
   "write it while it is still messy",
   "slack is where work talks. mumbl is where work remembers.",
 ];
@@ -146,7 +155,7 @@ export default function HomeView() {
         <section className="hero landing-hero">
           <div className="hero-copy landing-hero-copy">
             <p className="eyebrow">private memory for the messy middle</p>
-            <h1>your team remembers what shipped. mumbl remembers how it happened.</h1>
+            <h1>mumbl remembers how work happened.</h1>
             <p>
               mumbl keeps the rough notes, wrong turns, and lessons that never make it into tickets or docs.
             </p>
@@ -182,9 +191,21 @@ export default function HomeView() {
               ) : null}
             </form>
             <div className="hero-actions">
-              <Link className="ghost-button button-link" href={publicDemoRoom.href} onClick={() => trackDemoEntry("hero")}>
-                try the demo
-              </Link>
+              <a
+                className="slack-install-button"
+                href="/api/slack/install"
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => trackPublicCta("slack_install", { source: "hero" })}
+                aria-label="add mumbl to slack"
+              >
+                <SlackLogo className="slack-logo" />
+                <span>
+                  add to slack
+                  <small>private dumps + team reads</small>
+                </span>
+                <em>beta</em>
+              </a>
               <button
                 className="ghost-button"
                 type="button"
@@ -196,6 +217,7 @@ export default function HomeView() {
                 already have a link?
               </button>
             </div>
+            <p className="slack-beta-copy">slack beta: save private dumps and publish team reads by choice. no channel history.</p>
             <div className="landing-proof-strip" aria-label="mumbl promises">
               <span>private first</span>
               <span>shared by choice</span>
@@ -207,36 +229,35 @@ export default function HomeView() {
             <div className="team-space-topbar">
               <div>
                 <span className="demo-dot" aria-hidden="true" />
-                <strong>platform room</strong>
+                <strong>tiny fires crew in slack</strong>
               </div>
-              <span>private by default</span>
+              <span>/mumbl</span>
             </div>
             <div className="mumbl-room-tabs" aria-label="example mumbl room tabs">
-              <span className="active">quick dump</span>
-              <span>field notes</span>
-              <span>team reads</span>
-              <span>heartbeat</span>
+              <span className="active">private dump</span>
+              <span>field note</span>
+              <span>team read</span>
+              <span>pattern</span>
             </div>
             <div className="mumbl-room-surface">
-              <section className="quick-dump-composer" aria-label="example quick dump composer">
-                <div className="quick-dump-head">
-                  <span>private dump</span>
-                  <strong>say it before it disappears</strong>
+              <section className="slack-composer-demo" aria-label="example slack private dump">
+                <div className="slack-channel-head">
+                  <span># tiny-fires</span>
+                  <em>any channel or dm</em>
                 </div>
-                <div className="voice-dump-row">
-                  <span className="voice-button" aria-hidden="true">mic</span>
-                  <div className="voice-lines" aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                  <p>voice-to-text or typed. messy is fine.</p>
+                <div className="slack-message-row">
+                  <span className="slack-avatar" aria-hidden="true">you</span>
+                  <p>the thought shows up mid-conversation. you do not need to make it public.</p>
                 </div>
-                <div className="composer-actions">
-                  <span>still private</span>
-                  <button className="ghost-button" type="button">shape into note</button>
+                <div className="slack-input-shell">
+                  <span>/mumbl</span>
+                  <strong>i keep saying "just needs polish," but i think i'm avoiding a rewrite.</strong>
+                  <button type="button">send</button>
+                </div>
+                <div className="slack-ephemeral-card">
+                  <span>only visible to you</span>
+                  <strong>saved privately to mumbl</strong>
+                  <p>keep the honest version now. shape it into a field note later if it can help the team.</p>
                 </div>
               </section>
 
@@ -252,9 +273,9 @@ export default function HomeView() {
               </section>
 
               <aside className="room-memory-rail" aria-label="example room memory">
-                <span>room memory</span>
-                <strong>wrong turns, ownership lessons, and one useful fix path.</strong>
-                <p>shared by choice, useful when the team needs the trail.</p>
+                <span>private pattern</span>
+                <strong>softening hard truths before they become rework.</strong>
+                <p>visible to you first. publish only when it can help the team.</p>
               </aside>
             </div>
           </div>
@@ -301,23 +322,27 @@ export default function HomeView() {
           <p className="sr-only">{memoryStripItems.join(". ")}</p>
         </section>
 
-        <section className="landing-section demo-video-section" aria-labelledby="demo-video-heading">
-          <div className="demo-video-copy">
-            <p className="eyebrow">watch the loop</p>
-            <h2 id="demo-video-heading">watch a quick dump become a team read in under a minute.</h2>
-            <p>voice or type the thought, shape the useful part, and share only what helps the team understand the work.</p>
-          </div>
-          <div className="demo-video-frame">
-            <iframe
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="strict-origin-when-cross-origin"
-              src="https://www.youtube-nocookie.com/embed/cX6XQVzDXr8"
-              title="mumbl product demo"
-            />
-          </div>
-        </section>
+        {/*
+          Hidden until the new Slack-native demo is ready. The old web-flow video
+          made the landing page feel less current than the Slack beta story.
+          <section className="landing-section demo-video-section" aria-labelledby="demo-video-heading">
+            <div className="demo-video-copy">
+              <p className="eyebrow">watch the loop</p>
+              <h2 id="demo-video-heading">watch a quick dump become a team read in under a minute.</h2>
+              <p>voice or type the thought, shape the useful part, and share only what helps the team understand the work.</p>
+            </div>
+            <div className="demo-video-frame">
+              <iframe
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+                src="https://www.youtube-nocookie.com/embed/cX6XQVzDXr8"
+                title="mumbl product demo"
+              />
+            </div>
+          </section>
+        */}
 
         <section className="landing-section faq-section" aria-labelledby="faq-heading">
           <div>
@@ -337,19 +362,23 @@ export default function HomeView() {
         <section className="landing-section landing-cta" aria-labelledby="cta-heading">
           <div>
             <p className="eyebrow">early teams</p>
-            <h2 id="cta-heading">help shape mumbl for real engineering teams.</h2>
-            <p>join the waitlist for quick voice dumps, field notes, and team memory.</p>
+            <h2 id="cta-heading">try the slack-native loop with your team.</h2>
+            <p>save private thoughts from slack, shape the useful ones, and publish team reads by choice.</p>
           </div>
           <div className="cta-panel">
-            <a className="solid-button button-link" href="#waitlist" onClick={() => trackPublicCta("waitlist_anchor", { source: "bottom_cta" })}>
+            <a
+              className="solid-button button-link"
+              href="/api/slack/install"
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => trackPublicCta("slack_install", { source: "bottom_cta" })}
+            >
+              <SlackLogo className="slack-logo cta-slack-logo" />
+              add to slack
+            </a>
+            <a className="ghost-button button-link" href="#waitlist" onClick={() => trackPublicCta("waitlist_anchor", { source: "bottom_cta" })}>
               join the waitlist
             </a>
-            <Link className="ghost-button button-link" href="/create" onClick={() => trackPublicCta("create_room", { source: "bottom_cta" })}>
-              create a room
-            </Link>
-            <Link className="ghost-button button-link" href={publicDemoRoom.href} onClick={() => trackDemoEntry("bottom_cta")}>
-              try the demo
-            </Link>
             <a className="ghost-button button-link" href={teamNeedsMailHref} onClick={() => trackPublicCta("email_team_needs", { source: "bottom_cta" })}>
               tell us what your team needs
             </a>
@@ -371,6 +400,9 @@ export default function HomeView() {
               twitter @lla_dawn
             </a>
             <a href={teamNeedsMailHref} onClick={() => trackPublicCta("email_outbound", { source: "footer" })}>mumbl.wtf@gmail.com</a>
+            <Link href="/privacy" onClick={() => trackPublicCta("privacy", { source: "footer" })}>
+              privacy
+            </Link>
             <a href={calendlyHref} rel="noreferrer" target="_blank" onClick={() => trackPublicCta("calendly_outbound", { source: "footer" })}>
               book a call
             </a>
@@ -386,6 +418,29 @@ export default function HomeView() {
         />
       )}
     </>
+  );
+}
+
+function SlackLogo({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 122.8 122.8" aria-hidden="true" focusable="false">
+      <path
+        d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zM32.3 77.6c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z"
+        fill="#E01E5A"
+      />
+      <path
+        d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2zM45.2 32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z"
+        fill="#36C5F0"
+      />
+      <path
+        d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2zM90.5 45.2c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z"
+        fill="#2EB67D"
+      />
+      <path
+        d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9zM77.6 90.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z"
+        fill="#ECB22E"
+      />
+    </svg>
   );
 }
 

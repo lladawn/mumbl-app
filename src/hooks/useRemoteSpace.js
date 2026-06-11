@@ -1,14 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createRemotePost,
+  deleteRemotePost,
+  deleteRemoteSpace,
   dismissRemoteFirstPost,
   fetchSpace,
+  pinSlackSpaceForPublishing,
+  startSlackTeamReadsSetup,
   toggleRemoteReaction,
+  updateRemotePost,
+  updateSlackTeamReadsPosting,
   updateRemoteSpaceDescription,
   updateRemoteSpaceVisibility,
 } from "../lib/api";
+import { AUTH_CHANGED_EVENT } from "../lib/auth";
 
 const POST_PAGE_SIZE = 20;
 
@@ -17,15 +24,21 @@ export function useRemoteSpace(slug, postType = "") {
   const [status, setStatus] = useState("loading");
   const [pageStatus, setPageStatus] = useState("idle");
   const [error, setError] = useState("");
+  const refreshRequestId = useRef(0);
 
   const refresh = useCallback(async () => {
     if (!slug) return;
+    const requestId = refreshRequestId.current + 1;
+    refreshRequestId.current = requestId;
     setStatus("loading");
     setError("");
     try {
-      setSpace(await fetchSpace(slug, { limit: POST_PAGE_SIZE, type: postType }));
+      const nextSpace = await fetchSpace(slug, { limit: POST_PAGE_SIZE, type: postType });
+      if (refreshRequestId.current !== requestId) return;
+      setSpace(nextSpace);
       setStatus("ready");
     } catch (fetchError) {
+      if (refreshRequestId.current !== requestId) return;
       setSpace(null);
       setError(fetchError.message || "couldn't load this mumbl");
       setStatus(fetchError.message === "space not found" ? "not-found" : "error");
@@ -36,6 +49,18 @@ export function useRemoteSpace(slug, postType = "") {
     refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    function handleAuthChanged(event) {
+      if (event.detail?.status === "anonymous") {
+        setSpace((currentSpace) => stripAccountOnlyViewerState(currentSpace));
+      }
+      refresh();
+    }
+
+    window.addEventListener(AUTH_CHANGED_EVENT, handleAuthChanged);
+    return () => window.removeEventListener(AUTH_CHANGED_EVENT, handleAuthChanged);
+  }, [refresh]);
+
   async function submitPost(input) {
     await createRemotePost({ slug, ...input });
     await refresh();
@@ -44,6 +69,16 @@ export function useRemoteSpace(slug, postType = "") {
   async function toggleReaction(input) {
     const result = await toggleRemoteReaction(input);
     setSpace((currentSpace) => updatePostReaction(currentSpace, input, result.active));
+  }
+
+  async function updatePost(input) {
+    await updateRemotePost(input);
+    await refresh();
+  }
+
+  async function deletePost(input) {
+    await deleteRemotePost({ slug, ...input });
+    await refresh();
   }
 
   async function loadOlderPosts() {
@@ -81,6 +116,23 @@ export function useRemoteSpace(slug, postType = "") {
     await refresh();
   }
 
+  async function startTeamReadsSlackSetup() {
+    return startSlackTeamReadsSetup({ slug });
+  }
+
+  async function updateTeamReadsSlackPosting(input) {
+    await updateSlackTeamReadsPosting({ slug, ...input });
+    await refresh();
+  }
+
+  async function pinTeamReadsSlackSpace() {
+    return pinSlackSpaceForPublishing({ slug });
+  }
+
+  async function deleteSpace() {
+    return deleteRemoteSpace({ slug });
+  }
+
   return {
     space,
     status,
@@ -89,10 +141,29 @@ export function useRemoteSpace(slug, postType = "") {
     pageStatus,
     submitPost,
     toggleReaction,
+    updatePost,
+    deletePost,
     loadOlderPosts,
     dismissFirstPost,
     updateVisibility,
     updateDescription,
+    startTeamReadsSlackSetup,
+    pinTeamReadsSlackSpace,
+    updateTeamReadsSlackPosting,
+    deleteSpace,
+  };
+}
+
+function stripAccountOnlyViewerState(space) {
+  if (!space?.posts?.length) return space;
+  return {
+    ...space,
+    canManage: false,
+    posts: space.posts.map((post) => ({
+      ...post,
+      canAuthorEdit: false,
+      activeReactions: [],
+    })),
   };
 }
 

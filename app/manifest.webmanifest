@@ -1,7 +1,7 @@
 {
   "name": "mumbl",
   "short_name": "mumbl",
-  "description": "say the thing you've been mumbling all week.",
+  "description": "save private thoughts from Slack with /mumbl, shape field notes, and publish team reads only by choice.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fbfaf7",

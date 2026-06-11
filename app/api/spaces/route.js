@@ -1,4 +1,5 @@
 import { ok, badRequest, serverError } from "../../../src/server/http";
+import { resolveRequestOwner } from "../../../src/server/auth";
 import { createToken, hashToken } from "../../../src/server/hash";
 import { getSupabaseAdmin } from "../../../src/server/supabase";
 import { cleanString, isValidVibe, slugify } from "../../../src/server/validation";
@@ -13,6 +14,7 @@ export async function POST(request) {
     if (!isValidVibe(vibe)) return badRequest("unsupported vibe");
 
     const supabase = getSupabaseAdmin();
+    const owner = await resolveRequestOwner({ request, sessionToken: cleanString(body.sessionToken, 256) || "space-create" });
     const creatorToken = createToken();
     const baseSlug = slugify(name) || "team-mumbl";
     let slug = baseSlug;
@@ -26,6 +28,7 @@ export async function POST(request) {
           name,
           vibe,
           creator_token_hash: hashToken(creatorToken),
+          ...(owner.userId ? { creator_user_id: owner.userId } : {}),
         })
         .select()
         .single();

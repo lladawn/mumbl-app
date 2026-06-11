@@ -1,6 +1,7 @@
 import { badRequest, notFound, ok, serverError } from "../../../../../src/server/http";
+import { resolveRequestOwner } from "../../../../../src/server/auth";
 import { enforceRateLimit } from "../../../../../src/server/rateLimit";
-import { hashToken } from "../../../../../src/server/hash";
+import { createToken, hashToken } from "../../../../../src/server/hash";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
 import { cleanString, isValidPostType } from "../../../../../src/server/validation";
 
@@ -24,12 +25,14 @@ export async function POST(request, { params }) {
     if (!sessionToken) return badRequest("session token is required");
 
     const supabase = getSupabaseAdmin();
-    await enforceRateLimit({ supabase, action: "post", sessionToken });
+    const owner = await resolveRequestOwner({ request, sessionToken });
+    await enforceRateLimit({ supabase, action: "post", sessionToken: owner.userId ? `auth-post:${owner.userId}` : sessionToken });
 
     const { data: space, error: spaceError } = await supabase.from("spaces").select("id").eq("slug", slug).single();
     if (spaceError?.code === "PGRST116") return notFound("space not found");
     if (spaceError) throw spaceError;
 
+    const editToken = createToken();
     const { data: post, error: postError } = await supabase
       .from("posts")
       .insert({
@@ -46,6 +49,17 @@ export async function POST(request, { params }) {
       .single();
     if (postError) throw postError;
 
+    const { error: tokenError } = await supabase.from("post_edit_tokens").insert({
+      post_id: post.id,
+      edit_token_hash: hashToken(editToken),
+      owner_user_id: owner.userId || null,
+    });
+    if (tokenError) {
+      await supabase.from("posts").delete().eq("id", post.id);
+      if (isMissingPostEditTokensTable(tokenError)) return serverError(missingPostEditTokensMigrationError());
+      throw tokenError;
+    }
+
     if (isAnonymous && sessionToken) {
       await supabase.from("anon_audit").insert({
         post_id: post.id,
@@ -56,8 +70,26 @@ export async function POST(request, { params }) {
     const { error: updateError } = await supabase.from("spaces").update({ first_post_done: true }).eq("id", space.id);
     if (updateError) throw updateError;
 
-    return ok({ post });
+    return ok({ post, editToken });
   } catch (error) {
     return serverError(error);
   }
+}
+
+function isMissingPostEditTokensTable(error) {
+  const message = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
+  return (
+    error?.code === "42P01" ||
+    error?.code === "42703" ||
+    error?.code === "PGRST205" ||
+    error?.code === "PGRST204" ||
+    message.includes("post_edit_tokens") ||
+    message.includes("owner_user_id")
+  );
+}
+
+function missingPostEditTokensMigrationError() {
+  const error = new Error("Post edit-token migration is not applied yet. Run supabase/migrations/0024_post_edit_tokens.sql.");
+  error.status = 503;
+  return error;
 }

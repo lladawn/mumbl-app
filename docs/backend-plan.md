@@ -10,10 +10,11 @@ Use:
 - Supabase Postgres for persistence
 - Supabase client on the server only for privileged writes
 - Browser-generated session token for reaction dedupe only. Do not use it for member, visit, or join tracking.
-- Creator token stored in local storage for creator-only moderation actions
+- Supabase Auth as an optional but central account layer for private data persistence
+- Creator token stored in local storage as a recovery key for creator-only moderation actions
 - A scheduled Next.js route or Vercel cron for Monday heartbeat generation
 
-I would not use Supabase Auth for v1. The product promise is no signup. Treat spaces as link-access rooms, and keep identity optional at the post level.
+Login is not room identity. Spaces remain link-access and anonymous-first: people can read, react, and post anonymously without an account. Google/Supabase Auth exists so private dumps, field-note drafts, Slack connections, creator-owned rooms, and public-profile ownership do not get stranded in one browser.
 
 ## First Tables
 
@@ -77,7 +78,7 @@ create table anon_audit (
 - `posts` should not store `session_token`.
 - Reaction dedupe stores only a server-side hash of the session token.
 - `anon_audit` exists only for break-glass moderation and should never be queried by normal product views.
-- Heartbeat prompts receive only `{ type, content, reaction_count }`.
+- Heartbeat prompts receive only anonymised published team-read rows: `{ type, content, reaction_count }` where `type = 'field_note'`.
 - The creator gets no separate dashboard. Heartbeats are visible to everyone in the space.
 
 ## API Shape
@@ -85,9 +86,14 @@ create table anon_audit (
 - `POST /api/spaces` creates a space and returns `{ slug, creatorToken }`.
 - `GET /api/spaces/:slug` returns space, posts, reaction counts, and heartbeat data.
 - `POST /api/spaces/:slug/posts` creates a post. If anonymous, `display_name` must be null.
-- `POST /api/posts/:id/reactions` toggles a phrase reaction using a hashed session token.
+- New direct room posts also receive a one-time raw edit token in the response. Only its hash is stored in `post_edit_tokens`; the raw token stays in browser local storage for anonymous same-browser edit/delete.
+- `PATCH /api/posts/:id` edits direct room post content when the matching edit token is presented, or when the logged-in user owns that edit-token row.
+- `DELETE /api/posts/:id` deletes a post when the matching edit token, logged-in edit ownership, or creator access is presented. Team-read deletes unlink the author's field note instead of deleting it.
+- `POST /api/posts/:id/reactions` toggles a phrase reaction using a hashed local session token, or a hashed auth principal for logged-in continuity across browsers.
+- `DELETE /api/dumps` bulk-deletes selected private dumps for the current dump owner.
+- `DELETE /api/spaces/:slug` lets a creator hard-delete a room, freeing the slug. User-owned field notes are kept and unlinked before the room row is deleted.
 - `POST /api/spaces/:slug/first-post-dismissed` marks the creator-first prompt as dismissed.
-- `POST /api/cron/heartbeats` generates weekly heartbeats from anonymised post data.
+- `POST /api/cron/heartbeats` generates weekly heartbeats from anonymised published team reads.
 - `POST /api/waitlist` records an explicit landing-page email opt-in and returns success for duplicates.
 
 ## Waitlist
@@ -102,13 +108,17 @@ The dump feature keeps the no-signup model. Private dump entries are owned by th
 
 Team reads show only approved field notes. The flow is: select private dumps, request an OpenAI draft through a server route, save the draft in `field_notes`, let the author edit it, then publish it as `posts.type = 'field_note'`. The old raw-dump team endpoint is intentionally blocked so private dumps stay for dumping thoughts, not public reading.
 
-`OPENAI_API_KEY`, `OPENAI_MODEL_FIELD_NOTE`, and `OPENAI_MAX_DAILY_DRAFTS` are server-only. The default model should stay cost-sensitive, currently `gpt-5.4-nano`, and the draft route sends only selected dumps, capped at 10 per request. Field-note drafting should produce publishable working-process notes: specific, human, readable, and useful enough for team reads or a public profile, while staying grounded only in the selected dumps.
+During the Slack-native beta, `/r/:slug` opens to team reads. Legacy feed and wins routes remain available for compatibility, but they are not the primary room navigation and do not feed the heartbeat.
 
-Public profiles and account migration are not in this implementation yet. When identity lands, signup must migrate existing dump rows and field-note drafts without changing visibility.
+`OPENAI_API_KEY`, `OPENAI_MODEL_FIELD_NOTE`, and `OPENAI_MAX_DAILY_DRAFTS` are server-only. The default model should stay cost-sensitive, currently `gpt-5.4-nano`, and the draft route sends only selected dumps, capped at 10 per request. Field-note drafting should produce publishable working-process notes: specific, human, readable, and useful enough for team reads or a public profile, while staying grounded only in the selected dumps. Draft length is adaptive: tiny dumps should stay short and honest instead of becoming padded essays, while richer dump selections can become story-shaped reads with a real moment, tension, noticing, and takeaway.
 
 Prototype public profiles now exist as a no-signup bridge: a browser session can claim one public handle and selectively add already-published field notes to `mumbl.wtf/@handle`. Private dumps and field-note drafts never appear there. This is intentionally per-note opt-in and should be replaced or migrated carefully when full identity arrives.
 
-Email magic-link login now exists only for private dump persistence. Anonymous dumping still works without signup. When a user logs in, Mumbl links the current browser session's dumps, field-note drafts, public profile, and dump insights to the Supabase Auth user id. Visibility does not change, and room posts/reactions continue to use the anonymous browser session token so auth never becomes room identity.
+Google login is the primary production login path. Email magic-link code is dormant until custom SMTP is configured. Anonymous dumping still works without signup. When a user logs in, Mumbl links the current browser session's dumps, field-note drafts, public profile, dump insights, creator-token rooms, locally held room post edit tokens, and reaction dedupe hashes to the Supabase Auth user id. Visibility does not change. Anonymous room posts still leave `posts.user_id` empty; login only adds private continuity for edit access and reaction dedupe.
+
+Creator-token room ownership can also be claimed by a logged-in creator. The local creator token remains the recovery/portable key, but once a logged-in user proves possession of it, `spaces.creator_user_id` lets creator controls survive across browsers. Slack-created rooms should set or reconcile `creator_user_id` whenever Mumbl can connect the Slack user to a Mumbl login. This must not become room membership tracking; only creator access is persisted.
+
+Room post edit/delete uses per-post edit tokens rather than storing a reusable author/session hash on `posts`. Logged-in users can have `post_edit_tokens.owner_user_id` for cross-browser edit/delete, but the raw edit token is not saved to local storage for logged-in posts. Local edit tokens only unlock rows with no `owner_user_id`; logging out immediately removes account-owned edit controls from the feed. The post remains anonymous-facing and does not become a member record. Older posts without edit tokens are immutable to authors, though creators can remove posts from rooms they manage.
 
 ## Local Setup
 

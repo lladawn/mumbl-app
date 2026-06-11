@@ -58,7 +58,7 @@ Future improvements:
 
 Current compromise:
 - Per-entry AI reflection uses a deterministic local reflector in the route handler, not an external AI provider.
-- Team field-note drafting uses OpenAI only when the user clicks draft, sends selected dumps only, caps selection size, and rate-limits drafts per session with `OPENAI_MAX_DAILY_DRAFTS`.
+- Team field-note drafting uses OpenAI only when the user clicks draft, sends selected dumps only, caps selection size, and rate-limits drafts per session with `OPENAI_MAX_DAILY_DRAFTS`. Draft length adapts to source signal so tiny dumps stay short and honest, while richer selections can become story-shaped reads without costly padding.
 - The private map is rendered from the user's fetched dump text in the browser, with no weekly insight cron yet.
 - Team reads reuse the existing posts infrastructure, but only for approved `field_note` posts. Raw dumps are blocked from reads.
 
@@ -69,3 +69,19 @@ Why:
 Future improvements:
 - Add provider-backed reflection behind an opt-in toggle once budget and privacy copy are settled.
 - Generate `dump_insights` weekly for users with enough dumps, using a daily-or-weekly cron posture compatible with the current free-tier lane.
+
+## Slack Beta
+
+Current compromise:
+- Slack is free during beta. There is no 30-day countdown, no credit card, and no usage gate.
+- The beta supports only explicit user actions: `/mumbl [text]` and the `save_to_mumbl` message shortcut.
+- `/mumbl room [team name]` can create a Mumbl room from Slack with an expiring creator handoff link. `/mumbl start [team name]` remains an alias.
+- App Home can create private dumps, draft a field note from selected recent private dumps, edit recent private drafts, and publish to explicitly pinned Mumbl spaces. Drafting uses the existing field-note OpenAI daily limit. Pinned spaces are user-chosen publish destinations. Slack-created rooms and joins to Mumbl-created team-read channels can auto-pin for connected Mumbl users, but Mumbl does not track general Slack membership or channel history.
+- The Slack app requests `commands`, `users:read`, and `users:read.email` only. It does not request channel history or message history scopes.
+- Team-read posting to Slack is optional per room. When a creator enables it, Mumbl asks for an optional `chat:write`, `groups:write`, and `groups:read` permission upgrade only so it can create one private channel, post published team reads, and receive join events for Mumbl-created private team-read channels.
+- Public Slack team-read channels are deferred. They would require an admin-approved public-channel management scope such as `channels:manage`; if added later, it should only create the reads channel and still avoid history scopes.
+- Slack daily check-in reminders are deferred because a 15-minute scheduler does not fit the free-tier posture.
+
+Future improvements:
+- Add pricing and workspace plan gates after beta usage proves the integration is worth charging for.
+- Add opt-in daily reminders only if the scheduling/cost tradeoff is explicitly approved.

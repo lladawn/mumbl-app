@@ -48,6 +48,6 @@ function vibeWordFor(vibeRead, energyLevel) {
 }
 
 function cardLineFor({ vibeWord, topTheme, posts }) {
-  if (!posts.length) return "the room is quiet, but the door is open.";
-  return vibeWord + " week, " + topTheme + " in the air, and enough signal to call it real.";
+  if (!posts.length) return "no team reads yet; the private signal is still forming.";
+  return vibeWord + " week, " + topTheme + " in the reads, and enough chosen signal to call it real.";
 }

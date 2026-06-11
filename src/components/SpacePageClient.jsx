@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { trackEvent } from "../lib/analytics";
 import { postTypes, validTabs, vibes } from "../lib/constants";
-import { getCreatorToken } from "../lib/storage";
+import { getCreatorToken, getPostEditToken } from "../lib/storage";
 import { useRemoteSpace } from "../hooks/useRemoteSpace";
 import ComposeBox from "./space/ComposeBox";
 import HeartbeatView from "./space/HeartbeatView";
@@ -15,10 +16,12 @@ import PublicSpacePanel from "./space/PublicSpacePanel";
 import RoomDescriptionPanel from "./space/RoomDescriptionPanel";
 import RoomVibeBar from "./space/RoomVibeBar";
 import SideQuestsPanel from "./space/SideQuestsPanel";
+import SlackTeamReadsPanel from "./space/SlackTeamReadsPanel";
 import Toast from "./Toast";
 
 export default function SpacePageClient({ slug, tab }) {
-  const activeTab = validTabs.includes(tab) ? tab : "feed";
+  const router = useRouter();
+  const activeTab = validTabs.includes(tab) ? tab : "reads";
   const postTypeFilter = activeTab === "wins" ? "win" : activeTab === "reads" ? "reads" : "";
   const {
     space,
@@ -27,10 +30,16 @@ export default function SpacePageClient({ slug, tab }) {
     error,
     submitPost,
     toggleReaction,
+    updatePost,
+    deletePost,
     loadOlderPosts,
     dismissFirstPost,
     updateVisibility,
     updateDescription,
+    startTeamReadsSlackSetup,
+    pinTeamReadsSlackSpace,
+    updateTeamReadsSlackPosting,
+    deleteSpace,
   } = useRemoteSpace(slug, postTypeFilter);
   const [selectedType, setSelectedType] = useState("thought");
   const [composeAnonymous, setComposeAnonymous] = useState(true);
@@ -38,8 +47,8 @@ export default function SpacePageClient({ slug, tab }) {
   const [toast, setToast] = useState("");
 
   useEffect(() => {
-    setHasCreatorToken(Boolean(getCreatorToken(slug)));
-  }, [slug]);
+    setHasCreatorToken(Boolean(getCreatorToken(slug)) || space?.canManage === true);
+  }, [slug, space?.canManage]);
 
   async function copyText(text, message, target = "copy") {
     try {
@@ -110,12 +119,6 @@ export default function SpacePageClient({ slug, tab }) {
       <div className="space-grid">
         <div className="space-main">
           <div className="tab-row" role="tablist" aria-label="space tabs">
-            <TabLink slug={space.slug} tab="feed" activeTab={activeTab}>
-              feed
-            </TabLink>
-            <TabLink slug={space.slug} tab="wins" activeTab={activeTab}>
-              wins
-            </TabLink>
             <TabLink slug={space.slug} tab="reads" activeTab={activeTab}>
               reads
             </TabLink>
@@ -169,8 +172,11 @@ export default function SpacePageClient({ slug, tab }) {
                 posts={posts}
                 space={space}
                 toggleReaction={toggleReactionWithToast(toggleReaction, setToast)}
+                updatePost={updatePostWithToast(updatePost, setToast)}
+                deletePost={deletePostWithToast(deletePost, setToast)}
                 loadOlderPosts={loadOlderPosts}
                 pageStatus={pageStatus}
+                canManage={hasCreatorToken}
               />
             </>
           )}
@@ -180,12 +186,26 @@ export default function SpacePageClient({ slug, tab }) {
               posts={posts}
               space={space}
               toggleReaction={toggleReactionWithToast(toggleReaction, setToast)}
+              updatePost={updatePostWithToast(updatePost, setToast)}
+              deletePost={deletePostWithToast(deletePost, setToast)}
               loadOlderPosts={loadOlderPosts}
               pageStatus={pageStatus}
+              canManage={hasCreatorToken}
             />
           )}
 
-          {activeTab === "reads" && <ReadsView posts={posts} space={space} loadOlderPosts={loadOlderPosts} pageStatus={pageStatus} />}
+          {activeTab === "reads" && (
+            <ReadsView
+              posts={posts}
+              space={space}
+              loadOlderPosts={loadOlderPosts}
+              pageStatus={pageStatus}
+              deletePost={deletePostWithToast(deletePost, setToast)}
+              canManage={hasCreatorToken}
+              startSetup={startTeamReadsSlackSetup}
+              onToast={setToast}
+            />
+          )}
 
           {activeTab === "heartbeat" && <HeartbeatView space={space} />}
         </div>
@@ -197,7 +217,27 @@ export default function SpacePageClient({ slug, tab }) {
             <p>the heartbeat is generated from anonymised posts and reactions. no manager cave, no separate dashboard.</p>
           </div>
           {hasCreatorToken && <RoomDescriptionPanel space={space} updateDescription={updateDescription} onToast={setToast} />}
+          {hasCreatorToken && (
+            <SlackTeamReadsPanel
+              space={space}
+              startSetup={startTeamReadsSlackSetup}
+              pinSpace={pinTeamReadsSlackSpace}
+              updatePosting={updateTeamReadsSlackPosting}
+              onToast={setToast}
+            />
+          )}
           {hasCreatorToken && <PublicSpacePanel space={space} updateVisibility={updateVisibility} onToast={setToast} />}
+          {hasCreatorToken && (
+            <SpaceDangerZonePanel
+              space={space}
+              deleteSpace={async () => {
+                await deleteSpace();
+                trackEvent("space_deleted");
+                router.push("/dump?spaceDeleted=1");
+              }}
+              onToast={setToast}
+            />
+          )}
         </aside>
       </div>
 
@@ -214,39 +254,72 @@ function TabLink({ slug, tab, activeTab, children }) {
   );
 }
 
-function WinsView({ posts, space, toggleReaction, loadOlderPosts, pageStatus }) {
+function WinsView({ posts, space, toggleReaction, updatePost, deletePost, loadOlderPosts, pageStatus, canManage }) {
   return (
     <PostList
       posts={posts}
       space={space}
       toggleReaction={toggleReaction}
+      updatePost={updatePost}
+      deletePost={deletePost}
       loadOlderPosts={loadOlderPosts}
       pageStatus={pageStatus}
+      canManage={canManage}
       emptyText="no wins yet. rude of the week, honestly."
     />
   );
 }
 
-function ReadsView({ posts, space, loadOlderPosts, pageStatus }) {
+function ReadsView({ posts, space, loadOlderPosts, pageStatus, deletePost, canManage, startSetup, onToast }) {
   return (
     <>
       <div className="reads-intro">
         <span>team reads</span>
-        <p>Published field notes from teammates. Drafted from private dumps, approved by the person who wrote them.</p>
-        <Link className="ghost-button button-link" href="/dump">
-          open your dump
-        </Link>
+        <p>Published field notes from private dumps and Slack drafts. Nothing lands here until someone chooses to publish it.</p>
+        <div className="reads-intro-actions">
+          <Link className="solid-button button-link" href="/dump">
+            open your dump
+          </Link>
+          {canManage && !posts.length && !space.slackTeamReads && <SlackReadsSetupButton startSetup={startSetup} onToast={onToast} />}
+        </div>
       </div>
       <PostList
         posts={posts}
         space={space}
         toggleReaction={async () => {}}
+        deletePost={deletePost}
         loadOlderPosts={loadOlderPosts}
         pageStatus={pageStatus}
-        emptyText="no one has dropped anything here yet. share a dump with the team."
+        emptyText="no team reads yet. save private dumps in Slack or Mumbl, draft the useful thread, then publish when it is ready."
         showReactions={false}
+        canManage={canManage}
       />
     </>
+  );
+}
+
+function SlackReadsSetupButton({ startSetup, onToast }) {
+  const [isStarting, setIsStarting] = useState(false);
+
+  async function handleClick() {
+    if (isStarting) return;
+    setIsStarting(true);
+    try {
+      const result = await startSetup();
+      trackEvent("slack_team_reads_setup_started", { source: "reads_empty_state" });
+      window.location.href = result.installUrl;
+    } catch (error) {
+      trackEvent("slack_team_reads_setup_failed", { source: "reads_empty_state" });
+      onToast(error.message || "couldn't start the Slack team reads upgrade.");
+      setIsStarting(false);
+    }
+  }
+
+  return (
+    <button className="ghost-button button-with-loader" type="button" onClick={handleClick} disabled={isStarting}>
+      {isStarting && <span className="mini-loader" aria-hidden="true" />}
+      {isStarting ? "opening Slack..." : "create Slack reads channel"}
+    </button>
   );
 }
 
@@ -258,10 +331,13 @@ function PostList({
   posts,
   space,
   toggleReaction,
+  updatePost,
+  deletePost,
   loadOlderPosts,
   pageStatus,
   emptyText = "quiet room. dangerous. drop the first mumbl.",
   showReactions = true,
+  canManage = false,
 }) {
   const page = space.postsPage || {};
   const hasMore = Boolean(page.hasMore);
@@ -272,7 +348,17 @@ function PostList({
     <div className="feed-list">
       {posts.length ? (
         posts.map((post) => (
-          <PostCard post={post} space={space} toggleReaction={toggleReaction} showReactions={showReactions} key={post.id} />
+          <PostCard
+            post={post}
+            space={space}
+            toggleReaction={toggleReaction}
+            updatePost={updatePost}
+            deletePost={deletePost}
+            showReactions={showReactions}
+            canManage={canManage}
+            canAuthorEdit={post.canAuthorEdit === true || (post.localEditTokenAllowed === true && Boolean(getPostEditToken(post.id)))}
+            key={post.id}
+          />
         ))
       ) : (
         <div className="empty-state">{emptyText}</div>
@@ -312,6 +398,81 @@ function toggleReactionWithToast(toggleReaction, setToast) {
       throw error;
     }
   };
+}
+
+function updatePostWithToast(updatePost, setToast) {
+  return async (input) => {
+    try {
+      await updatePost(input);
+      setToast("mumbl updated.");
+    } catch (error) {
+      setToast(error.message || "couldn't update that mumbl.");
+      throw error;
+    }
+  };
+}
+
+function deletePostWithToast(deletePost, setToast) {
+  return async (input) => {
+    try {
+      await deletePost(input);
+      setToast("mumbl removed.");
+    } catch (error) {
+      setToast(error.message || "couldn't delete that mumbl.");
+      throw error;
+    }
+  };
+}
+
+function SpaceDangerZonePanel({ space, deleteSpace, onToast }) {
+  const [confirming, setConfirming] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const canDelete = confirming && confirmText.trim() === space.slug;
+
+  async function handleDelete() {
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    if (!canDelete || isDeleting) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteSpace();
+    } catch (error) {
+      onToast(error.message || "couldn't delete this space.");
+      setIsDeleting(false);
+    }
+  }
+
+  return (
+    <section className="panel danger-zone-panel" aria-busy={isDeleting}>
+      <div>
+        <h3>danger zone</h3>
+        <p className="panel-copy">
+          Delete this room, its feed, reactions, side quests, heartbeats, and Slack room links. Published field notes stay in the author's dump, unlinked from this room.
+        </p>
+      </div>
+      {confirming && (
+        <label>
+          type the room slug
+          <input value={confirmText} onChange={(event) => setConfirmText(event.target.value)} placeholder={space.slug} disabled={isDeleting} />
+        </label>
+      )}
+      <div className="danger-zone-actions">
+        {confirming && (
+          <button className="ghost-button" type="button" onClick={() => setConfirming(false)} disabled={isDeleting}>
+            cancel
+          </button>
+        )}
+        <button className="ghost-button danger button-with-loader" type="button" onClick={handleDelete} disabled={isDeleting || (confirming && !canDelete)}>
+          {isDeleting && <span className="mini-loader" aria-hidden="true" />}
+          {confirming ? "delete room forever" : "delete this room"}
+        </button>
+      </div>
+    </section>
+  );
 }
 
 async function copyToClipboard(text) {

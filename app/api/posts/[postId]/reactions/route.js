@@ -1,4 +1,5 @@
 import { badRequest, ok, serverError } from "../../../../../src/server/http";
+import { resolveRequestOwner } from "../../../../../src/server/auth";
 import { enforceRateLimit } from "../../../../../src/server/rateLimit";
 import { hashToken } from "../../../../../src/server/hash";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
@@ -16,9 +17,11 @@ export async function POST(request, { params }) {
     if (!sessionToken) return badRequest("session token is required");
 
     const supabase = getSupabaseAdmin();
-    await enforceRateLimit({ supabase, action: "reaction", sessionToken });
+    const owner = await resolveRequestOwner({ request, sessionToken });
+    const reactionIdentity = owner.userId ? `auth-reaction:${owner.userId}` : sessionToken;
+    await enforceRateLimit({ supabase, action: "reaction", sessionToken: reactionIdentity });
 
-    const sessionTokenHash = hashToken(sessionToken);
+    const sessionTokenHash = hashToken(reactionIdentity);
 
     const { data: existing, error: existingError } = await supabase
       .from("reactions")

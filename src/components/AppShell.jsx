@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useRecentSlug } from "../hooks/useRecentSlug";
-import { feedbackRoom } from "../lib/constants";
+import AccountControl from "./AccountControl";
 import JoinModal from "./JoinModal";
 
 export default function AppShell({ children }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [joinOpen, setJoinOpen] = useState(false);
   const recentSlug = useRecentSlug();
+  const dumpActive = pathname?.startsWith("/dump");
+  const missionActive = pathname?.startsWith("/mission");
 
   return (
     <div className="shell">
@@ -21,21 +24,21 @@ export default function AppShell({ children }) {
           </span>
           <span>mumbl</span>
         </Link>
-        <div className="topbar-actions">
-          <Link className="ghost-button button-link" href="/mission">
+        <nav className="topbar-nav" aria-label="mumbl navigation">
+          <Link className={`topbar-link ${missionActive ? "active" : ""}`} href="/mission" aria-current={missionActive ? "page" : undefined}>
             mission
           </Link>
-          <Link className="ghost-button button-link" href="/dump">
+          <Link className={`topbar-link ${dumpActive ? "active" : ""}`} href="/dump" aria-current={dumpActive ? "page" : undefined}>
             dump
           </Link>
-          <Link className="ghost-button button-link topbar-feedback" href={feedbackRoom.href}>
-            help shape mumbl
-          </Link>
-          <button className="ghost-button" type="button" onClick={() => setJoinOpen(true)}>
-            join a space
+          <button className="topbar-link" type="button" onClick={() => setJoinOpen(true)}>
+            join<span className="topbar-label-extra"> a space</span>
           </button>
-          <Link className="solid-button button-link" href="/create">
-            create space
+        </nav>
+        <div className="topbar-actions">
+          <AccountControl />
+          <Link className="topbar-create button-link" href="/create">
+            create<span className="topbar-label-extra"> space</span>
           </Link>
         </div>
       </header>

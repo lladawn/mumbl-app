@@ -148,6 +148,15 @@ posts is more alive than one with 40 silent visitors. The only counts visible in
 the product are reaction counts on posts — "i felt this · 8" — because they
 measure resonance, not surveillance.
 
+### slack-native beta room surface
+
+For the Slack-native beta, the main room surface is **team reads first**. People
+catch messy thoughts in Slack or their private dump, shape the useful parts into
+field notes, and publish those to room reads when ready. The old feed and wins
+routes remain available for compatibility and demos, but they should not be the
+primary room navigation. The heartbeat is based on published team reads only, so
+the weekly read reflects what the team intentionally chose to remember.
+
 ---
 
 ## why mumbl and not slack — the structural argument
@@ -495,13 +504,10 @@ build in this order. each item should feel shippable before moving to the next.
 
 **core loop**
 1. landing page — headline, vibe picker, create → get link instantly
-2. "you first" — after creating a space, prompt the creator to post before
-   they see the share link. one post seeds the culture. empty rooms don't get
-   opened the link.
-3. space feed — view posts, newest first. posts are the identity of the space
-4. compose + post — post types (find/thought/rant/win/lol), anonymous toggle
-   default on, 500 char limit
-5. reactions — phrase-based ("i felt this · 8"), session dedup, one tap
+2. private dump — catch the messy thought in Mumbl or Slack before it disappears
+3. field note — shape the useful thread into something readable
+4. team reads — publish by choice into the room, anonymous or with a handle
+5. heartbeat — give the week back to the team from anonymised room signal
 
 **tabs**
 6. wins tab — filtered feed view only. no aggregate stat cards; reaction counts

@@ -1,4 +1,14 @@
-import { getCreatorToken, loadSession, rememberRecentSlug, saveCreatorToken } from "./storage";
+import {
+  clearCreatorToken,
+  deletePostEditToken,
+  forgetRecentSlug,
+  getCreatorToken,
+  getPostEditToken,
+  loadSession,
+  rememberRecentSlug,
+  saveCreatorToken,
+  savePostEditToken,
+} from "./storage";
 import { authRequestContext } from "./auth";
 
 export async function joinWaitlist({ email }) {
@@ -12,12 +22,14 @@ export async function joinWaitlist({ email }) {
 
 export async function fetchSpace(slug, { limit, before, type } = {}) {
   const sessionToken = loadSession();
+  const auth = await authRequestContext();
   const params = new URLSearchParams({ sessionToken });
   if (limit) params.set("limit", String(limit));
   if (before) params.set("before", before);
   if (type) params.set("type", type);
 
   const response = await fetch(`/api/spaces/${slug}?${params.toString()}`, {
+    headers: auth.headers,
     cache: "no-store",
   });
   const data = await parseJson(response);
@@ -26,10 +38,11 @@ export async function fetchSpace(slug, { limit, before, type } = {}) {
 }
 
 export async function createRemoteSpace({ name, vibe }) {
+  const auth = await authRequestContext();
   const response = await fetch("/api/spaces", {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name, vibe }),
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ name, vibe, sessionToken: loadSession() }),
   });
   const data = await parseJson(response);
   saveCreatorToken(data.slug, data.creatorToken);
@@ -38,9 +51,10 @@ export async function createRemoteSpace({ name, vibe }) {
 }
 
 export async function createRemotePost({ slug, type, content, isAnonymous, displayName, promptId }) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/spaces/${slug}/posts`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...auth.headers },
     body: JSON.stringify({
       type,
       content,
@@ -50,7 +64,9 @@ export async function createRemotePost({ slug, type, content, isAnonymous, displ
       sessionToken: loadSession(),
     }),
   });
-  return parseJson(response);
+  const data = await parseJson(response);
+  if (!auth.expectsAuthenticatedOwner && data.post?.id && data.editToken) savePostEditToken(data.post.id, data.editToken);
+  return data;
 }
 
 export async function fetchDumps() {
@@ -102,6 +118,16 @@ export async function deleteDump(dumpId) {
     method: "DELETE",
     headers: { "content-type": "application/json", ...auth.headers },
     body: JSON.stringify({ sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
+  });
+  return parseJson(response);
+}
+
+export async function deleteDumps({ dumpIds }) {
+  const auth = await authRequestContext();
+  const response = await fetch("/api/dumps", {
+    method: "DELETE",
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ dumpIds, sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
   });
   return parseJson(response);
 }
@@ -158,9 +184,10 @@ export async function deleteFieldNote(fieldNoteId) {
 }
 
 export async function updateRemoteSpaceVisibility({ slug, isPublic, publicName }) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/spaces/${slug}`, {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...auth.headers },
     body: JSON.stringify({
       creatorToken: getCreatorToken(slug),
       isPublic,
@@ -171,9 +198,10 @@ export async function updateRemoteSpaceVisibility({ slug, isPublic, publicName }
 }
 
 export async function updateRemoteSpaceDescription({ slug, description }) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/spaces/${slug}`, {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...auth.headers },
     body: JSON.stringify({
       creatorToken: getCreatorToken(slug),
       description,
@@ -182,19 +210,89 @@ export async function updateRemoteSpaceDescription({ slug, description }) {
   return parseJson(response);
 }
 
+export async function deleteRemoteSpace({ slug }) {
+  const auth = await authRequestContext();
+  const response = await fetch(`/api/spaces/${slug}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ creatorToken: getCreatorToken(slug) }),
+  });
+  const data = await parseJson(response);
+  clearCreatorToken(slug);
+  forgetRecentSlug(slug);
+  return data;
+}
+
+export async function updateRemotePost({ postId, content }) {
+  const auth = await authRequestContext();
+  const response = await fetch(`/api/posts/${postId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ content, editToken: getPostEditToken(postId), sessionToken: loadSession() }),
+  });
+  return parseJson(response);
+}
+
+export async function deleteRemotePost({ postId, slug }) {
+  const auth = await authRequestContext();
+  const response = await fetch(`/api/posts/${postId}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({
+      editToken: getPostEditToken(postId),
+      creatorToken: getCreatorToken(slug),
+      sessionToken: loadSession(),
+    }),
+  });
+  const data = await parseJson(response);
+  deletePostEditToken(postId);
+  return data;
+}
+
+export async function startSlackTeamReadsSetup({ slug }) {
+  const auth = await authRequestContext();
+  const response = await fetch(`/api/spaces/${slug}/slack/team-reads/setup`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ creatorToken: getCreatorToken(slug) }),
+  });
+  return parseJson(response);
+}
+
+export async function updateSlackTeamReadsPosting({ slug, postingEnabled }) {
+  const auth = await authRequestContext();
+  const response = await fetch(`/api/spaces/${slug}/slack/team-reads`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ creatorToken: getCreatorToken(slug), postingEnabled }),
+  });
+  return parseJson(response);
+}
+
+export async function pinSlackSpaceForPublishing({ slug }) {
+  const auth = await authRequestContext();
+  const response = await fetch(`/api/spaces/${slug}/slack/pin`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...auth.headers },
+  });
+  return parseJson(response);
+}
+
 export async function dismissRemoteFirstPost(slug) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/spaces/${slug}/first-post-dismissed`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...auth.headers },
     body: JSON.stringify({ creatorToken: getCreatorToken(slug) }),
   });
   return parseJson(response);
 }
 
 export async function toggleRemoteReaction({ postId, label }) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/posts/${postId}/reactions`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...auth.headers },
     body: JSON.stringify({ label, sessionToken: loadSession() }),
   });
   return parseJson(response);

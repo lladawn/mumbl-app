@@ -1,7 +1,8 @@
-import { loadSession } from "./storage";
+import { listCreatorTokens, listPostEditTokens, loadSession } from "./storage";
 
 const SUPABASE_AUTH_CLIENT_KEY = "__mumblSupabaseAuthClient";
 const SUPABASE_AUTH_CLIENT_PROMISE_KEY = "__mumblSupabaseAuthClientPromise";
+export const AUTH_CHANGED_EVENT = "mumbl:auth-changed";
 
 export async function getBrowserSupabase() {
   if (globalThis[SUPABASE_AUTH_CLIENT_KEY]) return globalThis[SUPABASE_AUTH_CLIENT_KEY];
@@ -41,9 +42,9 @@ export async function requestMagicLink(email) {
   if (error) throw error;
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(next = "/dump") {
   const supabase = await getBrowserSupabase();
-  const redirectTo = `${window.location.origin}/auth/callback?next=/dump`;
+  const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -107,6 +108,11 @@ export async function signOutOfDump() {
   if (error) throw error;
 }
 
+export function dispatchAuthChanged(detail = {}) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(AUTH_CHANGED_EVENT, { detail }));
+}
+
 export async function completeMagicLinkSession(code) {
   const supabase = await getBrowserSupabase();
   if (!code) {
@@ -138,7 +144,11 @@ async function linkCurrentBrowserSession(accessToken) {
       "content-type": "application/json",
       authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ sessionToken: loadSession() }),
+    body: JSON.stringify({
+      sessionToken: loadSession(),
+      creatorTokens: listCreatorTokens(),
+      postEditTokens: listPostEditTokens(),
+    }),
   });
   const result = await response.json();
   if (!response.ok) {
