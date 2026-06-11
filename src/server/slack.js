@@ -399,13 +399,14 @@ export async function publishSlackAppHome({ teamId, slackUserId }) {
     iv: installation.bot_access_token_iv,
     tag: installation.bot_access_token_tag,
   });
+  const blocks = await slackAppHomeBlocks({ teamId, slackUserId });
 
   return slackApi("views.publish", token, {
     user_id: slackUserId,
     view: {
       type: "home",
       callback_id: "mumbl_home",
-      blocks: slackAppHomeBlocks(),
+      blocks,
     },
   });
 }
@@ -483,6 +484,10 @@ export function slackRoomModalView({ initialName = "" } = {}) {
   return slackRoomModal({ initialName });
 }
 
+export function slackDumpModalView() {
+  return slackDumpModal();
+}
+
 export async function slackFieldNoteDraftPickerView({ teamId, slackUserId }) {
   try {
     const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
@@ -501,6 +506,13 @@ export async function slackFieldNoteReviewPickerView({ teamId, slackUserId }) {
   } catch (error) {
     return slackFieldNoteDraftUnavailableModal(error.message || "connect mumbl first.");
   }
+}
+
+export async function slackPinnedSpacesView({ teamId, slackUserId }) {
+  const connection = await findSlackConnection({ teamId, slackUserId });
+  if (!connection) return slackPinnedSpacesEmptyModal({ connected: false });
+  const pinnedSpaces = await listSlackPinnedSpaces(connection);
+  return pinnedSpaces.length ? slackPinnedSpacesModal({ pinnedSpaces }) : slackPinnedSpacesEmptyModal({ connected: true });
 }
 
 export async function openSlackFieldNoteReviewModal({ teamId, slackUserId, triggerId }) {
@@ -796,6 +808,40 @@ export async function pinSlackSpaceForChannelMember({ teamId, slackUserId, chann
 
   await pinSlackSpace({ connection, spaceId: channel.space_id });
   return { pinned: true, space: channel.spaces };
+}
+
+export async function unpinSlackPinnedSpace({ teamId, slackUserId, pinId }) {
+  const cleanedPinId = cleanString(pinId, 64);
+  const cleanedTeamId = cleanString(teamId, 80);
+  const cleanedSlackUserId = cleanString(slackUserId, 80);
+  if (!cleanedPinId || !cleanedTeamId || !cleanedSlackUserId) throw new Error("pinned space is required.");
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("slack_pinned_spaces")
+    .delete()
+    .eq("id", cleanedPinId)
+    .eq("slack_team_id", cleanedTeamId)
+    .eq("slack_user_id", cleanedSlackUserId)
+    .select("id,spaces(id,slug,name)")
+    .single();
+  if (error?.code === "PGRST116") throw new Error("that pinned space is already gone.");
+  if (error) throw error;
+  return data;
+}
+
+export async function slackUnpinPinnedSpaceConfirmView({ teamId, slackUserId, pinId }) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("slack_pinned_spaces")
+    .select("id,spaces(id,slug,name)")
+    .eq("id", cleanString(pinId, 64))
+    .eq("slack_team_id", cleanString(teamId, 80))
+    .eq("slack_user_id", cleanString(slackUserId, 80))
+    .single();
+  if (error?.code === "PGRST116") throw new Error("that pinned space is already gone.");
+  if (error) throw error;
+  return slackUnpinPinnedSpaceConfirmModal({ pin: data });
 }
 
 export async function slackPublishOptionsView({ teamId, slackUserId, fieldNoteId }) {
@@ -1352,23 +1398,51 @@ function teamReadMessage({ space, post, channel }) {
   };
 }
 
-function slackAppHomeBlocks() {
+async function slackAppHomeBlocks({ teamId, slackUserId }) {
   const { appUrl } = getServerEnv();
+  const connection = await findSlackConnection({ teamId, slackUserId });
+  const pinnedSpaces = connection ? await listSlackPinnedSpaces(connection) : [];
+  const topPinnedSpaces = pinnedSpaces.slice(0, 5);
+  const pinnedList = topPinnedSpaces
+    .map((pin) => {
+      const space = pin.spaces || {};
+      return `- *${escapeSlackText(space.name || "Mumbl space")}*  \`${escapeSlackText(space.slug || "space")}\``;
+    })
+    .join("\n");
+
   return [
-    section("*mumbl*\nA private place to catch work thoughts, shape the useful ones, and publish team reads only when you choose."),
-    section("*1. save private dumps*\nType `/mumbl the thing you want to keep` anywhere in Slack, right-click a message, or write one here."),
-    actions([{ text: "new private dump", actionId: "new_private_dump" }]),
-    section("*2. draft from the useful thread*\nChoose recent private dumps. Mumbl creates a private field-note draft; nothing posts to the team yet."),
-    actions([{ text: "draft team read", actionId: "draft_team_read" }]),
-    section("*3. review, edit, publish*\nEdit drafts in Slack, then publish to a pinned Mumbl space as anonymous or with a handle you choose."),
-    actions([{ text: "review drafts", actionId: "review_field_note_drafts" }]),
-    section("*need a team space?*\nCreate one from Slack, or pin an existing room with `/mumbl pin space-slug`."),
-    actions([{ text: "start a team room", actionId: "start_room_modal" }]),
-    section("*team reads on Slack*\nIf a Mumbl room has Slack team reads enabled, published reads appear as one clean channel message. Replies stay in that Slack thread."),
+    section("*mumbl*\nCatch work thoughts privately. Shape the useful ones into team reads when they are ready."),
     actions([
+      { text: "new private dump", actionId: "new_private_dump", style: "primary" },
       { text: "open your dump", url: `${appUrl}/dump` },
-      { text: "create on mumbl", url: `${appUrl}/create` },
     ]),
+    divider(),
+    section("*drafts*\nTurn recent private dumps into a field-note draft, then edit and publish from Slack."),
+    actions([
+      { text: "draft team read", actionId: "draft_team_read" },
+      { text: "review drafts", actionId: "review_field_note_drafts" },
+    ]),
+    divider(),
+    section(
+      pinnedSpaces.length
+        ? `*pinned teamspaces*\n${pinnedList}`
+        : connection
+          ? "*pinned teamspaces*\nNo pinned spaces yet. Create a team room here, or use `/mumbl pin space-slug`."
+          : "*pinned teamspaces*\nConnect by saving a private dump, then pin a Mumbl space for team reads.",
+    ),
+    actions(
+      pinnedSpaces.length
+        ? [
+            { text: "manage pinned spaces", actionId: "manage_pinned_spaces", style: "primary" },
+            { text: "start a team room", actionId: "start_room_modal" },
+          ]
+        : [
+            { text: "start a team room", actionId: "start_room_modal", style: "primary" },
+            { text: "create on mumbl", url: `${appUrl}/create` },
+          ],
+    ),
+    divider(),
+    section("*team reads on Slack*\nIf a Mumbl room has Slack team reads enabled, published reads appear as one clean channel message. Replies stay in that Slack thread."),
     context("No channel history. No member tracking. Slack identity is never used for anonymous reads."),
   ];
 }
@@ -1512,7 +1586,76 @@ function slackNoPinnedSpacesModal() {
   };
 }
 
+function slackPinnedSpacesEmptyModal({ connected }) {
+  const { appUrl } = getServerEnv();
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "pinned spaces" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section(
+        connected
+          ? "*no pinned teamspaces yet.*\nCreate one from Slack, or pin an existing room with `/mumbl pin space-slug`."
+          : "*connect mumbl first.*\nSave a private dump from Slack once, then pin a teamspace for publishing.",
+      ),
+      actions(
+        connected
+          ? [
+              { text: "start a team room", actionId: "start_room_modal", style: "primary" },
+              { text: "create on mumbl", url: `${appUrl}/create` },
+            ]
+          : [
+              { text: "new private dump", actionId: "new_private_dump", style: "primary" },
+              { text: "open mumbl", url: `${appUrl}/dump` },
+            ],
+      ),
+    ],
+  };
+}
+
+function slackPinnedSpacesModal({ pinnedSpaces }) {
+  const blocks = [
+    section("*your pinned teamspaces*\nThese are personal Slack publish destinations. Unpinning only removes your shortcut."),
+  ];
+
+  pinnedSpaces.slice(0, 10).forEach((pin) => {
+    const space = pin.spaces || {};
+    blocks.push(
+      section(`*${escapeSlackText(space.name || "Mumbl space")}*\n\`${escapeSlackText(space.slug || "space")}\``),
+      actions([
+        { text: "open room", url: `${getServerEnv().appUrl}/r/${space.slug}` },
+        { text: "publish a draft", actionId: "review_field_note_drafts" },
+        { text: "unpin", actionId: "unpin_pinned_space_start", value: pin.id, style: "danger" },
+      ]),
+    );
+  });
+
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "pinned spaces" },
+    close: { type: "plain_text", text: "done" },
+    blocks,
+  };
+}
+
+export function slackUnpinPinnedSpaceConfirmModal({ pin }) {
+  const space = pin?.spaces || {};
+  return {
+    type: "modal",
+    callback_id: "unpin_pinned_space_confirm",
+    private_metadata: JSON.stringify({ pinId: pin?.id || "" }),
+    title: { type: "plain_text", text: "unpin space?" },
+    submit: { type: "plain_text", text: "unpin" },
+    close: { type: "plain_text", text: "cancel" },
+    blocks: [
+      section(`*Remove ${escapeSlackText(space.name || "this space")} from your Slack publish list?*`),
+      context("This does not delete the Mumbl room or change Slack team-read posting for anyone else."),
+    ],
+  };
+}
+
 function slackFieldNotePublishOptionsModal({ fieldNote, pinnedSpaces }) {
+  const initialPin = pinnedSpaces.length === 1 ? pinnedSpaceOption(pinnedSpaces[0]) : null;
   return {
     type: "modal",
     callback_id: "publish_field_note_options",
@@ -1530,6 +1673,7 @@ function slackFieldNotePublishOptionsModal({ fieldNote, pinnedSpaces }) {
           type: "static_select",
           action_id: "value",
           placeholder: { type: "plain_text", text: "choose a pinned space" },
+          ...(initialPin ? { initial_option: initialPin } : {}),
           options: pinnedSpaces.map((pin) => pinnedSpaceOption(pin)),
         },
       },
@@ -1669,6 +1813,10 @@ function section(text) {
     type: "section",
     text: { type: "mrkdwn", text },
   };
+}
+
+function divider() {
+  return { type: "divider" };
 }
 
 function actions(buttons) {
