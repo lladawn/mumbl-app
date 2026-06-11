@@ -109,6 +109,8 @@ Set `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`, and `MUMBL
 
 `/mumbl room platform team` creates a Mumbl room from Slack and returns a one-time creator handoff link for opening the room in a browser. `/mumbl start platform team` remains an alias. Slack-created rooms are auto-pinned and linked to creator ownership when Mumbl can match or later connect the Slack user to a Mumbl login. `/mumbl pin platform-team` explicitly adds a Mumbl room to that Slack user's publish list without tracking room membership, and best-effort invites them into the room's Mumbl-created Slack reads channel when one exists. App Home can draft, review, edit, publish private field notes to pinned Mumbl spaces, and manage personal pinned spaces. Optional team-read Slack posting is creator-enabled per room. If a creator switches it on, Mumbl starts an optional Slack permission upgrade that asks for `chat:write`, `groups:write`, and `groups:read` so it can create one private channel, post published team reads there, and auto-pin that Mumbl room when a connected user joins the Mumbl-created Slack channel. It still does not request Slack history scopes.
 
+Beta default: Slack team-read channels are private. A future public workspace channel option can use admin-approved Slack permissions such as `channels:manage`, only for creating the reads channel and still without history scopes.
+
 Slack reminders are intentionally not part of the beta because frequent scheduling does not fit the current free-tier posture.
 
 ## Branches And Environments

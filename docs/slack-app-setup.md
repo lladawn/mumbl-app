@@ -242,6 +242,8 @@ Optional team-reads upgrade:
 5. Mumbl links that channel in `slack_space_channels`.
 6. Published team reads post as one Slack message. Replies stay in Slack threads and are not ingested by Mumbl.
 
+Beta default: the Slack reads channel is private. Public workspace-visible reads channels can come later with admin-approved public-channel permissions such as `channels:manage`; that future scope should only be used to create the reads channel and should not add Slack history scopes.
+
 ## Smoke Test Checklist
 
 After production install or release:

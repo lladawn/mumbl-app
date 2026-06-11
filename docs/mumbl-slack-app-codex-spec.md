@@ -63,8 +63,10 @@ opt out anytime: `/mumbl remind off`
 **optional team reads add-on scopes:**
 - `chat:write` — to post published team reads into the room's private Slack channel
 - `groups:write` — to create one private channel for a Mumbl room after creator opt-in
+- `groups:read` — to receive join events for Mumbl-created private reads channels
 
-**future reminder scopes, not in beta:**
+**future scopes, not in beta:**
+- `channels:manage` — only if Mumbl adds an admin-approved public workspace reads channel option later
 - `im:write` — to open DM channels for daily check-in
 
 **do NOT request:**

@@ -61,6 +61,7 @@ export default function SlackTeamReadsPanel({ space, startSetup, pinSpace, updat
         <h3>team reads on Slack</h3>
         <p className="panel-copy">
           optional. mumbl creates one private Slack channel and posts published team reads there. no channel history, no member tracking.
+          public workspace channels can come later with admin-approved Slack permissions.
         </p>
       </div>
       <button className="share-button" type="button" onClick={handlePin} disabled={isSaving}>
@@ -79,7 +80,9 @@ export default function SlackTeamReadsPanel({ space, startSetup, pinSpace, updat
         </>
       ) : (
         <>
-          <p className="panel-copy">Mumbl needs one optional permission upgrade to create a private channel and post team reads there.</p>
+          <p className="panel-copy">
+            mumbl needs one optional permission upgrade to create a private reads channel. public workspace channels can come later with admin-approved Slack permissions.
+          </p>
           <button className="share-button primary button-with-loader" type="button" onClick={handleSetup} disabled={isSaving}>
             {isSaving && <span className="mini-loader" aria-hidden="true" />}
             enable Slack team reads
