@@ -65,6 +65,34 @@ export async function POST(request) {
   }
 }
 
+export async function DELETE(request) {
+  try {
+    const body = await request.json();
+    const sessionToken = cleanString(body.sessionToken, 256);
+    const expectsAuthenticatedOwner = body.expectsAuthenticatedOwner === true;
+    const dumpIds = Array.isArray(body.dumpIds)
+      ? [...new Set(body.dumpIds.map((id) => cleanString(id, 64)).filter(Boolean))]
+      : [];
+
+    if (!sessionToken) return badRequest("session token is required");
+    if (!dumpIds.length) return badRequest("choose at least one dump");
+    if (dumpIds.length > 80) return badRequest("delete 80 dumps or fewer at once");
+
+    const supabase = getSupabaseAdmin();
+    const owner = await resolveRequestOwner({ request, sessionToken });
+    assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner);
+    const { error, count } = await applyOwnerFilter(
+      supabase.from("dumps").delete({ count: "exact" }).in("id", dumpIds),
+      owner,
+    );
+    if (error) throw error;
+
+    return ok({ deleted: count || 0 });
+  } catch (error) {
+    return serverError(error);
+  }
+}
+
 function isMissingTableError(error) {
   const message = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
   return error?.code === "42P01" || error?.code === "PGRST205" || message.includes("could not find the table");

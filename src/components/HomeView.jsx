@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useRecentSlug } from "../hooks/useRecentSlug";
 import { joinWaitlist } from "../lib/api";
 import { trackConversionEvent, trackDemoEntry, trackPublicCta } from "../lib/analytics";
-import { publicDemoRoom } from "../lib/constants";
+import { feedbackRoom, publicDemoRoom } from "../lib/constants";
 import JoinModal from "./JoinModal";
 
 const contactEmail = "mumbl.wtf@gmail.com";
@@ -185,16 +185,17 @@ export default function HomeView() {
               <a
                 className="slack-install-button"
                 href="/api/slack/install"
+                target="_blank"
+                rel="noreferrer"
                 onClick={() => trackPublicCta("slack_install", { source: "hero" })}
                 aria-label="Add Mumbl to Slack"
               >
-                <img
-                  alt="Add to Slack"
-                  height="40"
-                  src="https://platform.slack-edge.com/img/add_to_slack.png"
-                  srcSet="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"
-                  width="139"
-                />
+                <span className="slack-mark" aria-hidden="true">#</span>
+                <span>
+                  add to Slack
+                  <small>private dumps + team reads</small>
+                </span>
+                <em>beta</em>
               </a>
               <Link className="ghost-button button-link" href={publicDemoRoom.href} onClick={() => trackDemoEntry("hero")}>
                 try the demo
@@ -210,6 +211,7 @@ export default function HomeView() {
                 already have a link?
               </button>
             </div>
+            <p className="slack-beta-copy">Slack beta: save private dumps and publish team reads by choice. no channel history.</p>
             <div className="landing-proof-strip" aria-label="mumbl promises">
               <span>private first</span>
               <span>shared by choice</span>
@@ -367,6 +369,9 @@ export default function HomeView() {
             <a className="ghost-button button-link" href={teamNeedsMailHref} onClick={() => trackPublicCta("email_team_needs", { source: "bottom_cta" })}>
               tell us what your team needs
             </a>
+            <Link className="ghost-button button-link" href={feedbackRoom.href} onClick={() => trackPublicCta("feedback_room", { source: "bottom_cta" })}>
+              help shape mumbl
+            </Link>
           </div>
         </section>
 
@@ -385,6 +390,9 @@ export default function HomeView() {
               twitter @lla_dawn
             </a>
             <a href={teamNeedsMailHref} onClick={() => trackPublicCta("email_outbound", { source: "footer" })}>mumbl.wtf@gmail.com</a>
+            <Link href="/privacy" onClick={() => trackPublicCta("privacy", { source: "footer" })}>
+              privacy
+            </Link>
             <a href={calendlyHref} rel="noreferrer" target="_blank" onClick={() => trackPublicCta("calendly_outbound", { source: "footer" })}>
               book a call
             </a>

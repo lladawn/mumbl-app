@@ -22,6 +22,7 @@ Privacy guardrails:
 - No passive member tracking, presence, or analytics.
 - Slack identity is never used as the author label for anonymous reads.
 - A Slack reads channel only receives field notes that a user explicitly publishes.
+- Mumbl login is used only to keep private data and creator access attached to the right person; it is not room identity.
 
 ## Slack App Identity
 
@@ -230,6 +231,7 @@ User connection:
 
 - If Slack email matches an existing Mumbl login, Mumbl can connect the Slack user automatically during explicit actions.
 - If not, Mumbl creates a pending dump and sends the user to the Mumbl connect flow.
+- After connection, Mumbl reconciles Slack-created rooms for that Slack user: creator ownership is linked when unclaimed, the room is pinned for Slack publishing, and the user is best-effort invited into the Mumbl-created reads channel when one exists.
 
 Optional team-reads upgrade:
 

@@ -1,4 +1,5 @@
 import { badRequest, ok, serverError } from "../../../../../src/server/http";
+import { resolveRequestOwner } from "../../../../../src/server/auth";
 import { consumeCreatorHandoff } from "../../../../../src/server/slack";
 import { cleanString } from "../../../../../src/server/validation";
 
@@ -9,7 +10,8 @@ export async function POST(request) {
     const handoffToken = cleanString(body.handoffToken, 256);
     if (!handoffId || !handoffToken) return badRequest("handoff link is incomplete");
 
-    const handoff = await consumeCreatorHandoff({ handoffId, handoffToken });
+    const owner = await resolveRequestOwner({ request, sessionToken: "" });
+    const handoff = await consumeCreatorHandoff({ handoffId, handoffToken, mumblUserId: owner.userId });
     return ok(handoff);
   } catch (error) {
     return serverError(error);

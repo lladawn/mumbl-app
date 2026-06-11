@@ -308,7 +308,7 @@ export async function createCreatorHandoff({ spaceId, creatorToken }) {
   return { handoffId: data.id, handoffToken };
 }
 
-export async function consumeCreatorHandoff({ handoffId, handoffToken }) {
+export async function consumeCreatorHandoff({ handoffId, handoffToken, mumblUserId = "" }) {
   const supabase = getSupabaseAdmin();
   const now = new Date().toISOString();
   const { data: handoff, error } = await supabase
@@ -329,10 +329,21 @@ export async function consumeCreatorHandoff({ handoffId, handoffToken }) {
   const { error: updateError } = await supabase.from("slack_space_handoffs").update({ consumed_at: now }).eq("id", handoff.id);
   if (updateError) throw updateError;
 
+  const cleanedMumblUserId = cleanString(mumblUserId, 80);
+  if (cleanedMumblUserId) {
+    const { error: claimError } = await supabase
+      .from("spaces")
+      .update({ creator_user_id: cleanedMumblUserId })
+      .eq("id", handoff.space_id)
+      .is("creator_user_id", null);
+    if (claimError) throw claimError;
+  }
+
   return {
     slug: handoff.spaces.slug,
     name: handoff.spaces.name,
     creatorToken,
+    creatorLinked: Boolean(cleanedMumblUserId),
   };
 }
 
@@ -639,6 +650,7 @@ export async function connectSlackUser({ teamId, slackUserId, mumblUserId }) {
     .select("*")
     .single();
   if (error) throw error;
+  await reconcileSlackStartedSpacesForConnection(data);
   return data;
 }
 
@@ -811,6 +823,45 @@ export async function pinSlackSpaceForMumblUser({ mumblUserId, spaceId }) {
     spaceId,
   });
   return connection;
+}
+
+async function reconcileSlackStartedSpacesForConnection(connection) {
+  if (!connection?.mumbl_user_id || !connection?.slack_team_id || !connection?.slack_user_id) return { claimed: 0, pinned: 0 };
+
+  const supabase = getSupabaseAdmin();
+  const { data: startedSpaces, error } = await supabase
+    .from("slack_started_spaces")
+    .select("space_id, spaces(id,creator_user_id)")
+    .eq("slack_team_id", connection.slack_team_id)
+    .eq("created_by_slack_user_id", connection.slack_user_id);
+  if (error) throw error;
+
+  let claimed = 0;
+  let pinned = 0;
+  for (const startedSpace of startedSpaces || []) {
+    const spaceId = startedSpace.space_id;
+    if (!spaceId) continue;
+
+    if (!startedSpace.spaces?.creator_user_id) {
+      const { count, error: claimError } = await supabase
+        .from("spaces")
+        .update({ creator_user_id: connection.mumbl_user_id }, { count: "exact" })
+        .eq("id", spaceId)
+        .is("creator_user_id", null);
+      if (claimError) throw claimError;
+      claimed += count || 0;
+    }
+
+    await pinSlackSpace({ connection, spaceId });
+    pinned += 1;
+    await inviteSlackUserToSpaceChannel({
+      teamId: connection.slack_team_id,
+      slackUserId: connection.slack_user_id,
+      spaceId,
+    });
+  }
+
+  return { claimed, pinned };
 }
 
 export async function pinSlackSpaceForChannelMember({ teamId, slackUserId, channelId }) {
@@ -1180,7 +1231,7 @@ export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl,
     blocks: [
       section(`*${escapeSlackText(space.name)} is ready.*\n${status}`),
       actions([
-        { text: "create Slack reads channel", url: teamReadsUrl, style: "primary" },
+        { text: "create team reads channel", url: teamReadsUrl, style: "primary" },
         { text: creatorLinked ? "open room" : "claim room", url: openUrl },
       ]),
       context(
@@ -1204,7 +1255,7 @@ export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUr
           : `*${escapeSlackText(space.name)} is ready.*\nConnect once to claim creator access in Mumbl.`,
       ),
       actions([
-        { text: "create Slack reads channel", url: teamReadsUrl, style: "primary" },
+        { text: "create team reads channel", url: teamReadsUrl, style: "primary" },
         { text: creatorLinked ? "open room" : "claim room", url: openUrl },
       ]),
       context(

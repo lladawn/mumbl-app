@@ -19,8 +19,9 @@ export async function GET(request, { params }) {
 
     const url = new URL(request.url);
     const sessionToken = url.searchParams.get("sessionToken");
-    const sessionTokenHash = sessionToken ? hashToken(sessionToken) : null;
     const owner = await resolveRequestOwner({ request, sessionToken: cleanString(sessionToken, 256) });
+    const sessionTokenHash = sessionToken ? hashToken(sessionToken) : null;
+    const reactionIdentityHash = owner.userId ? hashToken(`auth-reaction:${owner.userId}`) : sessionTokenHash;
     const postLimit = parsePostLimit(url.searchParams.get("limit"));
     const postCursor = parsePostCursor(url.searchParams.get("before"));
     const postType = parsePostType(url.searchParams.get("type"));
@@ -67,12 +68,15 @@ export async function GET(request, { params }) {
       .select("id")
       .eq("space_id", space.id)
       .gte("created_at", startOfTodayIso());
-    const [reactionsResult, activeReactionsResult, heartbeatsResult, todayReactionsResult, slackTeamReadsResult] = await Promise.all([
+    const [reactionsResult, activeReactionsResult, accountEditablePostsResult, heartbeatsResult, todayReactionsResult, slackTeamReadsResult] = await Promise.all([
       postIds.length
         ? supabase.from("reactions").select("post_id,label").in("post_id", postIds)
         : Promise.resolve({ data: [], error: null }),
-      postIds.length && sessionTokenHash
-        ? supabase.from("reactions").select("post_id,label").in("post_id", postIds).eq("session_token_hash", sessionTokenHash)
+      postIds.length && reactionIdentityHash
+        ? supabase.from("reactions").select("post_id,label").in("post_id", postIds).eq("session_token_hash", reactionIdentityHash)
+        : Promise.resolve({ data: [], error: null }),
+      postIds.length && owner.userId
+        ? supabase.from("post_edit_tokens").select("post_id").in("post_id", postIds).eq("owner_user_id", owner.userId)
         : Promise.resolve({ data: [], error: null }),
       supabase.from("heartbeats").select("*").eq("space_id", space.id).order("week_of", { ascending: false }),
       todayPostIdsPromise.then(({ data, error }) => {
@@ -87,6 +91,7 @@ export async function GET(request, { params }) {
 
     if (reactionsResult.error) throw reactionsResult.error;
     if (activeReactionsResult.error) throw activeReactionsResult.error;
+    if (accountEditablePostsResult.error && !isMissingPostEditTokensTable(accountEditablePostsResult.error)) throw accountEditablePostsResult.error;
     if (heartbeatsResult.error) throw heartbeatsResult.error;
     if (todayReactionsResult.error) throw todayReactionsResult.error;
     if (slackTeamReadsResult.error && !isMissingSlackTeamReadsTable(slackTeamReadsResult.error)) throw slackTeamReadsResult.error;
@@ -102,6 +107,7 @@ export async function GET(request, { params }) {
           roomVibe: getTopReactionLabels(todayReactionsResult.data),
           slackTeamReads: slackTeamReadsResult.error ? null : slackTeamReadsResult.data,
           canManage: Boolean(owner.userId && space.creator_user_id === owner.userId),
+          accountEditablePostIds: new Set((accountEditablePostsResult.error ? [] : accountEditablePostsResult.data || []).map((row) => row.post_id)),
           postsPage: {
             limit: postLimit,
             count: postCount || 0,
@@ -115,6 +121,18 @@ export async function GET(request, { params }) {
   } catch (error) {
     return serverError(error);
   }
+}
+
+function isMissingPostEditTokensTable(error) {
+  const message = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
+  return (
+    error?.code === "42P01" ||
+    error?.code === "42703" ||
+    error?.code === "PGRST205" ||
+    error?.code === "PGRST204" ||
+    message.includes("post_edit_tokens") ||
+    message.includes("owner_user_id")
+  );
 }
 
 function isMissingSlackTeamReadsTable(error) {
@@ -183,6 +201,44 @@ export async function PATCH(request, { params }) {
     if (updateError) throw updateError;
 
     return ok({ space: serializeSpace(updatedSpace) });
+  } catch (error) {
+    return serverError(error);
+  }
+}
+
+export async function DELETE(request, { params }) {
+  try {
+    const { slug } = await params;
+    const body = await request.json();
+
+    if (!slug) return badRequest("space slug is required");
+
+    const supabase = getSupabaseAdmin();
+    const { data: space, error: spaceError } = await supabase
+      .from("spaces")
+      .select("id,slug,creator_token_hash,creator_user_id")
+      .eq("slug", slug)
+      .single();
+    if (spaceError?.code === "PGRST116") return notFound("space not found");
+    if (spaceError) throw spaceError;
+
+    const access = await resolveCreatorAccess({ request, body, space });
+    if (!access.canManage) return badRequest("creator token did not match");
+    if (access.shouldClaim) await claimCreatorAccess({ supabase, spaceId: space.id, userId: access.owner.userId });
+
+    const { error: unlinkError } = await supabase
+      .from("field_notes")
+      .update({
+        team_room_id: null,
+        published_post_id: null,
+      })
+      .eq("team_room_id", space.id);
+    if (unlinkError) throw unlinkError;
+
+    const { error: deleteError } = await supabase.from("spaces").delete().eq("id", space.id);
+    if (deleteError) throw deleteError;
+
+    return ok({ deleted: true, slug: space.slug });
   } catch (error) {
     return serverError(error);
   }

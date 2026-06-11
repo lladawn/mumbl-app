@@ -1,0 +1,151 @@
+import { badRequest, ok, serverError } from "../../../../src/server/http";
+import { resolveRequestOwner } from "../../../../src/server/auth";
+import { resolveCreatorAccess } from "../../../../src/server/creatorAccess";
+import { hashToken } from "../../../../src/server/hash";
+import { getSupabaseAdmin } from "../../../../src/server/supabase";
+import { cleanString } from "../../../../src/server/validation";
+
+const AUTHOR_EDIT_TYPES = new Set(["find", "thought", "rant", "win", "lol"]);
+
+export async function PATCH(request, { params }) {
+  try {
+    const { postId } = await params;
+    const body = await request.json();
+    const content = cleanString(body.content, 420);
+    const editToken = cleanString(body.editToken, 256);
+    const sessionToken = cleanString(body.sessionToken, 256);
+
+    if (!postId) return badRequest("post id is required");
+    if (!content) return badRequest("post content is required");
+
+    const supabase = getSupabaseAdmin();
+    const post = await getPostForMutation(supabase, postId);
+    if (!AUTHOR_EDIT_TYPES.has(post.type)) return badRequest("team reads are edited from your dump.");
+    const owner = await resolveRequestOwner({ request, sessionToken });
+    await assertPostEditAccess({ supabase, postId: post.id, editToken, owner });
+
+    const { data: updatedPost, error } = await supabase
+      .from("posts")
+      .update({ content })
+      .eq("id", post.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+
+    return ok({ post: updatedPost });
+  } catch (error) {
+    return serverError(error);
+  }
+}
+
+export async function DELETE(request, { params }) {
+  try {
+    const { postId } = await params;
+    const body = await request.json();
+    const editToken = cleanString(body.editToken, 256);
+    const sessionToken = cleanString(body.sessionToken, 256);
+
+    if (!postId) return badRequest("post id is required");
+
+    const supabase = getSupabaseAdmin();
+    const post = await getPostForMutation(supabase, postId);
+    const owner = await resolveRequestOwner({ request, sessionToken });
+    const canDeleteAsAuthor = await hasPostEditAccess({ supabase, postId: post.id, editToken, owner });
+    const canDeleteAsCreator = await canCreatorDeletePost({ request, body, post });
+    if (!canDeleteAsAuthor && !canDeleteAsCreator) return badRequest("post edit token or creator access is required");
+
+    if (post.type === "field_note") {
+      const { error: unlinkError } = await supabase
+        .from("field_notes")
+        .update({ team_room_id: null, published_post_id: null })
+        .eq("published_post_id", post.id);
+      if (unlinkError) throw unlinkError;
+    }
+
+    const { error } = await supabase.from("posts").delete().eq("id", post.id);
+    if (error) throw error;
+
+    return ok({ deleted: true });
+  } catch (error) {
+    return serverError(error);
+  }
+}
+
+async function getPostForMutation(supabase, postId) {
+  const { data: post, error } = await supabase
+    .from("posts")
+    .select("id,space_id,type,spaces(id,creator_token_hash,creator_user_id)")
+    .eq("id", postId)
+    .single();
+  if (error?.code === "PGRST116") {
+    const notFoundError = new Error("post not found");
+    notFoundError.status = 404;
+    throw notFoundError;
+  }
+  if (error) throw error;
+  return post;
+}
+
+async function assertPostEditAccess({ supabase, postId, editToken, owner }) {
+  if (!(await hasPostEditAccess({ supabase, postId, editToken, owner }))) {
+    const error = new Error("post edit token did not match");
+    error.status = 400;
+    throw error;
+  }
+}
+
+async function hasPostEditAccess({ supabase, postId, editToken, owner }) {
+  if (editToken && (await hasPostEditToken(supabase, postId, editToken))) return true;
+  if (!owner.userId) return false;
+  return hasPostEditOwner(supabase, postId, owner.userId);
+}
+
+async function hasPostEditToken(supabase, postId, editToken) {
+  const { data, error } = await supabase
+    .from("post_edit_tokens")
+    .select("post_id")
+    .eq("post_id", postId)
+    .eq("edit_token_hash", hashToken(editToken))
+    .maybeSingle();
+  if (isMissingPostEditTokensTable(error)) {
+    const migrationError = new Error("Post edit-token migration is not applied yet. Run supabase/migrations/0024_post_edit_tokens.sql.");
+    migrationError.status = 503;
+    throw migrationError;
+  }
+  if (error) throw error;
+  return Boolean(data?.post_id);
+}
+
+async function hasPostEditOwner(supabase, postId, userId) {
+  const { data, error } = await supabase
+    .from("post_edit_tokens")
+    .select("post_id")
+    .eq("post_id", postId)
+    .eq("owner_user_id", userId)
+    .maybeSingle();
+  if (isMissingPostEditTokensTable(error)) {
+    const migrationError = new Error("Post edit-token migration is not applied yet. Run supabase/migrations/0024_post_edit_tokens.sql.");
+    migrationError.status = 503;
+    throw migrationError;
+  }
+  if (error) throw error;
+  return Boolean(data?.post_id);
+}
+
+async function canCreatorDeletePost({ request, body, post }) {
+  const space = Array.isArray(post.spaces) ? post.spaces[0] : post.spaces;
+  const access = await resolveCreatorAccess({ request, body, space: space || {} });
+  return access.canManage;
+}
+
+function isMissingPostEditTokensTable(error) {
+  const message = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
+  return (
+    error?.code === "42P01" ||
+    error?.code === "42703" ||
+    error?.code === "PGRST205" ||
+    error?.code === "PGRST204" ||
+    message.includes("post_edit_tokens") ||
+    message.includes("owner_user_id")
+  );
+}

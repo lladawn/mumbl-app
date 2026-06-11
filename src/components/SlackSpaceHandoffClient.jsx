@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { authHeader } from "../lib/auth";
 import { rememberRecentSlug, saveCreatorToken } from "../lib/storage";
 
 export default function SlackSpaceHandoffClient() {
@@ -20,9 +21,10 @@ export default function SlackSpaceHandoffClient() {
         const handoffToken = searchParams.get("token") || "";
         if (!handoffId || !handoffToken) throw new Error("that Slack room link is missing its handoff token.");
 
+        const headers = await authHeader();
         const response = await fetch("/api/slack/spaces/handoff", {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", ...headers },
           body: JSON.stringify({ handoffId, handoffToken }),
         });
         const result = await response.json();
@@ -31,7 +33,7 @@ export default function SlackSpaceHandoffClient() {
 
         saveCreatorToken(result.slug, result.creatorToken);
         rememberRecentSlug(result.slug);
-        setStatus("creator access saved. opening the room...");
+        setStatus(result.creatorLinked ? "creator access linked. opening the room..." : "creator access saved. opening the room...");
         router.replace(`/r/${result.slug}`);
       } catch (handoffError) {
         if (!mounted) return;

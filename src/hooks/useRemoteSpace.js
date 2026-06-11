@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   createRemotePost,
+  deleteRemotePost,
+  deleteRemoteSpace,
   dismissRemoteFirstPost,
   fetchSpace,
   pinSlackSpaceForPublishing,
   startSlackTeamReadsSetup,
   toggleRemoteReaction,
+  updateRemotePost,
   updateSlackTeamReadsPosting,
   updateRemoteSpaceDescription,
   updateRemoteSpaceVisibility,
@@ -47,6 +50,16 @@ export function useRemoteSpace(slug, postType = "") {
   async function toggleReaction(input) {
     const result = await toggleRemoteReaction(input);
     setSpace((currentSpace) => updatePostReaction(currentSpace, input, result.active));
+  }
+
+  async function updatePost(input) {
+    await updateRemotePost(input);
+    await refresh();
+  }
+
+  async function deletePost(input) {
+    await deleteRemotePost({ slug, ...input });
+    await refresh();
   }
 
   async function loadOlderPosts() {
@@ -97,6 +110,10 @@ export function useRemoteSpace(slug, postType = "") {
     return pinSlackSpaceForPublishing({ slug });
   }
 
+  async function deleteSpace() {
+    return deleteRemoteSpace({ slug });
+  }
+
   return {
     space,
     status,
@@ -105,6 +122,8 @@ export function useRemoteSpace(slug, postType = "") {
     pageStatus,
     submitPost,
     toggleReaction,
+    updatePost,
+    deletePost,
     loadOlderPosts,
     dismissFirstPost,
     updateVisibility,
@@ -112,6 +131,7 @@ export function useRemoteSpace(slug, postType = "") {
     startTeamReadsSlackSetup,
     pinTeamReadsSlackSpace,
     updateTeamReadsSlackPosting,
+    deleteSpace,
   };
 }
 

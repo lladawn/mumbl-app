@@ -37,6 +37,8 @@ http://127.0.0.1:3000/
 - Space feed with post types: `thought`, `rant`, `win`, `find`, `lol`
 - Anonymous-first compose flow with optional display handle
 - Phrase-based reactions with local session dedupe
+- Edit/delete for new room posts through per-post edit tokens, with optional logged-in continuity across browsers
+- Private dump and field-note edit/delete, including bulk cleanup for selected private dumps
 - Wins tab with lightweight stats
 - Heartbeat tab with weekly history and vibe-over-time from anonymised backend data
 - Share-copy actions for link, Slack, X, and WhatsApp
@@ -81,9 +83,11 @@ The frontend now uses these backend route handlers for spaces, posts, reactions,
 6. Run `npm run db:push` to apply the migrations.
 7. Restart `npm run app`.
 
-For dump login, enable Supabase Google OAuth and allow `/auth/callback` in the Supabase Auth redirect URLs for each environment, for example `http://127.0.0.1:3000/auth/callback` locally and `https://mumbl.wtf/auth/callback` in production. Email magic-link code is kept dormant for now; custom SMTP is recommended before exposing it again.
+For account/session continuity, enable Supabase Google OAuth and allow `/auth/callback` in the Supabase Auth redirect URLs for each environment, for example `http://127.0.0.1:3000/auth/callback` locally and `https://mumbl.wtf/auth/callback` in production. Login is optional but central: it keeps private dumps, field-note drafts, Slack connections, creator rooms, editable room posts, reactions, and public-profile ownership together across browsers. It is not room identity, and anonymous room posting still works without an account or `posts.user_id`. Email magic-link code is kept dormant for now; custom SMTP is recommended before exposing it again.
 
-Creator access starts with the local room creator token. When a logged-in creator presents that token, Mumbl links the room to their auth account so creator controls survive across browsers without tracking normal room membership.
+Creator access starts with the local room creator token. When a logged-in creator presents that token, or opens a Slack-created room handoff while logged in, Mumbl links the room to their auth account so creator controls survive across browsers without tracking normal room membership.
+
+Creators can delete test or unused rooms from the room danger zone. Deleting a room hard-deletes the room feed and room-owned signal, frees the slug, and leaves user-owned field notes in the author's dump with their room/post linkage cleared.
 
 Until those variables exist, API routes return a setup `503`.
 
@@ -105,7 +109,7 @@ In Slack app settings:
 
 Set `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`, and `MUMBL_SLACK_TOKEN_ENCRYPTION_KEY` in the deployment environment. Install through `/api/slack/install`.
 
-`/mumbl room platform team` creates a Mumbl room from Slack and returns a one-time creator handoff link for opening the room in a browser. `/mumbl start platform team` remains an alias. Slack-created rooms are auto-pinned for the creator when Mumbl can match their Slack email to a Mumbl login. `/mumbl pin platform-team` explicitly adds a Mumbl room to that Slack user's publish list without tracking room membership, and best-effort invites them into the room's Mumbl-created Slack reads channel when one exists. App Home can draft, review, edit, publish private field notes to pinned Mumbl spaces, and manage personal pinned spaces. Optional team-read Slack posting is creator-enabled per room. If a creator switches it on, Mumbl starts an optional Slack permission upgrade that asks for `chat:write`, `groups:write`, and `groups:read` so it can create one private channel, post published team reads there, and auto-pin that Mumbl room when a connected user joins the Mumbl-created Slack channel. It still does not request Slack history scopes.
+`/mumbl room platform team` creates a Mumbl room from Slack and returns a one-time creator handoff link for opening the room in a browser. `/mumbl start platform team` remains an alias. Slack-created rooms are auto-pinned and linked to creator ownership when Mumbl can match or later connect the Slack user to a Mumbl login. `/mumbl pin platform-team` explicitly adds a Mumbl room to that Slack user's publish list without tracking room membership, and best-effort invites them into the room's Mumbl-created Slack reads channel when one exists. App Home can draft, review, edit, publish private field notes to pinned Mumbl spaces, and manage personal pinned spaces. Optional team-read Slack posting is creator-enabled per room. If a creator switches it on, Mumbl starts an optional Slack permission upgrade that asks for `chat:write`, `groups:write`, and `groups:read` so it can create one private channel, post published team reads there, and auto-pin that Mumbl room when a connected user joins the Mumbl-created Slack channel. It still does not request Slack history scopes.
 
 Slack reminders are intentionally not part of the beta because frequent scheduling does not fit the current free-tier posture.
 

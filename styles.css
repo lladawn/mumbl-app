@@ -119,10 +119,141 @@ a {
   border-radius: 50%;
 }
 
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px;
+  border: 1px solid rgba(27, 24, 20, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 254, 250, 0.72);
+}
+
+.topbar-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.topbar-link:hover,
+.topbar-link.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
 .topbar-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.account-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  max-width: 180px;
+  padding: 0 14px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: #fffefa;
+  box-shadow: 2px 2px 0 var(--ink);
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 900;
+  line-height: 1;
+  text-decoration: none;
+}
+
+button.account-control {
+  cursor: pointer;
+}
+
+.account-control.is-authenticated {
+  gap: 8px;
+}
+
+.account-control.is-authenticated span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-control.is-loading {
+  color: var(--muted);
+}
+
+.account-modal {
+  display: grid;
+  gap: 16px;
+  width: min(500px, 100%);
+}
+
+.account-modal-backdrop {
+  z-index: 100;
+  align-items: center;
+  justify-items: center;
+}
+
+.account-modal-head h2 {
+  margin-bottom: 8px;
+  font-size: clamp(2.1rem, 6vw, 3.6rem);
+}
+
+.account-modal-head p {
+  margin-bottom: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.account-modal-signed-in {
+  display: grid;
+  gap: 12px;
+}
+
+.account-modal-signed-in small {
+  color: var(--muted);
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.account-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.account-modal-actions.stacked {
+  display: grid;
+  gap: 12px;
+}
+
+.topbar-create {
+  min-height: 38px;
+  padding: 0 15px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: 2px 2px 0 var(--gold);
+  font-size: 0.92rem;
+  font-weight: 950;
 }
 
 .solid-button,
@@ -183,6 +314,24 @@ a {
   padding: 0 14px;
   max-width: 100%;
   overflow-wrap: anywhere;
+}
+
+.icon-action-button {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+}
+
+.icon-action-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .hero,
@@ -328,14 +477,65 @@ h1 {
 .slack-install-button {
   display: inline-flex;
   align-items: center;
+  gap: 10px;
   min-height: 48px;
+  padding: 7px 12px;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  background: #fff8e4;
+  color: var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+  font-weight: 900;
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
   max-width: 100%;
 }
 
-.slack-install-button img {
-  display: block;
-  width: 139px;
-  height: 40px;
+.slack-install-button:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.slack-install-button span:not(.slack-mark) {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.slack-install-button small,
+.slack-beta-copy {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.slack-install-button em {
+  padding: 3px 7px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--mint-ink);
+  font-size: 0.7rem;
+  font-style: normal;
+  text-transform: lowercase;
+}
+
+.slack-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--ink);
+  border-radius: 7px;
+  background: var(--violet);
+  color: var(--violet-ink);
+  font-weight: 950;
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.slack-beta-copy {
+  max-width: 520px;
+  margin: 8px 0 0;
 }
 
 .waitlist-form {
@@ -2218,6 +2418,33 @@ textarea:focus {
   background: #f7f7ff;
 }
 
+.danger-zone-panel {
+  display: grid;
+  gap: 12px;
+  border-color: var(--clay-ink);
+  background: #fff3ef;
+}
+
+.danger-zone-panel h3,
+.danger-zone-panel p {
+  margin-bottom: 0;
+}
+
+.danger-zone-panel label {
+  display: grid;
+  gap: 6px;
+  color: var(--clay-ink);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.danger-zone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .slack-team-reads-panel h3 {
   margin-bottom: 8px;
 }
@@ -2924,6 +3151,26 @@ textarea:focus {
   font-weight: 850;
 }
 
+.dump-history-actions {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  min-width: min(100%, 340px);
+}
+
+.dump-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dump-bulk-actions .ghost-button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.78rem;
+}
+
 .dump-section-heading p {
   max-width: 420px;
   margin-bottom: 0;
@@ -3073,6 +3320,46 @@ textarea:focus {
 
 .ghost-button.danger {
   color: var(--clay-ink);
+}
+
+.post-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.post-actions .ghost-button,
+.post-actions .solid-button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 0.78rem;
+}
+
+.dump-card-actions .icon-action-button,
+.post-actions .icon-action-button,
+.field-note-actions .icon-action-button {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+}
+
+.post-edit-box {
+  display: grid;
+  gap: 6px;
+}
+
+.post-edit-box textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.post-edit-box span {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
 }
 
 .dump-edit-textarea {
@@ -3248,55 +3535,6 @@ textarea:focus {
 
 .public-note-option.selected {
   background: var(--violet);
-}
-
-.login-modal {
-  display: grid;
-  gap: 16px;
-  width: min(480px, 100%);
-}
-
-.login-modal-head h2 {
-  margin-bottom: 8px;
-  font-size: clamp(2.1rem, 6vw, 3.6rem);
-}
-
-.login-modal-head p {
-  margin-bottom: 0;
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-.login-form {
-  display: grid;
-  gap: 14px;
-}
-
-.login-options {
-  display: grid;
-  gap: 14px;
-}
-
-.google-login-button {
-  width: 100%;
-}
-
-.login-signed-in {
-  display: grid;
-  gap: 12px;
-}
-
-.login-signed-in small {
-  color: var(--muted);
-  font-weight: 850;
-  overflow-wrap: anywhere;
-}
-
-.login-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
 }
 
 .auth-callback-view {
@@ -4035,12 +4273,23 @@ textarea:focus {
   .topbar {
     min-height: 62px;
     padding: 12px 14px;
+    gap: 8px;
   }
 
   .brand span:last-child {
     display: none;
   }
 
+  .topbar-nav {
+    margin-left: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .topbar-nav .topbar-link:first-child,
+  .topbar-nav button.topbar-link,
+  .topbar-label-extra,
   .topbar-actions button.ghost-button {
     display: none;
   }
@@ -4053,6 +4302,20 @@ textarea:focus {
     min-height: 34px;
     padding: 0 10px;
     font-size: 0.86rem;
+  }
+
+  .account-control {
+    min-height: 34px;
+    max-width: 88px;
+    padding: 0 10px;
+    font-size: 0.82rem;
+  }
+
+  .topbar-link,
+  .topbar-create {
+    min-height: 34px;
+    padding: 0 11px;
+    font-size: 0.84rem;
   }
 
   .side-quest-mobile-link {
@@ -4118,7 +4381,6 @@ textarea:focus {
 
   .dump-select,
   .dump-panel-tabs button,
-  .dump-card-actions .ghost-button,
   .dump-card-actions .solid-button {
     width: 100%;
   }
@@ -4240,10 +4502,6 @@ textarea:focus {
   .private-dump-card,
   .heartbeat-preview {
     min-height: auto;
-  }
-
-  .topbar-feedback {
-    display: none;
   }
 
   .landing-footer {
