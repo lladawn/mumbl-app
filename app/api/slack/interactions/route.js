@@ -27,6 +27,7 @@ import {
   slackFieldNoteDraftErrorModalView,
   slackFieldNoteDraftSavedFallbackModalView,
   slackFieldNotePublishedModalView,
+  slackFieldNotePublishingModalView,
   slackFieldNoteSavedModalView,
   slackFieldNoteReviewPickerView,
   slackSavedDumpPayload,
@@ -311,26 +312,33 @@ export async function POST(request) {
       const teamId = slackTeamId(payload);
       const slackUserId = cleanString(payload.user?.id, 80);
       const metadata = parseViewMetadata(payload.view?.private_metadata);
-      try {
-        const result = await publishSlackFieldNoteDraft({
-          teamId,
-          slackUserId,
-          fieldNoteId: metadata.fieldNoteId,
-          spaceId: metadata.spaceId,
-          isAnonymous: metadata.isAnonymous !== false,
-          displayName: metadata.displayName,
-        });
-        after(async () => {
+      const viewId = cleanString(payload.view?.id, 120);
+      after(async () => {
+        try {
+          const result = await publishSlackFieldNoteDraft({
+            teamId,
+            slackUserId,
+            fieldNoteId: metadata.fieldNoteId,
+            spaceId: metadata.spaceId,
+            isAnonymous: metadata.isAnonymous !== false,
+            displayName: metadata.displayName,
+          });
+          await updateSlackView({ teamId, viewId, view: slackFieldNotePublishedModalView(result) });
           try {
             await publishSlackAppHome({ teamId, slackUserId });
           } catch (error) {
             console.error("Slack App Home refresh after publish failed", { message: error.message, slackError: error.slack?.error });
           }
-        });
-        return ok({ response_action: "update", view: slackFieldNotePublishedModalView(result) });
-      } catch (error) {
-        return ok({ response_action: "update", view: slackFieldNoteDraftErrorModalView(error.message || "couldn't publish that draft.") });
-      }
+        } catch (error) {
+          console.error("Slack field note publish failed", { message: error.message, slackError: error.slack?.error, slackResponse: error.slack });
+          await updateSlackView({
+            teamId,
+            viewId,
+            view: slackFieldNoteDraftErrorModalView(error.message || "couldn't publish that draft."),
+          });
+        }
+      });
+      return ok({ response_action: "update", view: slackFieldNotePublishingModalView() });
     }
 
     if (payload.type === "view_submission" && payload.view?.callback_id === "unpin_pinned_space_confirm") {
@@ -442,26 +450,28 @@ async function showLoadingThenReplace({ payload, title, message, buildView, logL
     viewId = cleanString(result.view?.id, 120);
   }
 
-  try {
-    await updateSlackView({
-      teamId,
-      viewId,
-      view: await buildView({ teamId, slackUserId }),
-    });
-  } catch (error) {
-    console.error(logLabel, { message: error.message, slackError: error.slack?.error, slackResponse: error.slack });
-    if (viewId) {
-      try {
-        await updateSlackView({
-          teamId,
-          viewId,
-          view: slackFieldNoteDraftErrorModalView(error.message || "Slack could not load that view yet."),
-        });
-      } catch (updateError) {
-        console.error("Slack error modal update failed", { message: updateError.message, slackError: updateError.slack?.error });
+  after(async () => {
+    try {
+      await updateSlackView({
+        teamId,
+        viewId,
+        view: await buildView({ teamId, slackUserId }),
+      });
+    } catch (error) {
+      console.error(logLabel, { message: error.message, slackError: error.slack?.error, slackResponse: error.slack });
+      if (viewId) {
+        try {
+          await updateSlackView({
+            teamId,
+            viewId,
+            view: slackFieldNoteDraftErrorModalView(error.message || "Slack could not load that view yet."),
+          });
+        } catch (updateError) {
+          console.error("Slack error modal update failed", { message: updateError.message, slackError: updateError.slack?.error });
+        }
       }
     }
-  }
+  });
 }
 
 function selectedSlackOptionValues(options) {

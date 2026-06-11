@@ -903,19 +903,28 @@ export async function publishSlackFieldNoteDraft({ teamId, slackUserId, fieldNot
   const sessionToken = `slack:${teamId}:${slackUserId}`;
   const sessionTokenHash = hashToken(sessionToken);
   const supabase = getSupabaseAdmin();
-  await enforceRateLimit({ supabase, action: "post", sessionToken });
 
   const [{ data: fieldNote, error: noteError }, pinnedSpace] = await Promise.all([
     supabase
       .from("field_notes")
-      .select("*")
+      .select("*, spaces:team_room_id(id,slug,name)")
       .eq("user_id", connection.mumbl_user_id)
-      .eq("is_published", false)
       .eq("id", cleanString(fieldNoteId, 64))
       .single(),
     getPinnedSpace({ connection, spaceId }),
   ]);
   if (noteError) throw noteError;
+
+  if (fieldNote.is_published) {
+    const space = fieldNote.spaces || pinnedSpace.spaces;
+    return {
+      fieldNote: { id: fieldNote.id, title: fieldNote.title },
+      space,
+      url: `${getServerEnv().appUrl}/r/${space.slug}/reads`,
+    };
+  }
+
+  await enforceRateLimit({ supabase, action: "post", sessionToken });
 
   const space = pinnedSpace.spaces;
   const authorName = isAnonymous ? null : cleanString(displayName, 48) || "someone brave";
@@ -1362,6 +1371,18 @@ export function slackFieldNotePublishedModalView({ fieldNote, space, url }) {
       section(`Published to *${escapeSlackText(space.name)}* team reads.`),
       actions([{ text: "open team reads", url }]),
       context("If Slack team reads are enabled for that room, Mumbl posted one message in the linked channel."),
+    ],
+  };
+}
+
+export function slackFieldNotePublishingModalView() {
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "publishing" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section("*publishing this team read...*"),
+      context("Keep this open for a moment. Mumbl is posting it once, then this modal will update."),
     ],
   };
 }
