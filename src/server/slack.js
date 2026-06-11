@@ -559,37 +559,8 @@ export function ephemeralText(text) {
   };
 }
 
-export function slackSavingPayload() {
-  return blockResponse({
-    text: "saving privately to mumbl...",
-    blocks: [
-      section("*saving privately to mumbl...*"),
-      context("Only you can see this."),
-    ],
-  });
-}
-
-export function slackCreatingRoomPayload() {
-  return blockResponse({
-    text: "creating a mumbl room...",
-    blocks: [
-      section("*creating a mumbl room...*"),
-      context("This stays private to you in Slack."),
-    ],
-  });
-}
-
 export function slackSavedDumpPayload({ url, shortcut = false, compact = false }) {
-  if (compact) {
-    return blockResponse({
-      text: "saved privately to mumbl.",
-      replaceOriginal: true,
-      blocks: [
-        section("*saved privately to mumbl.*"),
-        context("It is in your private dump."),
-      ],
-    });
-  }
+  if (compact) return ephemeralText("saved to mumbl privately.");
 
   return blockResponse({
     text: shortcut ? "saved to mumbl privately." : "saved. only you can see this.",
@@ -634,7 +605,6 @@ export function slackRoomNeedsNamePayload() {
 export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl }) {
   return blockResponse({
     text: `created a mumbl room for ${space.name}.`,
-    replaceOriginal: true,
     blocks: [
       section(`*created a mumbl room for ${escapeSlackText(space.name)}.*\nprivate dumps stay private. team reads only post to Slack if you enable them.`),
       actions([
