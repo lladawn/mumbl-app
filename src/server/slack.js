@@ -559,16 +559,9 @@ export function ephemeralText(text) {
   };
 }
 
-export function slackSavingPayload() {
-  return blockResponse({
-    text: "saving to mumbl...",
-    blocks: [
-      section("*saving to mumbl...*\nkeeping it private while mumbl files it away."),
-    ],
-  });
-}
+export function slackSavedDumpPayload({ url, shortcut = false, compact = false }) {
+  if (compact) return ephemeralText("saved privately to mumbl.");
 
-export function slackSavedDumpPayload({ url, shortcut = false }) {
   return blockResponse({
     text: shortcut ? "saved to mumbl privately." : "saved. only you can see this.",
     blocks: [
@@ -606,10 +599,6 @@ export function slackRoomNeedsNamePayload() {
       context("`/mumbl start platform team` still works too."),
     ],
   });
-}
-
-export function slackRoomModalOpenedPayload() {
-  return ephemeralText("opening room setup...");
 }
 
 export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl }) {

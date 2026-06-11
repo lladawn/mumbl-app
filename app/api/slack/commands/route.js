@@ -16,8 +16,6 @@ import {
   slackConnectUrl,
   slackHelpPayload,
   slackSavedDumpPayload,
-  slackSavingPayload,
-  slackRoomModalOpenedPayload,
   openSlackRoomModal,
 } from "../../../../src/server/slack";
 import { cleanString } from "../../../../src/server/validation";
@@ -42,7 +40,7 @@ export async function POST(request) {
           await postSlackResponse(responseUrl, ephemeralText(error.message || "couldn't open room setup."));
         }
       });
-      return ok(slackRoomModalOpenedPayload());
+      return ok({});
     }
 
     after(async () => {
@@ -57,7 +55,7 @@ export async function POST(request) {
       }
     });
 
-    return ok(roomName !== null ? ephemeralText("creating a mumbl room...") : slackSavingPayload());
+    return ok({});
   } catch (error) {
     return serverError(error);
   }
@@ -80,7 +78,7 @@ async function saveOrConnect({ teamId, slackUserId, content, sourceMeta }) {
   const existingConnection = await findSlackConnection({ teamId, slackUserId });
   if (existingConnection) {
     const dump = await saveSlackDump({ connection: existingConnection, content, sourceMeta });
-    return slackSavedDumpPayload({ url: dumpUrl(dump.id) });
+    return slackSavedDumpPayload({ url: dumpUrl(dump.id), compact: true });
   }
 
   const email = await getSlackUserEmail({ teamId, slackUserId });
@@ -88,7 +86,7 @@ async function saveOrConnect({ teamId, slackUserId, content, sourceMeta }) {
   if (mumblUserId) {
     const connection = await connectSlackUser({ teamId, slackUserId, mumblUserId });
     const dump = await saveSlackDump({ connection, content, sourceMeta });
-    return slackSavedDumpPayload({ url: dumpUrl(dump.id) });
+    return slackSavedDumpPayload({ url: dumpUrl(dump.id), compact: true });
   }
 
   const pending = await createPendingSlackDump({ teamId, slackUserId, content, sourceMeta });
