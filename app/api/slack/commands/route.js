@@ -3,7 +3,7 @@ import { ok, serverError } from "../../../../src/server/http";
 import {
   connectSlackUser,
   createPendingSlackDump,
-  createSlackStartedSpace,
+  createSlackStartedSpacePayload,
   dumpUrl,
   ephemeralText,
   findMumblUserByEmail,
@@ -15,10 +15,10 @@ import {
   slackConnectPayload,
   slackConnectUrl,
   slackHelpPayload,
-  slackRoomCreatedPayload,
   slackSavedDumpPayload,
   slackSavingPayload,
-  slackRoomNeedsNamePayload,
+  slackRoomModalOpenedPayload,
+  openSlackRoomModal,
 } from "../../../../src/server/slack";
 import { cleanString } from "../../../../src/server/validation";
 
@@ -29,11 +29,21 @@ export async function POST(request) {
     const slackUserId = cleanString(form.get("user_id"), 80);
     const text = cleanString(form.get("text"), 4000);
     const responseUrl = cleanString(form.get("response_url"), 2000);
+    const triggerId = cleanString(form.get("trigger_id"), 200);
     const roomName = parseRoomCommand(text);
 
     if (!teamId || !slackUserId) return ok(ephemeralText("couldn't tell which Slack workspace this came from."));
     if (!text || text.toLowerCase() === "help") return ok(slackHelpPayload());
-    if (roomName !== null && !roomName) return ok(slackRoomNeedsNamePayload());
+    if (roomName !== null && !roomName) {
+      after(async () => {
+        try {
+          await openSlackRoomModal({ teamId, triggerId });
+        } catch (error) {
+          await postSlackResponse(responseUrl, ephemeralText(error.message || "couldn't open room setup."));
+        }
+      });
+      return ok(slackRoomModalOpenedPayload());
+    }
 
     after(async () => {
       try {
@@ -63,8 +73,7 @@ function parseRoomCommand(text) {
 }
 
 async function startRoomFromSlack({ teamId, slackUserId, name }) {
-  const result = await createSlackStartedSpace({ teamId, slackUserId, name });
-  return slackRoomCreatedPayload(result);
+  return createSlackStartedSpacePayload({ teamId, slackUserId, name });
 }
 
 async function saveOrConnect({ teamId, slackUserId, content, sourceMeta }) {

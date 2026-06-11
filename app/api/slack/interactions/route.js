@@ -3,6 +3,7 @@ import { ok, serverError } from "../../../../src/server/http";
 import {
   connectSlackUser,
   createPendingSlackDump,
+  createSlackStartedSpaceModalView,
   dumpUrl,
   ephemeralText,
   findMumblUserByEmail,
@@ -14,6 +15,7 @@ import {
   slackConnectPayload,
   slackConnectUrl,
   slackSavedDumpPayload,
+  openSlackRoomModal,
 } from "../../../../src/server/slack";
 import { cleanString } from "../../../../src/server/validation";
 
@@ -24,6 +26,45 @@ export async function POST(request) {
     if (!payloadText) return ok(ephemeralText("Slack did not send a shortcut payload."));
 
     const payload = JSON.parse(payloadText);
+    if (payload.type === "block_actions") {
+      const actionId = cleanString(payload.actions?.[0]?.action_id, 80);
+      if (actionId === "start_room_modal") {
+        after(async () => {
+          try {
+            await openSlackRoomModal({
+              teamId: cleanString(payload.team?.id, 80),
+              triggerId: cleanString(payload.trigger_id, 200),
+            });
+          } catch {
+            // Slack will leave the App Home as-is if the modal cannot open.
+          }
+        });
+      }
+      return ok({});
+    }
+
+    if (payload.type === "view_submission" && payload.view?.callback_id === "create_mumbl_room") {
+      const teamId = cleanString(payload.team?.id, 80);
+      const slackUserId = cleanString(payload.user?.id, 80);
+      const roomName = cleanString(payload.view?.state?.values?.room_name?.value?.value, 80);
+      if (!roomName) {
+        return ok({
+          response_action: "errors",
+          errors: { room_name: "name the room first." },
+        });
+      }
+
+      try {
+        const view = await createSlackStartedSpaceModalView({ teamId, slackUserId, name: roomName });
+        return ok({ response_action: "update", view });
+      } catch (error) {
+        return ok({
+          response_action: "errors",
+          errors: { room_name: error.message || "couldn't create that room yet." },
+        });
+      }
+    }
+
     if (payload.type !== "message_action" || payload.callback_id !== "save_to_mumbl") {
       return ok(ephemeralText("That Slack action is not wired to Mumbl yet."));
     }

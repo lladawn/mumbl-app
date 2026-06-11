@@ -263,6 +263,16 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
   };
 }
 
+export async function createSlackStartedSpacePayload({ teamId, slackUserId, name }) {
+  const result = await createSlackStartedSpace({ teamId, slackUserId, name });
+  return slackRoomCreatedPayload(result);
+}
+
+export async function createSlackStartedSpaceModalView({ teamId, slackUserId, name }) {
+  const result = await createSlackStartedSpace({ teamId, slackUserId, name });
+  return slackRoomCreatedModalView(result);
+}
+
 export async function createCreatorHandoff({ spaceId, creatorToken }) {
   const handoffToken = createToken();
   const encrypted = encryptSlackSecret(creatorToken);
@@ -385,6 +395,20 @@ export async function publishSlackAppHome({ teamId, slackUserId }) {
       callback_id: "mumbl_home",
       blocks: slackAppHomeBlocks(),
     },
+  });
+}
+
+export async function openSlackRoomModal({ teamId, triggerId, initialName = "" }) {
+  const installation = await getSlackInstallation(teamId);
+  const token = decryptSlackToken({
+    ciphertext: installation.bot_access_token_ciphertext,
+    iv: installation.bot_access_token_iv,
+    tag: installation.bot_access_token_tag,
+  });
+
+  return slackApi("views.open", token, {
+    trigger_id: triggerId,
+    view: slackRoomModal({ initialName }),
   });
 }
 
@@ -584,6 +608,10 @@ export function slackRoomNeedsNamePayload() {
   });
 }
 
+export function slackRoomModalOpenedPayload() {
+  return ephemeralText("opening room setup...");
+}
+
 export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl }) {
   return blockResponse({
     text: `created a mumbl room for ${space.name}.`,
@@ -597,6 +625,23 @@ export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl 
       context(`invite link: <${roomUrl}|${roomUrl}>`),
     ],
   });
+}
+
+export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUrl }) {
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "room created" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section(`*created a mumbl room for ${escapeSlackText(space.name)}.*\nOpen it once to save creator access in this browser.`),
+      actions([
+        { text: "open room", url: openUrl },
+        { text: "open invite link", url: roomUrl },
+        { text: "enable Slack team reads", url: teamReadsUrl },
+      ]),
+      context("Private dumps stay private. Team reads only post to Slack if you enable them."),
+    ],
+  };
 }
 
 export async function postSlackResponse(responseUrl, payload) {
@@ -725,6 +770,7 @@ function slackAppHomeBlocks() {
     section("*mumbl*\nprivate dump first. team read only when you choose."),
     section("*save a private thought*\nType `/mumbl the thing you want to keep` anywhere in Slack."),
     section("*start a team space from Slack*\nType `/mumbl room platform team` to create the room without leaving Slack."),
+    actions([{ text: "start a team room", actionId: "start_room_modal" }]),
     section("*team reads on Slack*\nAfter a room is created, use its `enable Slack team reads` button to create one private channel."),
     actions([
       { text: "open your dump", url: `${appUrl}/dump` },
@@ -732,6 +778,31 @@ function slackAppHomeBlocks() {
     ]),
     context("No channel history. No member tracking. Only what you explicitly send or publish."),
   ];
+}
+
+function slackRoomModal({ initialName = "" }) {
+  return {
+    type: "modal",
+    callback_id: "create_mumbl_room",
+    title: { type: "plain_text", text: "new mumbl room" },
+    submit: { type: "plain_text", text: "create room" },
+    close: { type: "plain_text", text: "cancel" },
+    blocks: [
+      {
+        type: "input",
+        block_id: "room_name",
+        label: { type: "plain_text", text: "team name" },
+        element: {
+          type: "plain_text_input",
+          action_id: "value",
+          initial_value: initialName,
+          placeholder: { type: "plain_text", text: "platform team" },
+          max_length: 80,
+        },
+      },
+      context("Mumbl creates the room privately first. Team reads on Slack stay optional."),
+    ],
+  };
 }
 
 function blockResponse({ text, blocks }) {
@@ -755,7 +826,8 @@ function actions(buttons) {
     elements: buttons.map((button) => ({
       type: "button",
       text: { type: "plain_text", text: button.text },
-      url: button.url,
+      ...(button.url ? { url: button.url } : {}),
+      ...(button.actionId ? { action_id: button.actionId } : {}),
     })),
   };
 }
