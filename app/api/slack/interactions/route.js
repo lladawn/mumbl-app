@@ -38,6 +38,7 @@ import {
   slackUnpinPinnedSpaceConfirmView,
   openSlackDumpModal,
   openSlackRoomModal,
+  openSlackModalView,
   publishSlackAppHome,
   updateSlackView,
   updateSlackFieldNoteDraft,
@@ -113,36 +114,13 @@ export async function POST(request) {
             await updateSlackView({
               teamId,
               viewId,
-              view: slackLoadingModalView({ title: "review drafts", message: "loading your private drafts..." }),
-            });
-            after(async () => {
-              try {
-                await updateSlackView({
-                  teamId,
-                  viewId,
-                  view: await slackFieldNoteReviewPickerView({ teamId, slackUserId }),
-                });
-              } catch (error) {
-                console.error("Slack draft review update failed", { message: error.message, slackError: error.slack?.error });
-              }
+              view: await slackFieldNoteReviewPickerView({ teamId, slackUserId }),
             });
           } else {
-            const result = await openSlackLoadingModal({
+            await openSlackModalView({
               teamId,
               triggerId: cleanString(payload.trigger_id, 200),
-              title: "review drafts",
-              message: "loading your private drafts...",
-            });
-            after(async () => {
-              try {
-                await updateSlackView({
-                  teamId,
-                  viewId: cleanString(result.view?.id, 120),
-                  view: await slackFieldNoteReviewPickerView({ teamId, slackUserId }),
-                });
-              } catch (error) {
-                console.error("Slack draft review update failed", { message: error.message, slackError: error.slack?.error });
-              }
+              view: await slackFieldNoteReviewPickerView({ teamId, slackUserId }),
             });
           }
         }
