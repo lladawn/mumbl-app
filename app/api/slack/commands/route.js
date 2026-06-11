@@ -14,8 +14,10 @@ import {
   saveSlackDump,
   slackConnectPayload,
   slackConnectUrl,
+  slackCreatingRoomPayload,
   slackHelpPayload,
   slackSavedDumpPayload,
+  slackSavingPayload,
   openSlackRoomModal,
 } from "../../../../src/server/slack";
 import { cleanString } from "../../../../src/server/validation";
@@ -40,7 +42,7 @@ export async function POST(request) {
           await postSlackResponse(responseUrl, ephemeralText(error.message || "couldn't open room setup."));
         }
       });
-      return ok({});
+      return new Response(null, { status: 200 });
     }
 
     after(async () => {
@@ -55,7 +57,7 @@ export async function POST(request) {
       }
     });
 
-    return ok({});
+    return ok(roomName !== null ? slackCreatingRoomPayload() : slackSavingPayload());
   } catch (error) {
     return serverError(error);
   }
@@ -90,5 +92,5 @@ async function saveOrConnect({ teamId, slackUserId, content, sourceMeta }) {
   }
 
   const pending = await createPendingSlackDump({ teamId, slackUserId, content, sourceMeta });
-  return slackConnectPayload({ url: slackConnectUrl(pending.id) });
+  return slackConnectPayload({ url: slackConnectUrl(pending.id), replaceOriginal: true });
 }

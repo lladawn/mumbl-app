@@ -559,8 +559,37 @@ export function ephemeralText(text) {
   };
 }
 
+export function slackSavingPayload() {
+  return blockResponse({
+    text: "saving privately to mumbl...",
+    blocks: [
+      section("*saving privately to mumbl...*"),
+      context("Only you can see this."),
+    ],
+  });
+}
+
+export function slackCreatingRoomPayload() {
+  return blockResponse({
+    text: "creating a mumbl room...",
+    blocks: [
+      section("*creating a mumbl room...*"),
+      context("This stays private to you in Slack."),
+    ],
+  });
+}
+
 export function slackSavedDumpPayload({ url, shortcut = false, compact = false }) {
-  if (compact) return ephemeralText("saved privately to mumbl.");
+  if (compact) {
+    return blockResponse({
+      text: "saved privately to mumbl.",
+      replaceOriginal: true,
+      blocks: [
+        section("*saved privately to mumbl.*"),
+        context("It is in your private dump."),
+      ],
+    });
+  }
 
   return blockResponse({
     text: shortcut ? "saved to mumbl privately." : "saved. only you can see this.",
@@ -571,9 +600,10 @@ export function slackSavedDumpPayload({ url, shortcut = false, compact = false }
   });
 }
 
-export function slackConnectPayload({ url, shortcut = false }) {
+export function slackConnectPayload({ url, shortcut = false, replaceOriginal = false }) {
   return blockResponse({
     text: "connect your mumbl account to save from Slack.",
+    replaceOriginal,
     blocks: [
       section(shortcut ? "*connect mumbl once.*\nthen this message can land in your private dump." : "*connect mumbl once.*\nthen `/mumbl` can save thoughts without leaving Slack."),
       actions([{ text: "connect mumbl", url }]),
@@ -604,6 +634,7 @@ export function slackRoomNeedsNamePayload() {
 export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl }) {
   return blockResponse({
     text: `created a mumbl room for ${space.name}.`,
+    replaceOriginal: true,
     blocks: [
       section(`*created a mumbl room for ${escapeSlackText(space.name)}.*\nprivate dumps stay private. team reads only post to Slack if you enable them.`),
       actions([
@@ -794,11 +825,12 @@ function slackRoomModal({ initialName = "" }) {
   };
 }
 
-function blockResponse({ text, blocks }) {
+function blockResponse({ text, blocks, replaceOriginal = false }) {
   return {
     response_type: "ephemeral",
     text,
     blocks,
+    ...(replaceOriginal ? { replace_original: true } : {}),
   };
 }
 
