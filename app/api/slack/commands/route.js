@@ -14,10 +14,11 @@ import {
   saveSlackDump,
   slackConnectPayload,
   slackConnectUrl,
+  slackHelpPayload,
   slackRoomCreatedPayload,
   slackSavedDumpPayload,
   slackSavingPayload,
-  slackStartNeedsNamePayload,
+  slackRoomNeedsNamePayload,
 } from "../../../../src/server/slack";
 import { cleanString } from "../../../../src/server/validation";
 
@@ -28,17 +29,17 @@ export async function POST(request) {
     const slackUserId = cleanString(form.get("user_id"), 80);
     const text = cleanString(form.get("text"), 4000);
     const responseUrl = cleanString(form.get("response_url"), 2000);
-    const startName = parseStartCommand(text);
+    const roomName = parseRoomCommand(text);
 
     if (!teamId || !slackUserId) return ok(ephemeralText("couldn't tell which Slack workspace this came from."));
-    if (!text) return ok(ephemeralText("drop a thought after `/mumbl`, like `/mumbl deployment felt cursed today`."));
-    if (startName !== null && !startName) return ok(slackStartNeedsNamePayload());
+    if (!text || text.toLowerCase() === "help") return ok(slackHelpPayload());
+    if (roomName !== null && !roomName) return ok(slackRoomNeedsNamePayload());
 
     after(async () => {
       try {
         const result =
-          startName !== null
-            ? await startRoomFromSlack({ teamId, slackUserId, name: startName })
+          roomName !== null
+            ? await startRoomFromSlack({ teamId, slackUserId, name: roomName })
             : await saveOrConnect({ teamId, slackUserId, content: text, sourceMeta: { trigger: "slash_command" } });
         await postSlackResponse(responseUrl, result);
       } catch (error) {
@@ -46,16 +47,18 @@ export async function POST(request) {
       }
     });
 
-    return ok(startName !== null ? ephemeralText("creating a mumbl room...") : slackSavingPayload());
+    return ok(roomName !== null ? ephemeralText("creating a mumbl room...") : slackSavingPayload());
   } catch (error) {
     return serverError(error);
   }
 }
 
-function parseStartCommand(text) {
+function parseRoomCommand(text) {
   const trimmed = cleanString(text, 4000);
-  if (trimmed === "start") return "";
-  if (trimmed.toLowerCase().startsWith("start ")) return cleanString(trimmed.slice(6), 80);
+  const lower = trimmed.toLowerCase();
+  if (lower === "room" || lower === "start") return "";
+  if (lower.startsWith("room ")) return cleanString(trimmed.slice(5), 80);
+  if (lower.startsWith("start ")) return cleanString(trimmed.slice(6), 80);
   return null;
 }
 

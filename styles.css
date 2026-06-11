@@ -325,6 +325,19 @@ h1 {
   padding: 0 18px;
 }
 
+.slack-install-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  max-width: 100%;
+}
+
+.slack-install-button img {
+  display: block;
+  width: 139px;
+  height: 40px;
+}
+
 .waitlist-form {
   display: grid;
   gap: 10px;

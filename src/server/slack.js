@@ -564,11 +564,22 @@ export function slackConnectPayload({ url, shortcut = false }) {
   });
 }
 
-export function slackStartNeedsNamePayload() {
+export function slackHelpPayload() {
   return blockResponse({
-    text: "name the team after /mumbl start.",
+    text: "use /mumbl to save a private thought or create a room.",
     blocks: [
-      section("*start a mumbl room from Slack*\nTry `/mumbl start platform team` or `/mumbl start design squad`."),
+      section("*mumbl in Slack*\n`/mumbl the thing I want to keep` saves a private dump.\n`/mumbl room platform team` creates a Mumbl room from Slack."),
+      context("Private dumps stay private. Team reads only post to Slack if you enable them."),
+    ],
+  });
+}
+
+export function slackRoomNeedsNamePayload() {
+  return blockResponse({
+    text: "name the team after /mumbl room.",
+    blocks: [
+      section("*create a mumbl room from Slack*\nTry `/mumbl room platform team` or `/mumbl room design squad`."),
+      context("`/mumbl start platform team` still works too."),
     ],
   });
 }
@@ -713,7 +724,7 @@ function slackAppHomeBlocks() {
   return [
     section("*mumbl*\nprivate dump first. team read only when you choose."),
     section("*save a private thought*\nType `/mumbl the thing you want to keep` anywhere in Slack."),
-    section("*start a team space from Slack*\nType `/mumbl start platform team` to create the room without leaving Slack."),
+    section("*start a team space from Slack*\nType `/mumbl room platform team` to create the room without leaving Slack."),
     section("*team reads on Slack*\nAfter a room is created, use its `enable Slack team reads` button to create one private channel."),
     actions([
       { text: "open your dump", url: `${appUrl}/dump` },

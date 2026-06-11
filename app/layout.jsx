@@ -57,6 +57,9 @@ export const metadata = {
     shortcut: "/icon.svg",
   },
   manifest: "/manifest.webmanifest",
+  other: {
+    "slack-app-id": "A0B9JPJGT2S",
+  },
 };
 
 export const viewport = {

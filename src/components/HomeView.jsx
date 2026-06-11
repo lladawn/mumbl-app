@@ -182,6 +182,20 @@ export default function HomeView() {
               ) : null}
             </form>
             <div className="hero-actions">
+              <a
+                className="slack-install-button"
+                href="/api/slack/install"
+                onClick={() => trackPublicCta("slack_install", { source: "hero" })}
+                aria-label="Add Mumbl to Slack"
+              >
+                <img
+                  alt="Add to Slack"
+                  height="40"
+                  src="https://platform.slack-edge.com/img/add_to_slack.png"
+                  srcSet="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"
+                  width="139"
+                />
+              </a>
               <Link className="ghost-button button-link" href={publicDemoRoom.href} onClick={() => trackDemoEntry("hero")}>
                 try the demo
               </Link>
