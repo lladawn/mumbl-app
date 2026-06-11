@@ -1133,7 +1133,7 @@ export async function createSlackFieldNoteDraft({ teamId, slackUserId, dumpIds }
   if (dumpsError) throw dumpsError;
   if (!dumps?.length) throw new Error("no matching private dumps found.");
 
-  const orderedDumps = cleanedDumpIds.map((id) => dumps.find((dump) => dump.id === id)).filter(Boolean);
+  const orderedDumps = [...cleanedDumpIds].reverse().map((id) => dumps.find((dump) => dump.id === id)).filter(Boolean);
   const draft = await draftFieldNote({ dumps: orderedDumps });
 
   const { data: fieldNote, error: noteError } = await supabase
@@ -1617,6 +1617,8 @@ async function slackAppHomeBlocks({ teamId, slackUserId }) {
 }
 
 function slackRoomModal({ initialName = "" }) {
+  const cleanedInitialName = cleanString(initialName, 80);
+
   return {
     type: "modal",
     callback_id: "create_mumbl_room",
@@ -1631,7 +1633,7 @@ function slackRoomModal({ initialName = "" }) {
         element: {
           type: "plain_text_input",
           action_id: "value",
-          initial_value: initialName,
+          ...(cleanedInitialName ? { initial_value: cleanedInitialName } : {}),
           placeholder: { type: "plain_text", text: "platform team" },
           max_length: 80,
         },
