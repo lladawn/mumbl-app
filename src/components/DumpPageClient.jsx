@@ -67,6 +67,11 @@ export default function DumpPageClient({ mode = "home" }) {
 
   useEffect(() => {
     setRecentSlug(getRecentSlug(""));
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("fieldNote")) {
+      setActivePanel("notes");
+      setToast("draft ready. review it before it goes anywhere.");
+    }
   }, []);
 
   useEffect(() => {

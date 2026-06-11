@@ -12,13 +12,19 @@ import {
   parseVerifiedSlackForm,
   postSlackResponse,
   saveSlackDump,
+  createSlackFieldNoteDraft,
   slackConnectPayload,
   slackConnectUrl,
   slackDumpConnectModalView,
   slackDumpSavedModalView,
+  slackFieldNoteDraftingModalView,
+  slackFieldNoteDraftReadyModalView,
+  slackFieldNoteDraftErrorModalView,
   slackSavedDumpPayload,
   openSlackDumpModal,
+  openSlackFieldNoteDraftModal,
   openSlackRoomModal,
+  updateSlackView,
 } from "../../../../src/server/slack";
 import { cleanString } from "../../../../src/server/validation";
 
@@ -41,6 +47,13 @@ export async function POST(request) {
         if (actionId === "new_private_dump") {
           await openSlackDumpModal({
             teamId: slackTeamId(payload),
+            triggerId: cleanString(payload.trigger_id, 200),
+          });
+        }
+        if (actionId === "draft_team_read") {
+          await openSlackFieldNoteDraftModal({
+            teamId: slackTeamId(payload),
+            slackUserId: cleanString(payload.user?.id, 80),
             triggerId: cleanString(payload.trigger_id, 200),
           });
         }
@@ -70,6 +83,37 @@ export async function POST(request) {
           errors: { dump_content: error.message || "couldn't save that to mumbl yet." },
         });
       }
+    }
+
+    if (payload.type === "view_submission" && payload.view?.callback_id === "draft_team_read") {
+      const teamId = slackTeamId(payload);
+      const slackUserId = cleanString(payload.user?.id, 80);
+      const selectedDumpIds = selectedSlackOptionValues(payload.view?.state?.values?.draft_dump_ids?.value?.selected_options);
+      if (!selectedDumpIds.length) {
+        return ok({
+          response_action: "errors",
+          errors: { draft_dump_ids: "choose at least one dump." },
+        });
+      }
+
+      after(async () => {
+        try {
+          const result = await createSlackFieldNoteDraft({ teamId, slackUserId, dumpIds: selectedDumpIds });
+          await updateSlackView({
+            teamId,
+            viewId: cleanString(payload.view?.id, 120),
+            view: slackFieldNoteDraftReadyModalView(result),
+          });
+        } catch (error) {
+          await updateSlackView({
+            teamId,
+            viewId: cleanString(payload.view?.id, 120),
+            view: slackFieldNoteDraftErrorModalView(error.message || "couldn't draft that field note yet."),
+          });
+        }
+      });
+
+      return ok({ response_action: "update", view: slackFieldNoteDraftingModalView() });
     }
 
     if (payload.type === "view_submission" && payload.view?.callback_id === "create_mumbl_room") {
@@ -128,6 +172,10 @@ export async function POST(request) {
 
 function slackTeamId(payload) {
   return cleanString(payload.team?.id || payload.user?.team_id, 80);
+}
+
+function selectedSlackOptionValues(options) {
+  return Array.isArray(options) ? options.map((option) => cleanString(option?.value, 64)).filter(Boolean) : [];
 }
 
 async function saveModalDump({ teamId, slackUserId, content }) {

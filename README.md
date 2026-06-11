@@ -87,7 +87,7 @@ Until those variables exist, API routes return a setup `503`.
 
 ## Slack Beta Setup
 
-The Slack app is a free beta entry point for private dumps. It supports `/mumbl [text]`, `/mumbl room [team name]`, a `save_to_mumbl` message shortcut, and a private App Home. It does not read channel history.
+The Slack app is a free beta entry point for private dumps. It supports `/mumbl [text]`, `/mumbl room [team name]`, a `save_to_mumbl` message shortcut, App Home private dumping, and App Home field-note drafting from recent private dumps. It does not read channel history.
 
 In Slack app settings:
 
@@ -100,7 +100,7 @@ In Slack app settings:
 
 Set `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`, and `MUMBL_SLACK_TOKEN_ENCRYPTION_KEY` in the deployment environment. Install through `/api/slack/install`.
 
-`/mumbl room platform team` creates a Mumbl room from Slack and returns a one-time creator handoff link for opening the room in a browser. `/mumbl start platform team` remains an alias. Optional team-read Slack posting is creator-enabled per room. If a creator switches it on, Mumbl starts an optional Slack permission upgrade that asks for `chat:write` and `groups:write` so it can create one private channel and post published team reads there. It still does not request Slack history scopes.
+`/mumbl room platform team` creates a Mumbl room from Slack and returns a one-time creator handoff link for opening the room in a browser. `/mumbl start platform team` remains an alias. App Home can draft a private field note from selected recent dumps, but review and publishing still happen in Mumbl. Optional team-read Slack posting is creator-enabled per room. If a creator switches it on, Mumbl starts an optional Slack permission upgrade that asks for `chat:write` and `groups:write` so it can create one private channel and post published team reads there. It still does not request Slack history scopes.
 
 Slack reminders are intentionally not part of the beta because frequent scheduling does not fit the current free-tier posture.
 

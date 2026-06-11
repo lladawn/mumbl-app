@@ -1,6 +1,8 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { assertSlackEnv, getServerEnv } from "./env";
+import { draftFieldNote } from "./fieldNotes";
 import { createToken, hashToken } from "./hash";
+import { enforceRateLimit } from "./rateLimit";
 import { getSupabaseAdmin } from "./supabase";
 import { cleanString, slugify } from "./validation";
 
@@ -8,6 +10,7 @@ const SLACK_OAUTH_SCOPES = ["commands", "users:read", "users:read.email"];
 const SLACK_TEAM_READS_SCOPES = ["chat:write", "groups:write"];
 const TOKEN_ALGORITHM = "aes-256-gcm";
 const MAX_SLACK_AGE_SECONDS = 60 * 5;
+const MAX_SLACK_DRAFT_DUMPS = 10;
 
 export function slackInstallUrl() {
   const { appUrl, slackClientId } = assertSlackEnv();
@@ -426,6 +429,43 @@ export async function openSlackDumpModal({ teamId, triggerId }) {
   });
 }
 
+export async function openSlackFieldNoteDraftModal({ teamId, slackUserId, triggerId }) {
+  const installation = await getSlackInstallation(teamId);
+  const token = decryptSlackToken({
+    ciphertext: installation.bot_access_token_ciphertext,
+    iv: installation.bot_access_token_iv,
+    tag: installation.bot_access_token_tag,
+  });
+
+  let view;
+  try {
+    const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+    const dumps = await recentSlackPrivateDumps(connection);
+    view = dumps.length ? slackFieldNoteDraftModal({ dumps }) : slackFieldNoteNoDumpsModal();
+  } catch (error) {
+    view = slackFieldNoteDraftUnavailableModal(error.message || "save a private dump first, then come back here.");
+  }
+
+  return slackApi("views.open", token, {
+    trigger_id: triggerId,
+    view,
+  });
+}
+
+export async function updateSlackView({ teamId, viewId, view }) {
+  const installation = await getSlackInstallation(teamId);
+  const token = decryptSlackToken({
+    ciphertext: installation.bot_access_token_ciphertext,
+    iv: installation.bot_access_token_iv,
+    tag: installation.bot_access_token_tag,
+  });
+
+  return slackApi("views.update", token, {
+    view_id: viewId,
+    view,
+  });
+}
+
 export async function getSlackUserEmail({ teamId, slackUserId }) {
   const installation = await getSlackInstallation(teamId);
   const token = decryptSlackToken({
@@ -461,6 +501,18 @@ export async function findSlackConnection({ teamId, slackUserId }) {
     .maybeSingle();
   if (error) throw error;
   return data;
+}
+
+export async function findOrCreateSlackConnectionByEmail({ teamId, slackUserId }) {
+  const existingConnection = await findSlackConnection({ teamId, slackUserId });
+  if (existingConnection) return existingConnection;
+
+  const email = await getSlackUserEmail({ teamId, slackUserId });
+  const mumblUserId = await findMumblUserByEmail(email);
+  if (!mumblUserId) {
+    throw new Error("connect mumbl once by saving a private dump from Slack first.");
+  }
+  return connectSlackUser({ teamId, slackUserId, mumblUserId });
 }
 
 export async function connectSlackUser({ teamId, slackUserId, mumblUserId }) {
@@ -548,6 +600,59 @@ export async function consumePendingSlackDump({ pendingId, mumblUserId }) {
   const { error: updateError } = await supabase.from("slack_pending_dumps").update({ consumed_at: now }).eq("id", pending.id);
   if (updateError) throw updateError;
   return { connection, dump };
+}
+
+export async function recentSlackPrivateDumps(connection) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("dumps")
+    .select("id, content, created_at")
+    .eq("user_id", connection.mumbl_user_id)
+    .eq("visibility", "private")
+    .order("created_at", { ascending: false })
+    .limit(MAX_SLACK_DRAFT_DUMPS);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createSlackFieldNoteDraft({ teamId, slackUserId, dumpIds }) {
+  const cleanedDumpIds = Array.isArray(dumpIds) ? dumpIds.map((id) => cleanString(id, 64)).filter(Boolean) : [];
+  if (!cleanedDumpIds.length) throw new Error("choose at least one dump.");
+  if (cleanedDumpIds.length > MAX_SLACK_DRAFT_DUMPS) throw new Error(`choose ${MAX_SLACK_DRAFT_DUMPS} dumps or fewer.`);
+
+  const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+  const supabase = getSupabaseAdmin();
+  await enforceRateLimit({ supabase, action: "field_note", sessionToken: `slack:${teamId}:${slackUserId}` });
+
+  const { data: dumps, error: dumpsError } = await supabase
+    .from("dumps")
+    .select("*")
+    .eq("user_id", connection.mumbl_user_id)
+    .in("id", cleanedDumpIds);
+  if (dumpsError) throw dumpsError;
+  if (!dumps?.length) throw new Error("no matching private dumps found.");
+
+  const orderedDumps = cleanedDumpIds.map((id) => dumps.find((dump) => dump.id === id)).filter(Boolean);
+  const draft = await draftFieldNote({ dumps: orderedDumps });
+
+  const { data: fieldNote, error: noteError } = await supabase
+    .from("field_notes")
+    .insert({
+      user_id: connection.mumbl_user_id,
+      session_token_hash: connection.slack_session_token_hash,
+      source_dump_ids: draft.sourceDumpIds,
+      title: draft.title || "field note",
+      content: draft.content,
+    })
+    .select("id, title")
+    .single();
+  if (noteError) throw noteError;
+
+  return {
+    fieldNote,
+    visibilityReminder: draft.visibilityReminder,
+    url: `${getServerEnv().appUrl}/dump?fieldNote=${encodeURIComponent(fieldNote.id)}`,
+  };
 }
 
 export function slackConnectUrl(pendingId) {
@@ -669,6 +774,44 @@ export function slackDumpConnectModalView({ url }) {
     blocks: [
       section("*connect mumbl once.*\nThen this thought can land in your private dump."),
       actions([{ text: "connect mumbl", url }]),
+    ],
+  };
+}
+
+export function slackFieldNoteDraftingModalView() {
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "drafting" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section("*drafting a field note...*"),
+      context("Keep this open for a moment. Publishing still happens in Mumbl after review."),
+    ],
+  };
+}
+
+export function slackFieldNoteDraftReadyModalView({ fieldNote, url, visibilityReminder }) {
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "draft ready" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section(`*${escapeSlackText(fieldNote.title || "field note draft")}*`),
+      section("A private field-note draft is ready in Mumbl. Review it there before anything reaches team reads."),
+      actions([{ text: "open draft in mumbl", url }]),
+      context(visibilityReminder || "Only publish this if it still feels true."),
+    ],
+  };
+}
+
+export function slackFieldNoteDraftErrorModalView(message) {
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "draft failed" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section("*couldn't draft that field note yet.*"),
+      context(cleanString(message, 180) || "Try fewer dumps or open Mumbl to draft there."),
     ],
   };
 }
@@ -799,6 +942,8 @@ function slackAppHomeBlocks() {
     section("*mumbl*\nprivate dump first. team read only when you choose."),
     section("*save a private thought*\nType `/mumbl the thing you want to keep` anywhere in Slack, or write it here."),
     actions([{ text: "new private dump", actionId: "new_private_dump" }]),
+    section("*draft a team read*\nChoose a few recent private dumps and Mumbl will turn them into a private field-note draft."),
+    actions([{ text: "draft team read", actionId: "draft_team_read" }]),
     section("*start a team space from Slack*\nType `/mumbl room platform team` to create the room without leaving Slack."),
     actions([{ text: "start a team room", actionId: "start_room_modal" }]),
     section("*team reads on Slack*\nAfter a room is created, use its `enable Slack team reads` button to create one private channel."),
@@ -860,6 +1005,68 @@ function slackDumpModal() {
   };
 }
 
+function slackFieldNoteDraftModal({ dumps }) {
+  return {
+    type: "modal",
+    callback_id: "draft_team_read",
+    title: { type: "plain_text", text: "draft team read" },
+    submit: { type: "plain_text", text: "draft" },
+    close: { type: "plain_text", text: "cancel" },
+    blocks: [
+      section("Choose recent private dumps. Mumbl creates a private draft; you review and publish in Mumbl."),
+      {
+        type: "input",
+        block_id: "draft_dump_ids",
+        label: { type: "plain_text", text: "private dumps" },
+        element: {
+          type: "checkboxes",
+          action_id: "value",
+          options: dumps.slice(0, MAX_SLACK_DRAFT_DUMPS).map((dump) => dumpOption(dump)),
+        },
+      },
+      context("Nothing posts to team reads from Slack. This only creates an editable draft."),
+    ],
+  };
+}
+
+function slackFieldNoteNoDumpsModal() {
+  const { appUrl } = getServerEnv();
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "no dumps yet" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section("*no private dumps to draft from yet.*\nSave a few thoughts first, then come back."),
+      actions([{ text: "open your dump", url: `${appUrl}/dump` }]),
+    ],
+  };
+}
+
+function slackFieldNoteDraftUnavailableModal(message) {
+  const { appUrl } = getServerEnv();
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "connect first" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section(`*${escapeSlackText(cleanString(message, 180) || "connect mumbl first.")}*`),
+      actions([{ text: "open mumbl", url: `${appUrl}/dump` }]),
+    ],
+  };
+}
+
+function dumpOption(dump) {
+  const date = new Date(dump.created_at);
+  return {
+    text: { type: "plain_text", text: truncatePlain(firstLine(dump.content), 75) },
+    value: dump.id,
+    description: {
+      type: "plain_text",
+      text: truncatePlain(date.toLocaleDateString("en-US", { month: "short", day: "numeric" }), 75),
+    },
+  };
+}
+
 function blockResponse({ text, blocks, replaceOriginal = false }) {
   return {
     response_type: "ephemeral",
@@ -900,6 +1107,16 @@ function escapeSlackText(text) {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+}
+
+function firstLine(text) {
+  return cleanString(text, 300).split(/\r?\n/).find(Boolean) || "private dump";
+}
+
+function truncatePlain(text, maxLength) {
+  const cleaned = cleanString(text, maxLength + 20).replace(/\s+/g, " ").trim();
+  if (cleaned.length <= maxLength) return cleaned || "private dump";
+  return `${cleaned.slice(0, Math.max(0, maxLength - 1)).trim()}...`;
 }
 
 function decodeState(state) {
