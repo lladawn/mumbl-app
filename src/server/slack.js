@@ -725,7 +725,7 @@ export async function recentSlackFieldNoteDrafts(connection) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("field_notes")
-    .select("id, title, content, created_at, source_dump_ids")
+    .select("id, title, created_at")
     .eq("user_id", connection.mumbl_user_id)
     .eq("is_published", false)
     .order("created_at", { ascending: false })
@@ -738,7 +738,7 @@ export async function recentSlackPublishedFieldNotes(connection) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("field_notes")
-    .select("id, title, content, published_at, spaces:team_room_id(id,slug,name)")
+    .select("id, title, published_at, spaces:team_room_id(id,slug,name)")
     .eq("user_id", connection.mumbl_user_id)
     .eq("is_published", true)
     .order("published_at", { ascending: false })
@@ -1888,7 +1888,7 @@ function dumpOption(dump) {
 function fieldNoteOption(fieldNote) {
   const date = new Date(fieldNote.created_at);
   return {
-    text: { type: "plain_text", text: truncatePlain(fieldNote.title || firstLine(fieldNote.content), 75) },
+    text: { type: "plain_text", text: truncatePlain(fieldNote.title || firstLine(fieldNote.content) || "field note draft", 75) },
     value: fieldNote.id,
     description: {
       type: "plain_text",
