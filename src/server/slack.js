@@ -535,7 +535,7 @@ export async function slackPinnedSpacesView({ teamId, slackUserId }) {
   const connection = await findSlackConnection({ teamId, slackUserId });
   if (!connection) return slackPinnedSpacesEmptyModal({ connected: false });
   const pinnedSpaces = await listSlackPinnedSpaces(connection);
-  return pinnedSpaces.length ? slackPinnedSpacesModal({ pinnedSpaces }) : slackPinnedSpacesEmptyModal({ connected: true });
+  return pinnedSpaces.length ? await slackPinnedSpacesModal({ pinnedSpaces }) : slackPinnedSpacesEmptyModal({ connected: true });
 }
 
 export async function openSlackFieldNoteReviewModal({ teamId, slackUserId, triggerId }) {
@@ -905,11 +905,54 @@ export async function unpinSlackPinnedSpace({ teamId, slackUserId, pinId }) {
     .eq("id", cleanedPinId)
     .eq("slack_team_id", cleanedTeamId)
     .eq("slack_user_id", cleanedSlackUserId)
-    .select("id,spaces(id,slug,name)")
+    .select("id,space_id,spaces(id,slug,name)")
     .single();
   if (error?.code === "PGRST116") throw new Error("that pinned space is already gone.");
   if (error) throw error;
   return data;
+}
+
+export async function removeSlackUserFromPinnedSpaceChannel({ teamId, slackUserId, spaceId }) {
+  const cleanedTeamId = cleanString(teamId, 80);
+  const cleanedSlackUserId = cleanString(slackUserId, 80);
+  const cleanedSpaceId = cleanString(spaceId, 64);
+  if (!cleanedTeamId || !cleanedSlackUserId || !cleanedSpaceId) {
+    return { removed: false, reason: "missing_channel_data" };
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data: channel, error } = await supabase
+    .from("slack_space_channels")
+    .select("slack_channel_id, slack_channel_name")
+    .eq("slack_team_id", cleanedTeamId)
+    .eq("space_id", cleanedSpaceId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!channel?.slack_channel_id) return { removed: false, reason: "no_slack_channel" };
+
+  try {
+    const installation = await getSlackInstallation(cleanedTeamId);
+    const token = decryptSlackToken({
+      ciphertext: installation.bot_access_token_ciphertext,
+      iv: installation.bot_access_token_iv,
+      tag: installation.bot_access_token_tag,
+    });
+    await slackApi("conversations.kick", token, {
+      channel: channel.slack_channel_id,
+      user: cleanedSlackUserId,
+    });
+    return { removed: true, channelName: channel.slack_channel_name };
+  } catch (error) {
+    if (["not_in_channel", "not_in_group", "user_not_found", "channel_not_found"].includes(error.slack?.error)) {
+      return { removed: true, alreadyGone: true, channelName: channel.slack_channel_name };
+    }
+    console.error("Slack channel removal after unpin failed", {
+      message: error.message,
+      slackError: error.slack?.error,
+      spaceId: cleanedSpaceId,
+    });
+    return { removed: false, reason: error.slack?.error || "remove_failed", channelName: channel.slack_channel_name };
+  }
 }
 
 export async function slackUnpinPinnedSpaceConfirmView({ teamId, slackUserId, pinId }) {
@@ -1063,7 +1106,22 @@ async function listSlackPinnedSpaces(connection) {
     .order("created_at", { ascending: false })
     .limit(10);
   if (error) throw error;
-  return data || [];
+  const pins = data || [];
+  const spaceIds = pins.map((pin) => pin.space_id).filter(Boolean);
+  if (!spaceIds.length) return pins;
+
+  const { data: channels, error: channelsError } = await supabase
+    .from("slack_space_channels")
+    .select("space_id,slack_channel_id,slack_channel_name,posting_enabled")
+    .eq("slack_team_id", connection.slack_team_id)
+    .in("space_id", spaceIds);
+  if (channelsError) throw channelsError;
+
+  const channelsBySpaceId = new Map((channels || []).map((channel) => [channel.space_id, channel]));
+  return pins.map((pin) => ({
+    ...pin,
+    slackTeamReads: channelsBySpaceId.get(pin.space_id) || null,
+  }));
 }
 
 async function getPinnedSpace({ connection, spaceId }) {
@@ -1823,22 +1881,32 @@ function slackPinnedSpacesEmptyModal({ connected }) {
   };
 }
 
-function slackPinnedSpacesModal({ pinnedSpaces }) {
+async function slackPinnedSpacesModal({ pinnedSpaces }) {
   const blocks = [
     section("*your pinned teamspaces*\nThese are personal Slack publish destinations. Unpinning only removes your shortcut."),
   ];
 
-  pinnedSpaces.slice(0, 10).forEach((pin) => {
+  for (const pin of pinnedSpaces.slice(0, 10)) {
     const space = pin.spaces || {};
+    const channel = pin.slackTeamReads;
+    const channelText = channel?.slack_channel_name
+      ? `slack reads channel: #${channel.slack_channel_name}${channel.posting_enabled ? "" : " (posting paused)"}`
+      : "no slack reads channel yet.";
+    const rowActions = [
+      { text: "open team reads", url: `${getServerEnv().appUrl}/r/${space.slug}/reads` },
+      { text: "publish a draft", actionId: "review_field_note_drafts" },
+    ];
+    if (!channel?.slack_channel_id) {
+      const setup = await createTeamReadsSetup({ spaceId: space.id });
+      rowActions.push({ text: "create team reads channel", url: slackTeamReadsInstallUrl(setup), style: "primary" });
+    }
+    rowActions.push({ text: "unpin", actionId: "unpin_pinned_space_start", value: pin.id, style: "danger" });
+
     blocks.push(
-      section(`*${escapeSlackText(space.name || "Mumbl space")}*\n\`${escapeSlackText(space.slug || "space")}\``),
-      actions([
-        { text: "open team reads", url: `${getServerEnv().appUrl}/r/${space.slug}/reads` },
-        { text: "publish a draft", actionId: "review_field_note_drafts" },
-        { text: "unpin", actionId: "unpin_pinned_space_start", value: pin.id, style: "danger" },
-      ]),
+      section(`*${escapeSlackText(space.name || "Mumbl space")}*\n\`${escapeSlackText(space.slug || "space")}\`\n${escapeSlackText(channelText)}`),
+      actions(rowActions),
     );
-  });
+  }
 
   return {
     type: "modal",
@@ -1859,7 +1927,7 @@ export function slackUnpinPinnedSpaceConfirmModal({ pin }) {
     close: { type: "plain_text", text: "cancel" },
     blocks: [
       section(`*Remove ${escapeSlackText(space.name || "this space")} from your Slack publish list?*`),
-      context("This does not delete the Mumbl room or change Slack team-read posting for anyone else."),
+      context("This does not delete the Mumbl room or change posting for anyone else. If there is a linked Slack reads channel, Mumbl will remove you from it too."),
     ],
   };
 }

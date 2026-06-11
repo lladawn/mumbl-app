@@ -115,6 +115,7 @@ Expected behavior:
 - `/mumbl room platform team` creates a Mumbl room.
 - `/mumbl start platform team` is an alias.
 - `/mumbl pin platform-team` pins an existing Mumbl room and best-effort joins the room's Slack reads channel if it exists.
+- Unpinning from App Home removes only that user's publish shortcut and best-effort removes them from the linked Slack reads channel if one exists.
 
 ### Interactivity & Shortcuts
 
