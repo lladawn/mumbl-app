@@ -1260,6 +1260,7 @@ export function slackFieldNoteDraftReadyModalView({ fieldNote, url, visibilityRe
 
 export function slackFieldNoteEditModalView(fieldNote) {
   const content = cleanString(fieldNote.content, 4000);
+  const title = slackSingleLineInputValue(fieldNote.title, 120) || "field note";
   if (content.length > 3000) {
     const { appUrl } = getServerEnv();
     return {
@@ -1288,7 +1289,7 @@ export function slackFieldNoteEditModalView(fieldNote) {
         element: {
           type: "plain_text_input",
           action_id: "value",
-          initial_value: cleanString(fieldNote.title, 120) || "field note",
+          initial_value: title,
           max_length: 120,
         },
       },
@@ -1333,6 +1334,20 @@ export function slackFieldNoteDraftErrorModalView(message) {
     blocks: [
       section("*couldn't draft that field note yet.*"),
       context(cleanString(message, 180) || "Try fewer dumps or open Mumbl to draft there."),
+    ],
+  };
+}
+
+export function slackFieldNoteDraftSavedFallbackModalView({ fieldNote, url, message }) {
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "draft saved" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section(`*${escapeSlackText(slackSingleLineInputValue(fieldNote?.title, 120) || "field note draft")}*`),
+      section("The draft was saved, but Slack could not open the editor here."),
+      actions([{ text: "open draft in mumbl", url }]),
+      context(cleanString(message, 180) || "You can still edit and publish it from Mumbl."),
     ],
   };
 }
@@ -1448,6 +1463,7 @@ async function slackApi(method, token, body) {
       method,
       status: response.status,
       slackError: result.error,
+      messages: result.response_metadata?.messages,
       response: result,
     });
     error.slack = result;
@@ -1975,6 +1991,10 @@ function truncatePlain(text, maxLength) {
   const cleaned = cleanString(text, maxLength + 20).replace(/\s+/g, " ").trim();
   if (cleaned.length <= maxLength) return cleaned || "private dump";
   return `${cleaned.slice(0, Math.max(0, maxLength - 1)).trim()}...`;
+}
+
+function slackSingleLineInputValue(text, maxLength) {
+  return cleanString(text, maxLength + 20).replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
 function decodeState(state) {

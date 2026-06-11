@@ -25,6 +25,7 @@ import {
   slackFieldNoteEditModalView,
   slackFieldNoteDraftingModalView,
   slackFieldNoteDraftErrorModalView,
+  slackFieldNoteDraftSavedFallbackModalView,
   slackFieldNotePublishedModalView,
   slackFieldNoteSavedModalView,
   slackFieldNoteReviewPickerView,
@@ -190,18 +191,31 @@ export async function POST(request) {
       }
 
       after(async () => {
+        let result;
         try {
-          const result = await createSlackFieldNoteDraft({ teamId, slackUserId, dumpIds: selectedDumpIds });
+          result = await createSlackFieldNoteDraft({ teamId, slackUserId, dumpIds: selectedDumpIds });
           await updateSlackView({
             teamId,
             viewId: cleanString(payload.view?.id, 120),
             view: slackFieldNoteEditModalView(result.fieldNote),
           });
         } catch (error) {
+          console.error("Slack draft creation/edit update failed", {
+            message: error.message,
+            slackError: error.slack?.error,
+            slackResponse: error.slack,
+          });
+          const fallbackView = result
+            ? slackFieldNoteDraftSavedFallbackModalView({
+                fieldNote: result.fieldNote,
+                url: result.url,
+                message: error.message,
+              })
+            : slackFieldNoteDraftErrorModalView(error.message || "couldn't draft that field note yet.");
           await updateSlackView({
             teamId,
             viewId: cleanString(payload.view?.id, 120),
-            view: slackFieldNoteDraftErrorModalView(error.message || "couldn't draft that field note yet."),
+            view: fallbackView,
           });
         }
       });
