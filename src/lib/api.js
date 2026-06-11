@@ -12,12 +12,14 @@ export async function joinWaitlist({ email }) {
 
 export async function fetchSpace(slug, { limit, before, type } = {}) {
   const sessionToken = loadSession();
+  const auth = await authRequestContext();
   const params = new URLSearchParams({ sessionToken });
   if (limit) params.set("limit", String(limit));
   if (before) params.set("before", before);
   if (type) params.set("type", type);
 
   const response = await fetch(`/api/spaces/${slug}?${params.toString()}`, {
+    headers: auth.headers,
     cache: "no-store",
   });
   const data = await parseJson(response);
@@ -26,10 +28,11 @@ export async function fetchSpace(slug, { limit, before, type } = {}) {
 }
 
 export async function createRemoteSpace({ name, vibe }) {
+  const auth = await authRequestContext();
   const response = await fetch("/api/spaces", {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name, vibe }),
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ name, vibe, sessionToken: loadSession() }),
   });
   const data = await parseJson(response);
   saveCreatorToken(data.slug, data.creatorToken);
@@ -158,9 +161,10 @@ export async function deleteFieldNote(fieldNoteId) {
 }
 
 export async function updateRemoteSpaceVisibility({ slug, isPublic, publicName }) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/spaces/${slug}`, {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...auth.headers },
     body: JSON.stringify({
       creatorToken: getCreatorToken(slug),
       isPublic,
@@ -171,9 +175,10 @@ export async function updateRemoteSpaceVisibility({ slug, isPublic, publicName }
 }
 
 export async function updateRemoteSpaceDescription({ slug, description }) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/spaces/${slug}`, {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...auth.headers },
     body: JSON.stringify({
       creatorToken: getCreatorToken(slug),
       description,
@@ -183,18 +188,20 @@ export async function updateRemoteSpaceDescription({ slug, description }) {
 }
 
 export async function startSlackTeamReadsSetup({ slug }) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/spaces/${slug}/slack/team-reads/setup`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...auth.headers },
     body: JSON.stringify({ creatorToken: getCreatorToken(slug) }),
   });
   return parseJson(response);
 }
 
 export async function updateSlackTeamReadsPosting({ slug, postingEnabled }) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/spaces/${slug}/slack/team-reads`, {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...auth.headers },
     body: JSON.stringify({ creatorToken: getCreatorToken(slug), postingEnabled }),
   });
   return parseJson(response);
@@ -210,9 +217,10 @@ export async function pinSlackSpaceForPublishing({ slug }) {
 }
 
 export async function dismissRemoteFirstPost(slug) {
+  const auth = await authRequestContext();
   const response = await fetch(`/api/spaces/${slug}/first-post-dismissed`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...auth.headers },
     body: JSON.stringify({ creatorToken: getCreatorToken(slug) }),
   });
   return parseJson(response);

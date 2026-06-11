@@ -83,6 +83,8 @@ The frontend now uses these backend route handlers for spaces, posts, reactions,
 
 For dump login, enable Supabase Google OAuth and allow `/auth/callback` in the Supabase Auth redirect URLs for each environment, for example `http://127.0.0.1:3000/auth/callback` locally and `https://mumbl.wtf/auth/callback` in production. Email magic-link code is kept dormant for now; custom SMTP is recommended before exposing it again.
 
+Creator access starts with the local room creator token. When a logged-in creator presents that token, Mumbl links the room to their auth account so creator controls survive across browsers without tracking normal room membership.
+
 Until those variables exist, API routes return a setup `503`.
 
 ## Slack Beta Setup

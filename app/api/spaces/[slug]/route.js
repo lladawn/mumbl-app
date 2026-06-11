@@ -1,4 +1,6 @@
 import { badRequest, notFound, ok, serverError } from "../../../../src/server/http";
+import { resolveRequestOwner } from "../../../../src/server/auth";
+import { claimCreatorAccess, resolveCreatorAccess } from "../../../../src/server/creatorAccess";
 import { hashToken } from "../../../../src/server/hash";
 import { getOrCreateKnownPublicRoom } from "../../../../src/server/demoRoom";
 import { getTopReactionLabels, startOfTodayIso } from "../../../../src/server/roomVibe";
@@ -18,6 +20,7 @@ export async function GET(request, { params }) {
     const url = new URL(request.url);
     const sessionToken = url.searchParams.get("sessionToken");
     const sessionTokenHash = sessionToken ? hashToken(sessionToken) : null;
+    const owner = await resolveRequestOwner({ request, sessionToken: cleanString(sessionToken, 256) });
     const postLimit = parsePostLimit(url.searchParams.get("limit"));
     const postCursor = parsePostCursor(url.searchParams.get("before"));
     const postType = parsePostType(url.searchParams.get("type"));
@@ -98,6 +101,7 @@ export async function GET(request, { params }) {
         {
           roomVibe: getTopReactionLabels(todayReactionsResult.data),
           slackTeamReads: slackTeamReadsResult.error ? null : slackTeamReadsResult.data,
+          canManage: Boolean(owner.userId && space.creator_user_id === owner.userId),
           postsPage: {
             limit: postLimit,
             count: postCount || 0,
@@ -140,7 +144,6 @@ export async function PATCH(request, { params }) {
   try {
     const { slug } = await params;
     const body = await request.json();
-    const creatorToken = cleanString(body.creatorToken, 256);
     const updates = {};
 
     if (Object.hasOwn(body, "isPublic")) {
@@ -154,21 +157,22 @@ export async function PATCH(request, { params }) {
     }
 
     if (!slug) return badRequest("space slug is required");
-    if (!creatorToken) return badRequest("creator token is required");
     if (!Object.keys(updates).length) return badRequest("no space settings to update");
 
     const supabase = getSupabaseAdmin();
     const { data: space, error: spaceError } = await supabase
       .from("spaces")
-      .select("id,creator_token_hash")
+      .select("id,creator_token_hash,creator_user_id")
       .eq("slug", slug)
       .single();
     if (spaceError?.code === "PGRST116") return notFound("space not found");
     if (spaceError) throw spaceError;
 
-    if (space.creator_token_hash !== hashToken(creatorToken)) {
+    const access = await resolveCreatorAccess({ request, body, space });
+    if (!access.canManage) {
       return badRequest("creator token did not match");
     }
+    if (access.shouldClaim) await claimCreatorAccess({ supabase, spaceId: space.id, userId: access.owner.userId });
 
     const { data: updatedSpace, error: updateError } = await supabase
       .from("spaces")

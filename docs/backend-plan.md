@@ -110,6 +110,8 @@ Prototype public profiles now exist as a no-signup bridge: a browser session can
 
 Email magic-link login now exists only for private dump persistence. Anonymous dumping still works without signup. When a user logs in, Mumbl links the current browser session's dumps, field-note drafts, public profile, and dump insights to the Supabase Auth user id. Visibility does not change, and room posts/reactions continue to use the anonymous browser session token so auth never becomes room identity.
 
+Creator-token room ownership can also be claimed by a logged-in creator. The local creator token remains the recovery/portable key, but once a logged-in user proves possession of it, `spaces.creator_user_id` lets creator controls survive across browsers. This must not become room membership tracking; only creator access is persisted.
+
 ## Local Setup
 
 1. Create a Supabase project.

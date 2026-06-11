@@ -1,4 +1,5 @@
 import { badRequest, ok, serverError } from "../../../../src/server/http";
+import { hashToken } from "../../../../src/server/hash";
 import { resolveRequestOwner } from "../../../../src/server/auth";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 import { cleanString } from "../../../../src/server/validation";
@@ -7,6 +8,7 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const sessionToken = cleanString(body.sessionToken, 256);
+    const creatorTokens = parseCreatorTokens(body.creatorTokens);
     if (!sessionToken) return badRequest("session token is required");
 
     const owner = await resolveRequestOwner({ request, sessionToken });
@@ -18,6 +20,7 @@ export async function POST(request) {
       linkTable({ supabase, table: "field_notes", owner }),
       linkTable({ supabase, table: "public_profiles", owner, tolerateMissing: true }),
       linkTable({ supabase, table: "dump_insights", owner, tolerateMissing: true }),
+      linkCreatorSpaces({ supabase, owner, creatorTokens }),
     ]);
 
     return ok({
@@ -26,10 +29,39 @@ export async function POST(request) {
       fieldNotes: updates[1],
       publicProfiles: updates[2],
       dumpInsights: updates[3],
+      creatorSpaces: updates[4],
     });
   } catch (error) {
     return serverError(error);
   }
+}
+
+function parseCreatorTokens(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => ({
+      slug: cleanString(item?.slug, 64),
+      token: cleanString(item?.token, 256),
+    }))
+    .filter((item) => item.slug && item.token)
+    .slice(0, 50);
+}
+
+async function linkCreatorSpaces({ supabase, owner, creatorTokens }) {
+  if (!creatorTokens.length) return 0;
+  let linked = 0;
+  for (const item of creatorTokens) {
+    const { count, error } = await supabase
+      .from("spaces")
+      .update({ creator_user_id: owner.userId }, { count: "exact" })
+      .eq("slug", item.slug)
+      .eq("creator_token_hash", hashToken(item.token))
+      .is("creator_user_id", null);
+    if (isMissingColumnError(error)) return 0;
+    if (error) throw error;
+    linked += count || 0;
+  }
+  return linked;
 }
 
 async function linkTable({ supabase, table, owner, tolerateMissing = false }) {

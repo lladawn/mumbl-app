@@ -1,4 +1,4 @@
-import { loadSession } from "./storage";
+import { listCreatorTokens, loadSession } from "./storage";
 
 const SUPABASE_AUTH_CLIENT_KEY = "__mumblSupabaseAuthClient";
 const SUPABASE_AUTH_CLIENT_PROMISE_KEY = "__mumblSupabaseAuthClientPromise";
@@ -138,7 +138,7 @@ async function linkCurrentBrowserSession(accessToken) {
       "content-type": "application/json",
       authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ sessionToken: loadSession() }),
+    body: JSON.stringify({ sessionToken: loadSession(), creatorTokens: listCreatorTokens() }),
   });
   const result = await response.json();
   if (!response.ok) {

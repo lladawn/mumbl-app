@@ -16,6 +16,7 @@ export function serializeSpace(space, posts = [], heartbeats = [], reactionRows 
     createdAt: new Date(space.created_at).getTime(),
     dailyPrompt: extras.dailyPrompt ? serializePrompt(extras.dailyPrompt) : null,
     slackTeamReads: extras.slackTeamReads ? serializeSlackTeamReads(extras.slackTeamReads) : null,
+    canManage: extras.canManage === true,
     roomVibe: extras.roomVibe || [],
     postsPage: extras.postsPage || {
       limit: posts.length,

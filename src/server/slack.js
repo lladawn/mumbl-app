@@ -220,6 +220,7 @@ export async function createSlackSpaceChannel({ oauthResult, setup }) {
 
 export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
   const supabase = getSupabaseAdmin();
+  const connection = await findSlackConnection({ teamId, slackUserId });
   const creatorToken = createToken();
   const cleanName = cleanString(name, 80).toLowerCase();
   const baseSlug = slugify(cleanName) || "team-mumbl";
@@ -234,6 +235,7 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
         name: cleanName,
         vibe: "chill",
         creator_token_hash: hashToken(creatorToken),
+        ...(connection?.mumbl_user_id ? { creator_user_id: connection.mumbl_user_id } : {}),
       })
       .select("*")
       .single();
@@ -254,7 +256,6 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
     slack_team_id: teamId,
     created_by_slack_user_id: slackUserId,
   });
-  const connection = await findSlackConnection({ teamId, slackUserId });
   if (connection) {
     await pinSlackSpace({ connection, spaceId: insertedSpace.id });
   }

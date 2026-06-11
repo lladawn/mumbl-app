@@ -37,6 +37,17 @@ export function getCreatorToken(slug) {
   return window.localStorage.getItem(`${CREATOR_TOKEN_PREFIX}${slug}`) || "";
 }
 
+export function listCreatorTokens() {
+  if (typeof window === "undefined") return [];
+  return Object.keys(window.localStorage)
+    .filter((key) => key.startsWith(CREATOR_TOKEN_PREFIX))
+    .map((key) => ({
+      slug: key.slice(CREATOR_TOKEN_PREFIX.length),
+      token: window.localStorage.getItem(key) || "",
+    }))
+    .filter((item) => item.slug && item.token);
+}
+
 export function timeAgo(timestamp) {
   const seconds = Math.max(1, Math.floor((Date.now() - timestamp) / 1000));
   if (seconds < 60) return "just now";

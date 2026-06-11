@@ -42,8 +42,8 @@ export default function SpacePageClient({ slug, tab }) {
   const [toast, setToast] = useState("");
 
   useEffect(() => {
-    setHasCreatorToken(Boolean(getCreatorToken(slug)));
-  }, [slug]);
+    setHasCreatorToken(Boolean(getCreatorToken(slug)) || space?.canManage === true);
+  }, [slug, space?.canManage]);
 
   async function copyText(text, message, target = "copy") {
     try {
