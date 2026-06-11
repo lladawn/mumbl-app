@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "mumbl - say the thing you've been mumbling all week";
+export const alt = "mumbl - save what you're thinking before you polish what you say";
 export const size = {
   width: 1200,
   height: 630,
@@ -23,7 +23,7 @@ function ShareImage() {
         background: "#fbfaf7",
         color: "#161412",
         fontFamily: "Arial, Helvetica, sans-serif",
-        padding: "62px 72px",
+        padding: "56px 66px",
         position: "relative",
       }}
     >
@@ -36,8 +36,8 @@ function ShareImage() {
           backgroundSize: "36px 36px",
         }}
       />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "relative" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 22, fontSize: 42, fontWeight: 800 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 22, fontSize: 42, fontWeight: 900 }}>
           <div
             style={{
               width: 76,
@@ -60,41 +60,45 @@ function ShareImage() {
             padding: "14px 18px",
             border: "2px solid #161412",
             borderRadius: 999,
-            background: "#d9f2df",
-            color: "#1f5d3a",
+            background: "#d8e8ff",
+            color: "#173c66",
             fontSize: 24,
-            fontWeight: 800,
+            fontWeight: 900,
           }}
         >
-          anonymous · always
+          slack beta · private first
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 34, alignItems: "flex-end", position: "relative" }}>
+      <div style={{ display: "flex", gap: 36, alignItems: "flex-end", position: "relative" }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-          <div style={{ fontSize: 78, lineHeight: 0.96, fontWeight: 900, letterSpacing: -1 }}>
-            say the thing you've been mumbling all week.
+          <div style={{ fontSize: 76, lineHeight: 0.96, fontWeight: 900, letterSpacing: 0 }}>
+            save what you're thinking before you polish what you say.
           </div>
           <div style={{ marginTop: 28, fontSize: 30, lineHeight: 1.35, color: "#5f5952", maxWidth: 760 }}>
-              where engineering teams actually talk. anonymous, no signup, just the team being real.
+            /mumbl saves the honest version privately. shape it into a field note later, or keep it for yourself.
           </div>
         </div>
         <div
           style={{
-            width: 318,
+            width: 360,
             border: "3px solid #161412",
             borderRadius: 10,
             background: "#ffffff",
             boxShadow: "10px 10px 0 #161412",
-            padding: 22,
+            padding: 20,
             display: "flex",
             flexDirection: "column",
-            gap: 18,
+            gap: 14,
           }}
         >
-          <CardLine title="rant" text="one more meeting and i'm going feral" color="#edcec4" />
-          <CardLine title="win" text="the build is green and so are we" color="#f8dda0" />
-          <CardLine title="heartbeat" text="heavy but alive" color="#d8e8ff" />
+          <CardLine
+            title="# tiny-fires"
+            text={'/mumbl i said "just needs polish" again, but honestly i think i\'m scared to name the rewrite.'}
+            color="#f8dda0"
+          />
+          <CardLine title="only visible to you" text="saved privately to mumbl." color="#d9f2df" />
+          <CardLine title="team read" text="publish only when the useful part can help the team." color="#d8e8ff" />
         </div>
       </div>
     </div>
@@ -111,7 +115,7 @@ function CardLine({ title, text, color }) {
           borderRadius: 999,
           background: color,
           fontSize: 18,
-          fontWeight: 800,
+          fontWeight: 900,
         }}
       >
         {title}

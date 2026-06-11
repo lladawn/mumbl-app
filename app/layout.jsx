@@ -8,7 +8,7 @@ const analyticsEnabled = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === "true";
 const umamiScriptSrc = process.env.NEXT_PUBLIC_UMAMI_SRC || "https://breathe-umami.vercel.app/script.js";
 const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID || "";
 const description =
-  "Mumbl is the working-memory layer for teams: private dumps, team reads, and anonymous rooms for the messy middle of work.";
+  "Mumbl lets teams save private thoughts from Slack with /mumbl, shape useful ones into field notes, and publish team reads only by choice.";
 
 export const metadata = {
   metadataBase: new URL(appUrl),
@@ -20,7 +20,9 @@ export const metadata = {
   applicationName: "mumbl",
   keywords: [
     "mumbl",
-    "anonymous team feedback",
+    "slack private notes",
+    "team reads",
+    "field notes",
     "engineering teams",
     "team heartbeat",
     "work culture",
@@ -32,7 +34,7 @@ export const metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "mumbl",
+    title: "mumbl - save what you're thinking before you polish what you say",
     description,
     url: "/",
     siteName: "mumbl",
@@ -42,13 +44,13 @@ export const metadata = {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "mumbl - say the thing you've been mumbling all week",
+        alt: "mumbl - save what you're thinking before you polish what you say",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "mumbl",
+    title: "mumbl - save what you're thinking before you polish what you say",
     description,
     images: ["/twitter-image"],
   },
