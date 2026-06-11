@@ -60,16 +60,17 @@ export async function POST(request) {
         if (actionId === "start_room_modal") {
           const teamId = slackTeamId(payload);
           const viewId = slackModalViewId(payload);
-          if (viewId) {
+          const triggerId = cleanString(payload.trigger_id, 200);
+          if (triggerId) {
+            await openSlackRoomModal({
+              teamId,
+              triggerId,
+            });
+          } else if (viewId) {
             await updateSlackView({
               teamId,
               viewId,
               view: slackRoomModalView(),
-            });
-          } else {
-            await openSlackRoomModal({
-              teamId,
-              triggerId: cleanString(payload.trigger_id, 200),
             });
           }
         }

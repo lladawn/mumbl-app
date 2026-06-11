@@ -28,7 +28,7 @@ export async function POST(request) {
     if (dumpsError) throw dumpsError;
     if (!dumps?.length) return badRequest("no matching private dumps found");
 
-    const orderedDumps = dumpIds.map((id) => dumps.find((dump) => dump.id === id)).filter(Boolean);
+    const orderedDumps = [...dumpIds].reverse().map((id) => dumps.find((dump) => dump.id === id)).filter(Boolean);
     const draft = await draftFieldNote({ dumps: orderedDumps });
 
     const { data: fieldNote, error: noteError } = await supabase
