@@ -2011,7 +2011,9 @@ function firstLine(text) {
 function truncatePlain(text, maxLength) {
   const cleaned = cleanString(text, maxLength + 20).replace(/\s+/g, " ").trim();
   if (cleaned.length <= maxLength) return cleaned || "private dump";
-  return `${cleaned.slice(0, Math.max(0, maxLength - 1)).trim()}...`;
+  const suffix = "...";
+  if (maxLength <= suffix.length) return suffix.slice(0, Math.max(0, maxLength));
+  return `${cleaned.slice(0, Math.max(0, maxLength - suffix.length)).trim()}${suffix}`;
 }
 
 function slackSingleLineInputValue(text, maxLength) {
