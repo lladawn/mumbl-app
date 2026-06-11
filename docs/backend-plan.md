@@ -78,7 +78,7 @@ create table anon_audit (
 - `posts` should not store `session_token`.
 - Reaction dedupe stores only a server-side hash of the session token.
 - `anon_audit` exists only for break-glass moderation and should never be queried by normal product views.
-- Heartbeat prompts receive only `{ type, content, reaction_count }`.
+- Heartbeat prompts receive only anonymised published team-read rows: `{ type, content, reaction_count }` where `type = 'field_note'`.
 - The creator gets no separate dashboard. Heartbeats are visible to everyone in the space.
 
 ## API Shape
@@ -93,7 +93,7 @@ create table anon_audit (
 - `DELETE /api/dumps` bulk-deletes selected private dumps for the current dump owner.
 - `DELETE /api/spaces/:slug` lets a creator hard-delete a room, freeing the slug. User-owned field notes are kept and unlinked before the room row is deleted.
 - `POST /api/spaces/:slug/first-post-dismissed` marks the creator-first prompt as dismissed.
-- `POST /api/cron/heartbeats` generates weekly heartbeats from anonymised post data.
+- `POST /api/cron/heartbeats` generates weekly heartbeats from anonymised published team reads.
 - `POST /api/waitlist` records an explicit landing-page email opt-in and returns success for duplicates.
 
 ## Waitlist
@@ -108,6 +108,8 @@ The dump feature keeps the no-signup model. Private dump entries are owned by th
 
 Team reads show only approved field notes. The flow is: select private dumps, request an OpenAI draft through a server route, save the draft in `field_notes`, let the author edit it, then publish it as `posts.type = 'field_note'`. The old raw-dump team endpoint is intentionally blocked so private dumps stay for dumping thoughts, not public reading.
 
+During the Slack-native beta, `/r/:slug` opens to team reads. Legacy feed and wins routes remain available for compatibility, but they are not the primary room navigation and do not feed the heartbeat.
+
 `OPENAI_API_KEY`, `OPENAI_MODEL_FIELD_NOTE`, and `OPENAI_MAX_DAILY_DRAFTS` are server-only. The default model should stay cost-sensitive, currently `gpt-5.4-nano`, and the draft route sends only selected dumps, capped at 10 per request. Field-note drafting should produce publishable working-process notes: specific, human, readable, and useful enough for team reads or a public profile, while staying grounded only in the selected dumps.
 
 Prototype public profiles now exist as a no-signup bridge: a browser session can claim one public handle and selectively add already-published field notes to `mumbl.wtf/@handle`. Private dumps and field-note drafts never appear there. This is intentionally per-note opt-in and should be replaced or migrated carefully when full identity arrives.
@@ -116,7 +118,7 @@ Google login is the primary production login path. Email magic-link code is dorm
 
 Creator-token room ownership can also be claimed by a logged-in creator. The local creator token remains the recovery/portable key, but once a logged-in user proves possession of it, `spaces.creator_user_id` lets creator controls survive across browsers. Slack-created rooms should set or reconcile `creator_user_id` whenever Mumbl can connect the Slack user to a Mumbl login. This must not become room membership tracking; only creator access is persisted.
 
-Room post edit/delete uses per-post edit tokens rather than storing a reusable author/session hash on `posts`. Logged-in users can have `post_edit_tokens.owner_user_id` for cross-browser edit/delete, but the post remains anonymous-facing and does not become a member record. Older posts without edit tokens are immutable to authors, though creators can remove posts from rooms they manage.
+Room post edit/delete uses per-post edit tokens rather than storing a reusable author/session hash on `posts`. Logged-in users can have `post_edit_tokens.owner_user_id` for cross-browser edit/delete, but the raw edit token is not saved to local storage for logged-in posts. Local edit tokens only unlock rows with no `owner_user_id`; logging out immediately removes account-owned edit controls from the feed. The post remains anonymous-facing and does not become a member record. Older posts without edit tokens are immutable to authors, though creators can remove posts from rooms they manage.
 
 ## Local Setup
 

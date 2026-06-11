@@ -65,7 +65,7 @@ export async function createRemotePost({ slug, type, content, isAnonymous, displ
     }),
   });
   const data = await parseJson(response);
-  if (data.post?.id && data.editToken) savePostEditToken(data.post.id, data.editToken);
+  if (!auth.expectsAuthenticatedOwner && data.post?.id && data.editToken) savePostEditToken(data.post.id, data.editToken);
   return data;
 }
 

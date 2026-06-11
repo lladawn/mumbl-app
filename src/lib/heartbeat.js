@@ -2,41 +2,30 @@ import { vibes } from "./constants";
 
 export function makeHeartbeat(space) {
   const posts = space.posts || [];
-  const wins = posts.filter((post) => post.type === "win").length;
-  const rants = posts.filter((post) => post.type === "rant").length;
   const reactions = posts.reduce((sum, post) => sum + countReactions(post), 0);
   const vibeLabel = vibes[space.vibe]?.label || "chill & honest";
 
   if (!posts.length) {
     return {
       weekOf: "this week",
-      vibeRead: `${vibeLabel} room, still mostly quiet - which is usually the moment before someone says the useful thing.`,
+      vibeRead: `${vibeLabel} room, no published team reads yet - still private, still forming.`,
       digest:
-        "the room is new, so the signal is still warming up. someone needs to go first, preferably with the kind of thought that would otherwise become a side DM. once one honest post lands, the reactions usually do the rest.",
+        "the heartbeat starts once the team publishes a few field notes. private dumps can stay private until someone decides a thread is useful enough to become team memory.",
       uplift:
-        "drop one small true thing before sharing the link. doesn't need to be profound. it just needs to make the room feel real.",
+        "save the honest version privately first. if a pattern keeps showing up, shape it into one field note and publish it when it feels ready.",
     };
   }
 
-  const vibeRead =
-    rants > wins
-      ? "rough edges showing, but the room is doing its job - the unsaid stuff is finally visible."
-      : wins > rants
-        ? "surprisingly solid week - not perfect, but there is real momentum in here."
-        : "mixed week, honest signal - some friction, some wins, and enough reactions to know people are listening.";
+  const readCount = posts.length;
+  const plural = readCount === 1 ? "read" : "reads";
+  const vibeRead = `${vibeLabel} signal from ${readCount} published team ${plural} - enough to see what the team chose to remember.`;
 
-  const digest = `this week had ${posts.length} mumbl${posts.length === 1 ? "" : "s"} and ${reactions} reaction${reactions === 1 ? "" : "s"}, which is already more signal than a dead random channel. ${
-    rants ? "a few rough edges made it into the open, which is the point." : "not much venting yet, suspiciously peaceful."
-  } ${
-    wins ? "there were wins too, so the room did not become a complaint bucket with furniture." : "wins are still missing, and someone should probably fix that with one tiny brag."
-  } overall: ${vibes[space.vibe]?.hint || "human, useful, honest"}.`;
+  const digest = `this week had ${readCount} published team ${plural} and ${reactions} reaction${reactions === 1 ? "" : "s"}. that means the team did not just talk in the moment; someone saved the useful trail and let others read it back. overall: ${vibes[space.vibe]?.hint || "human, useful, honest"}.`;
 
   const uplift =
-    rants > wins
-      ? "pick one rant with reactions and ask a single follow-up in the feed. no meeting invite. just one useful question."
-      : wins
-        ? "someone reply to a win with the exact thing they appreciated. takes twenty seconds and lands better than a generic nice."
-        : "react to one post you quietly agreed with. the lurkers are part of the signal too.";
+    reactions > readCount
+      ? "pick the read people kept reacting to and name one small follow-up. no meeting ceremony. just make the useful part easier for the next person."
+      : "publish one more field note from a private dump this week. the heartbeat gets sharper when the team has more chosen signal, not more noise.";
 
   return { weekOf: "this week", vibeRead, digest, uplift };
 }

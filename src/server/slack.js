@@ -272,7 +272,7 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
     creatorLinked: Boolean(connection?.mumbl_user_id),
     pinned: Boolean(connection),
     openUrl: slackSpaceHandoffUrl(handoff),
-    roomUrl: `${getServerEnv().appUrl}/r/${insertedSpace.slug}`,
+    roomUrl: `${getServerEnv().appUrl}/r/${insertedSpace.slug}/reads`,
     teamReadsUrl: slackTeamReadsInstallUrl(teamReadsSetup),
   };
 }
@@ -1232,7 +1232,7 @@ export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl,
       section(`*${escapeSlackText(space.name)} is ready.*\n${status}`),
       actions([
         { text: "create team reads channel", url: teamReadsUrl, style: "primary" },
-        { text: creatorLinked ? "open room" : "claim room", url: openUrl },
+        { text: creatorLinked ? "open team reads" : "claim room", url: openUrl },
       ]),
       context(
         pinned
@@ -1256,7 +1256,7 @@ export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUr
       ),
       actions([
         { text: "create team reads channel", url: teamReadsUrl, style: "primary" },
-        { text: creatorLinked ? "open room" : "claim room", url: openUrl },
+        { text: creatorLinked ? "open team reads" : "claim room", url: openUrl },
       ]),
       context(
         pinned
@@ -1831,7 +1831,7 @@ function slackPinnedSpacesModal({ pinnedSpaces }) {
     blocks.push(
       section(`*${escapeSlackText(space.name || "Mumbl space")}*\n\`${escapeSlackText(space.slug || "space")}\``),
       actions([
-        { text: "open room", url: `${getServerEnv().appUrl}/r/${space.slug}` },
+        { text: "open team reads", url: `${getServerEnv().appUrl}/r/${space.slug}/reads` },
         { text: "publish a draft", actionId: "review_field_note_drafts" },
         { text: "unpin", actionId: "unpin_pinned_space_start", value: pin.id, style: "danger" },
       ]),

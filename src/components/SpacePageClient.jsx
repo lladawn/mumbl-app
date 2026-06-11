@@ -21,7 +21,7 @@ import Toast from "./Toast";
 
 export default function SpacePageClient({ slug, tab }) {
   const router = useRouter();
-  const activeTab = validTabs.includes(tab) ? tab : "feed";
+  const activeTab = validTabs.includes(tab) ? tab : "reads";
   const postTypeFilter = activeTab === "wins" ? "win" : activeTab === "reads" ? "reads" : "";
   const {
     space,
@@ -119,12 +119,6 @@ export default function SpacePageClient({ slug, tab }) {
       <div className="space-grid">
         <div className="space-main">
           <div className="tab-row" role="tablist" aria-label="space tabs">
-            <TabLink slug={space.slug} tab="feed" activeTab={activeTab}>
-              feed
-            </TabLink>
-            <TabLink slug={space.slug} tab="wins" activeTab={activeTab}>
-              wins
-            </TabLink>
             <TabLink slug={space.slug} tab="reads" activeTab={activeTab}>
               reads
             </TabLink>
@@ -208,6 +202,8 @@ export default function SpacePageClient({ slug, tab }) {
               pageStatus={pageStatus}
               deletePost={deletePostWithToast(deletePost, setToast)}
               canManage={hasCreatorToken}
+              startSetup={startTeamReadsSlackSetup}
+              onToast={setToast}
             />
           )}
 
@@ -274,15 +270,18 @@ function WinsView({ posts, space, toggleReaction, updatePost, deletePost, loadOl
   );
 }
 
-function ReadsView({ posts, space, loadOlderPosts, pageStatus, deletePost, canManage }) {
+function ReadsView({ posts, space, loadOlderPosts, pageStatus, deletePost, canManage, startSetup, onToast }) {
   return (
     <>
       <div className="reads-intro">
         <span>team reads</span>
-        <p>Published field notes from teammates. Drafted from private dumps, approved by the person who wrote them.</p>
-        <Link className="ghost-button button-link" href="/dump">
-          open your dump
-        </Link>
+        <p>Published field notes from private dumps and Slack drafts. Nothing lands here until someone chooses to publish it.</p>
+        <div className="reads-intro-actions">
+          <Link className="solid-button button-link" href="/dump">
+            open your dump
+          </Link>
+          {canManage && !posts.length && !space.slackTeamReads && <SlackReadsSetupButton startSetup={startSetup} onToast={onToast} />}
+        </div>
       </div>
       <PostList
         posts={posts}
@@ -291,11 +290,36 @@ function ReadsView({ posts, space, loadOlderPosts, pageStatus, deletePost, canMa
         deletePost={deletePost}
         loadOlderPosts={loadOlderPosts}
         pageStatus={pageStatus}
-        emptyText="no one has dropped anything here yet. share a dump with the team."
+        emptyText="no team reads yet. save private dumps in Slack or Mumbl, draft the useful thread, then publish when it is ready."
         showReactions={false}
         canManage={canManage}
       />
     </>
+  );
+}
+
+function SlackReadsSetupButton({ startSetup, onToast }) {
+  const [isStarting, setIsStarting] = useState(false);
+
+  async function handleClick() {
+    if (isStarting) return;
+    setIsStarting(true);
+    try {
+      const result = await startSetup();
+      trackEvent("slack_team_reads_setup_started", { source: "reads_empty_state" });
+      window.location.href = result.installUrl;
+    } catch (error) {
+      trackEvent("slack_team_reads_setup_failed", { source: "reads_empty_state" });
+      onToast(error.message || "couldn't start the Slack team reads upgrade.");
+      setIsStarting(false);
+    }
+  }
+
+  return (
+    <button className="ghost-button button-with-loader" type="button" onClick={handleClick} disabled={isStarting}>
+      {isStarting && <span className="mini-loader" aria-hidden="true" />}
+      {isStarting ? "opening Slack..." : "create Slack reads channel"}
+    </button>
   );
 }
 
@@ -332,7 +356,7 @@ function PostList({
             deletePost={deletePost}
             showReactions={showReactions}
             canManage={canManage}
-            canAuthorEdit={post.canAuthorEdit === true || Boolean(getPostEditToken(post.id))}
+            canAuthorEdit={post.canAuthorEdit === true || (post.localEditTokenAllowed === true && Boolean(getPostEditToken(post.id)))}
             key={post.id}
           />
         ))

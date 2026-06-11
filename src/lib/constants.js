@@ -40,9 +40,9 @@ export const validTabs = ["feed", "wins", "reads", "heartbeat"];
 export const publicDemoRoom = {
   slug: "it-works-on-my-machine",
   name: "it works on my machine",
-  href: "/r/it-works-on-my-machine",
-  tagline: "the public room for tiny rants, weird finds, and safe test mumbles.",
-  description: "Public demo room. Try a tiny rant, weird find, or half-formed thought here; team rooms stay private by default.",
+  href: "/r/it-works-on-my-machine/reads",
+  tagline: "sample team reads for seeing what mumbl gives back.",
+  description: "Public sample room. Read a few published team notes here; real team rooms stay private by default.",
 };
 
 export const feedbackRoom = {

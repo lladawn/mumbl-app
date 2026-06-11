@@ -25,8 +25,11 @@ export default function AccountControl() {
     getBrowserSupabase()
       .then((supabase) => {
         if (!isMounted) return;
-        const result = supabase.auth.onAuthStateChange((_event, session) => {
+        const result = supabase.auth.onAuthStateChange((event, session) => {
           setAuthState(stateFromSession(session));
+          if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+            dispatchAuthChanged({ status: session?.user ? "authenticated" : "anonymous" });
+          }
         });
         subscription = result.data?.subscription;
       })

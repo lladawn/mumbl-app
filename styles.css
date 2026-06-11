@@ -396,10 +396,12 @@ button.account-control {
 }
 
 .hero-copy {
+  min-width: 0;
   max-width: 680px;
 }
 
 .landing-hero-copy {
+  min-width: 0;
   max-width: 560px;
 }
 
@@ -407,6 +409,7 @@ button.account-control {
   max-width: 720px;
   font-size: clamp(2.8rem, 3.85vw, 4.45rem);
   line-height: 0.94;
+  overflow-wrap: anywhere;
 }
 
 .eyebrow {
@@ -495,7 +498,7 @@ h1 {
   box-shadow: 3px 3px 0 var(--ink);
 }
 
-.slack-install-button span:not(.slack-mark) {
+.slack-install-button > span:not(.slack-logo) {
   display: grid;
   gap: 1px;
   min-width: 0;
@@ -520,17 +523,51 @@ h1 {
   text-transform: lowercase;
 }
 
-.slack-mark {
-  display: inline-grid;
-  place-items: center;
+.slack-logo {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, 12px);
+  grid-template-rows: repeat(2, 12px);
+  flex: 0 0 auto;
+  gap: 3px;
   width: 30px;
   height: 30px;
-  border: 1px solid var(--ink);
-  border-radius: 7px;
-  background: var(--violet);
-  color: var(--violet-ink);
-  font-weight: 950;
-  box-shadow: 1px 1px 0 var(--ink);
+  padding: 2px;
+  border-radius: 8px;
+  background: #fffefa;
+  box-shadow: inset 0 0 0 1px rgba(22, 20, 18, 0.16);
+}
+
+.slack-logo span {
+  display: block;
+  border-radius: 999px;
+}
+
+.slack-logo span:nth-child(1) {
+  background: #36c5f0;
+}
+
+.slack-logo span:nth-child(2) {
+  background: #2eb67d;
+}
+
+.slack-logo span:nth-child(3) {
+  background: #ecb22e;
+}
+
+.slack-logo span:nth-child(4) {
+  background: #e01e5a;
+}
+
+.cta-slack-logo {
+  width: 24px;
+  height: 24px;
+  grid-template-columns: repeat(2, 9px);
+  grid-template-rows: repeat(2, 9px);
+}
+
+.cta-panel .solid-button {
+  gap: 9px;
 }
 
 .slack-beta-copy {
@@ -862,11 +899,135 @@ h1 {
 }
 
 .quick-dump-composer,
+.slack-composer-demo,
 .room-read-card,
 .room-memory-rail {
   border: 1px solid var(--ink);
   border-radius: var(--radius);
   box-shadow: 2px 2px 0 var(--ink);
+}
+
+.slack-composer-demo {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  padding: 14px;
+  background: #f8f4ff;
+}
+
+.slack-channel-head,
+.slack-message-row,
+.slack-input-shell,
+.slack-ephemeral-card {
+  border: 1px solid rgba(22, 20, 18, 0.34);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.slack-channel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 11px;
+}
+
+.slack-channel-head span,
+.slack-channel-head em,
+.slack-ephemeral-card span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 850;
+  text-transform: lowercase;
+}
+
+.slack-channel-head span {
+  color: var(--ink);
+}
+
+.slack-message-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 11px;
+}
+
+.slack-avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--ink);
+  border-radius: 7px;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: lowercase;
+}
+
+.slack-message-row p,
+.slack-ephemeral-card p {
+  margin: 0;
+  color: rgba(22, 20, 18, 0.74);
+  font-weight: 700;
+  line-height: 1.36;
+}
+
+.slack-input-shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px;
+  box-shadow: inset 0 0 0 1px rgba(22, 20, 18, 0.08);
+}
+
+.slack-input-shell span {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: #fffefa;
+  font-size: 0.74rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.slack-input-shell strong {
+  min-width: 0;
+  font-size: clamp(0.96rem, 1.5vw, 1.16rem);
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+
+.slack-input-shell button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--ink);
+  border-radius: 7px;
+  background: var(--blue);
+  color: var(--blue-ink);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: lowercase;
+}
+
+.slack-ephemeral-card {
+  display: grid;
+  gap: 4px;
+  padding: 11px;
+  border-style: dashed;
+  background: #eef8f3;
+}
+
+.slack-ephemeral-card strong {
+  font-size: 1rem;
+  line-height: 1.1;
 }
 
 .quick-dump-composer {
@@ -1269,7 +1430,7 @@ h1 {
 
 .memory-strip {
   width: min(1360px, calc(100% - 32px));
-  margin: clamp(6px, 1.4vw, 18px) auto 0;
+  margin: clamp(28px, 6vw, 72px) auto;
   overflow: hidden;
   border-block: 1px solid var(--ink);
   background: var(--ink);
@@ -2495,9 +2656,17 @@ textarea:focus {
   line-height: 1.35;
 }
 
-.reads-intro .ghost-button {
+.reads-intro-actions {
   grid-column: 2;
   grid-row: 1 / span 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.reads-intro-actions .button-link,
+.reads-intro-actions button {
   min-height: 38px;
 }
 
@@ -3564,6 +3733,34 @@ textarea:focus {
   line-height: 1.45;
 }
 
+.auth-callback-status {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+}
+
+.auth-callback-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.auth-callback-steps span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #fffefa;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.auth-callback-steps span.active {
+  border-color: var(--ink);
+  background: var(--mint);
+  color: var(--ink);
+}
+
 .auth-callback-card .button-link {
   width: fit-content;
 }
@@ -4141,11 +4338,12 @@ textarea:focus {
 
   .landing-hero {
     min-height: auto;
+    width: min(100%, calc(100% - 28px));
   }
 
   .memory-strip {
     width: 100%;
-    margin-top: 18px;
+    margin-block: 38px;
   }
 
   .memory-strip-track {
@@ -4224,10 +4422,14 @@ textarea:focus {
     flex-direction: column;
   }
 
-  .reads-intro .ghost-button,
+  .reads-intro-actions,
   .reads-intro p {
     grid-column: auto;
     grid-row: auto;
+  }
+
+  .reads-intro-actions {
+    justify-content: flex-start;
   }
 
   .side-quest-mobile-link {
@@ -4334,7 +4536,9 @@ textarea:focus {
   }
 
   .landing-hero h1 {
-    font-size: clamp(2.45rem, 8vw, 3rem);
+    max-width: 100%;
+    font-size: clamp(1.78rem, 7.4vw, 2.08rem);
+    line-height: 1;
   }
 
   .vibe-grid,
@@ -4399,6 +4603,7 @@ textarea:focus {
   }
 
   .memory-strip {
+    margin-block: 30px;
     box-shadow: 0 2px 0 #9f8060;
   }
 
@@ -4430,6 +4635,25 @@ textarea:focus {
 
   .quick-dump-composer {
     padding: 14px;
+  }
+
+  .slack-composer-demo {
+    padding: 12px;
+  }
+
+  .slack-channel-head,
+  .slack-input-shell {
+    align-items: flex-start;
+    grid-template-columns: 1fr;
+  }
+
+  .slack-channel-head {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .slack-input-shell button {
+    justify-self: stretch;
   }
 
   .quick-dump-head {

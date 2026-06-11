@@ -95,15 +95,15 @@ async function assertPostEditAccess({ supabase, postId, editToken, owner }) {
 }
 
 async function hasPostEditAccess({ supabase, postId, editToken, owner }) {
-  if (editToken && (await hasPostEditToken(supabase, postId, editToken))) return true;
+  if (editToken && (await hasPostEditToken(supabase, postId, editToken, owner))) return true;
   if (!owner.userId) return false;
   return hasPostEditOwner(supabase, postId, owner.userId);
 }
 
-async function hasPostEditToken(supabase, postId, editToken) {
+async function hasPostEditToken(supabase, postId, editToken, owner) {
   const { data, error } = await supabase
     .from("post_edit_tokens")
-    .select("post_id")
+    .select("post_id,owner_user_id")
     .eq("post_id", postId)
     .eq("edit_token_hash", hashToken(editToken))
     .maybeSingle();
@@ -113,7 +113,9 @@ async function hasPostEditToken(supabase, postId, editToken) {
     throw migrationError;
   }
   if (error) throw error;
-  return Boolean(data?.post_id);
+  if (!data?.post_id) return false;
+  if (!data.owner_user_id) return true;
+  return owner.userId === data.owner_user_id;
 }
 
 async function hasPostEditOwner(supabase, postId, userId) {

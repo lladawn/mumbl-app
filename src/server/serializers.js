@@ -3,6 +3,7 @@ import { feedbackRoom, publicDemoRoom } from "../lib/constants";
 export function serializeSpace(space, posts = [], heartbeats = [], reactionRows = [], activeReactionRows = [], extras = {}) {
   const activeReactionKeys = new Set(activeReactionRows.map((row) => `${row.post_id}:${row.label}`));
   const accountEditablePostIds = extras.accountEditablePostIds || new Set();
+  const localEditablePostIds = extras.localEditablePostIds || new Set();
   const knownRoomDescription = getKnownRoomDescription(space.slug);
 
   return {
@@ -26,7 +27,12 @@ export function serializeSpace(space, posts = [], heartbeats = [], reactionRows 
       nextCursor: "",
       type: "",
     },
-    posts: posts.map((post) => serializePost(post, reactionRows, activeReactionKeys, { canAuthorEdit: accountEditablePostIds.has(post.id) })),
+    posts: posts.map((post) =>
+      serializePost(post, reactionRows, activeReactionKeys, {
+        canAuthorEdit: accountEditablePostIds.has(post.id),
+        localEditTokenAllowed: localEditablePostIds.has(post.id),
+      }),
+    ),
     heartbeats: heartbeats.map(serializeHeartbeat),
   };
 }
@@ -85,6 +91,7 @@ export function serializePost(post, reactionRows = [], activeReactionKeys = new 
     reactions,
     activeReactions,
     canAuthorEdit: extras.canAuthorEdit === true,
+    localEditTokenAllowed: extras.localEditTokenAllowed === true,
   };
 }
 

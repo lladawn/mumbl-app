@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { feedbackRoom, publicDemoRoom } from "../lib/constants";
+import { publicDemoRoom } from "../lib/constants";
 
 export default function JoinModal({ recentSlug, navigate, close }) {
   const [joinValue, setJoinValue] = useState("");
@@ -21,7 +21,7 @@ export default function JoinModal({ recentSlug, navigate, close }) {
         <form className="form-stack" onSubmit={handleSubmit}>
           <label>
             invite link or slug
-            <input value={joinValue} onChange={(event) => setJoinValue(event.target.value)} autoComplete="off" placeholder="backend-gremlins" />
+            <input value={joinValue} onChange={(event) => setJoinValue(event.target.value)} autoComplete="off" placeholder="tiny-fires" />
           </label>
           <div className="join-actions">
             <button className="solid-button" type="submit">
@@ -47,7 +47,7 @@ export default function JoinModal({ recentSlug, navigate, close }) {
         <div className="join-open-room">
           <span>no invite yet?</span>
           <strong>{publicDemoRoom.slug}</strong>
-          <p>try mumbl in the open. this room is public; team rooms stay private by default.</p>
+          <p>open a public sample read. real team rooms stay private by default.</p>
           <button
             className="ghost-button"
             type="button"
@@ -56,17 +56,7 @@ export default function JoinModal({ recentSlug, navigate, close }) {
               close();
             }}
           >
-            enter open room
-          </button>
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={() => {
-              navigate(feedbackRoom.href);
-              close();
-            }}
-          >
-            help shape mumbl
+            open sample reads
           </button>
         </div>
       </div>

@@ -89,6 +89,7 @@ async function generateHeartbeatForSpace(supabase, spaceId, weekOf) {
     .from("posts")
     .select("id,type,content")
     .eq("space_id", space.id)
+    .eq("type", "field_note")
     .gte("created_at", weekOf + "T00:00:00.000Z");
   if (postsError) throw postsError;
 

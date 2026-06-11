@@ -21,7 +21,7 @@ http://127.0.0.1:3000/
 
 - `app/` contains Next.js routes: landing, create, explore, room pages, and API handlers.
 - `src/components/` contains reusable UI components.
-- `src/components/space/` contains room-specific feed, compose, reaction, share, and heartbeat pieces.
+- `src/components/space/` contains room-specific team reads, hidden legacy feed, share, and heartbeat pieces.
 - `src/hooks/` contains client-side state hooks.
 - `src/lib/` contains product constants, API helpers, storage helpers for session/creator tokens, and heartbeat logic.
 - `docs/mumbl-product-context.md` and `docs/mumbl-extension-01.md` are the product source of truth. The extension wins on conflicts.
@@ -32,18 +32,16 @@ http://127.0.0.1:3000/
 - Landing screen with Mumbl's core voice
 - Create-space flow with vibe picker
 - Real routes for `/create` and `/r/:slug/:tab`
-- Creator-first post prompt before sharing
 - Optional creator-managed room note after creation
-- Space feed with post types: `thought`, `rant`, `win`, `find`, `lol`
-- Anonymous-first compose flow with optional display handle
-- Phrase-based reactions with local session dedupe
+- Reads-first room view for published field notes, with legacy feed/wins routes kept for compatibility
+- Slack/private-dump to field-note to team-read loop
+- Phrase-based reactions with local or logged-in dedupe
 - Edit/delete for new room posts through per-post edit tokens, with optional logged-in continuity across browsers
 - Private dump and field-note edit/delete, including bulk cleanup for selected private dumps
-- Wins tab with lightweight stats
-- Heartbeat tab with weekly history and vibe-over-time from anonymised backend data
+- Heartbeat tab with weekly history and vibe-over-time from anonymised published team reads
 - Share-copy actions for link, Slack, X, and WhatsApp
 - Aggregate-only `/explore` page for public-space culture pulse
-- Open demo room at `/r/it-works-on-my-machine` for trying Mumbl before creating a team space
+- Public sample reads at `/r/it-works-on-my-machine/reads` for seeing Mumbl before adding it to Slack
 - Side Quests: short-lived anonymous 2-person backchannels inside a room
 
 ## Product Principles
@@ -68,7 +66,7 @@ The open demo room is the intentional exception: `/r/it-works-on-my-machine` is 
 
 Weekly heartbeat generation is scheduled through Vercel Cron in `vercel.json` and runs every Monday at 09:00 UTC, which stays within Vercel Hobby cron limits. The endpoint is `GET /api/cron/heartbeats` and is protected by `CRON_SECRET`.
 
-The current generator is deterministic/local; the AI provider can replace the generator later while keeping the anonymised payload shape. Heartbeat history and vibe-over-time are displayed from stored heartbeat rows.
+The current generator is deterministic/local and reads only published team-read posts (`posts.type = 'field_note'`). Private dumps, Slack history, hidden feed posts, and presence never feed the heartbeat. An AI provider can replace the generator later while keeping the anonymised published-read payload shape. Heartbeat history and vibe-over-time are displayed from stored heartbeat rows.
 
 ## Backend Setup
 
@@ -87,7 +85,7 @@ For account/session continuity, enable Supabase Google OAuth and allow `/auth/ca
 
 Creator access starts with the local room creator token. When a logged-in creator presents that token, or opens a Slack-created room handoff while logged in, Mumbl links the room to their auth account so creator controls survive across browsers without tracking normal room membership.
 
-Creators can delete test or unused rooms from the room danger zone. Deleting a room hard-deletes the room feed and room-owned signal, frees the slug, and leaves user-owned field notes in the author's dump with their room/post linkage cleared.
+Creators can delete test or unused rooms from the room danger zone. Deleting a room hard-deletes the room reads/feed signal, frees the slug, and leaves user-owned field notes in the author's dump with their room/post linkage cleared.
 
 Until those variables exist, API routes return a setup `503`.
 

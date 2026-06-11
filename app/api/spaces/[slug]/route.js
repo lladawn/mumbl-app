@@ -68,7 +68,15 @@ export async function GET(request, { params }) {
       .select("id")
       .eq("space_id", space.id)
       .gte("created_at", startOfTodayIso());
-    const [reactionsResult, activeReactionsResult, accountEditablePostsResult, heartbeatsResult, todayReactionsResult, slackTeamReadsResult] = await Promise.all([
+    const [
+      reactionsResult,
+      activeReactionsResult,
+      accountEditablePostsResult,
+      localEditablePostsResult,
+      heartbeatsResult,
+      todayReactionsResult,
+      slackTeamReadsResult,
+    ] = await Promise.all([
       postIds.length
         ? supabase.from("reactions").select("post_id,label").in("post_id", postIds)
         : Promise.resolve({ data: [], error: null }),
@@ -77,6 +85,9 @@ export async function GET(request, { params }) {
         : Promise.resolve({ data: [], error: null }),
       postIds.length && owner.userId
         ? supabase.from("post_edit_tokens").select("post_id").in("post_id", postIds).eq("owner_user_id", owner.userId)
+        : Promise.resolve({ data: [], error: null }),
+      postIds.length
+        ? supabase.from("post_edit_tokens").select("post_id").in("post_id", postIds).is("owner_user_id", null)
         : Promise.resolve({ data: [], error: null }),
       supabase.from("heartbeats").select("*").eq("space_id", space.id).order("week_of", { ascending: false }),
       todayPostIdsPromise.then(({ data, error }) => {
@@ -92,6 +103,7 @@ export async function GET(request, { params }) {
     if (reactionsResult.error) throw reactionsResult.error;
     if (activeReactionsResult.error) throw activeReactionsResult.error;
     if (accountEditablePostsResult.error && !isMissingPostEditTokensTable(accountEditablePostsResult.error)) throw accountEditablePostsResult.error;
+    if (localEditablePostsResult.error && !isMissingPostEditTokensTable(localEditablePostsResult.error)) throw localEditablePostsResult.error;
     if (heartbeatsResult.error) throw heartbeatsResult.error;
     if (todayReactionsResult.error) throw todayReactionsResult.error;
     if (slackTeamReadsResult.error && !isMissingSlackTeamReadsTable(slackTeamReadsResult.error)) throw slackTeamReadsResult.error;
@@ -108,6 +120,7 @@ export async function GET(request, { params }) {
           slackTeamReads: slackTeamReadsResult.error ? null : slackTeamReadsResult.data,
           canManage: Boolean(owner.userId && space.creator_user_id === owner.userId),
           accountEditablePostIds: new Set((accountEditablePostsResult.error ? [] : accountEditablePostsResult.data || []).map((row) => row.post_id)),
+          localEditablePostIds: new Set((localEditablePostsResult.error ? [] : localEditablePostsResult.data || []).map((row) => row.post_id)),
           postsPage: {
             limit: postLimit,
             count: postCount || 0,
