@@ -7,7 +7,7 @@ import { getSupabaseAdmin } from "./supabase";
 import { cleanString, slugify } from "./validation";
 
 const SLACK_OAUTH_SCOPES = ["commands", "users:read", "users:read.email"];
-const SLACK_TEAM_READS_SCOPES = ["chat:write", "groups:write"];
+const SLACK_TEAM_READS_SCOPES = ["chat:write", "groups:write", "groups:read"];
 const TOKEN_ALGORITHM = "aes-256-gcm";
 const MAX_SLACK_AGE_SECONDS = 60 * 5;
 const MAX_SLACK_DRAFT_DUMPS = 10;
@@ -214,13 +214,17 @@ export async function createSlackSpaceChannel({ oauthResult, setup }) {
     .select("*")
     .single();
   if (error) throw error;
+  if (createdBy) {
+    const connection = await findSlackConnectionForAutoPin({ teamId, slackUserId: createdBy });
+    if (connection) await pinSlackSpace({ connection, spaceId: setup.space_id });
+  }
   await postSlackChannelIntro({ token: accessToken, channel: data, space: setup.spaces });
   return data;
 }
 
 export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
   const supabase = getSupabaseAdmin();
-  const connection = await findSlackConnection({ teamId, slackUserId });
+  const connection = await findSlackConnectionForAutoPin({ teamId, slackUserId });
   const creatorToken = createToken();
   const cleanName = cleanString(name, 80).toLowerCase();
   const baseSlug = slugify(cleanName) || "team-mumbl";
@@ -577,6 +581,14 @@ export async function findOrCreateSlackConnectionByEmail({ teamId, slackUserId }
   return connectSlackUser({ teamId, slackUserId, mumblUserId });
 }
 
+async function findSlackConnectionForAutoPin({ teamId, slackUserId }) {
+  try {
+    return await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+  } catch {
+    return null;
+  }
+}
+
 export async function connectSlackUser({ teamId, slackUserId, mumblUserId }) {
   const supabase = getSupabaseAdmin();
   const sessionTokenHash = hashToken(`slack:${teamId}:${slackUserId}`);
@@ -748,6 +760,34 @@ export async function pinSlackSpaceForMumblUser({ mumblUserId, spaceId }) {
   if (!connection) throw new Error("connect Slack once before pinning this room.");
   await pinSlackSpace({ connection, spaceId });
   return connection;
+}
+
+export async function pinSlackSpaceForChannelMember({ teamId, slackUserId, channelId }) {
+  const cleanedTeamId = cleanString(teamId, 80);
+  const cleanedSlackUserId = cleanString(slackUserId, 80);
+  const cleanedChannelId = cleanString(channelId, 80);
+  if (!cleanedTeamId || !cleanedSlackUserId || !cleanedChannelId) {
+    return { pinned: false, reason: "missing_event_data" };
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data: channel, error } = await supabase
+    .from("slack_space_channels")
+    .select("space_id, slack_team_id, slack_channel_id, spaces(id,slug,name)")
+    .eq("slack_team_id", cleanedTeamId)
+    .eq("slack_channel_id", cleanedChannelId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!channel?.space_id) return { pinned: false, reason: "channel_not_linked" };
+
+  const connection = await findSlackConnectionForAutoPin({
+    teamId: cleanedTeamId,
+    slackUserId: cleanedSlackUserId,
+  });
+  if (!connection) return { pinned: false, reason: "mumbl_account_not_connected" };
+
+  await pinSlackSpace({ connection, spaceId: channel.space_id });
+  return { pinned: true, space: channel.spaces };
 }
 
 export async function slackPublishOptionsView({ teamId, slackUserId, fieldNoteId }) {
