@@ -4,7 +4,6 @@ import {
   connectSlackUser,
   createPendingSlackDump,
   dumpUrl,
-  ephemeralLink,
   ephemeralText,
   findMumblUserByEmail,
   findSlackConnection,
@@ -12,7 +11,10 @@ import {
   parseVerifiedSlackForm,
   postSlackResponse,
   saveSlackDump,
+  slackConnectPayload,
   slackConnectUrl,
+  slackSavedDumpPayload,
+  slackSavingPayload,
 } from "../../../../src/server/slack";
 import { cleanString } from "../../../../src/server/validation";
 
@@ -36,7 +38,7 @@ export async function POST(request) {
       }
     });
 
-    return ok(ephemeralText("saving to mumbl..."));
+    return ok(slackSavingPayload());
   } catch (error) {
     return serverError(error);
   }
@@ -46,7 +48,7 @@ async function saveOrConnect({ teamId, slackUserId, content, sourceMeta }) {
   const existingConnection = await findSlackConnection({ teamId, slackUserId });
   if (existingConnection) {
     const dump = await saveSlackDump({ connection: existingConnection, content, sourceMeta });
-    return ephemeralLink({ text: "saved. only you can see this.", url: dumpUrl(dump.id), label: "open in mumbl ->" });
+    return slackSavedDumpPayload({ url: dumpUrl(dump.id) });
   }
 
   const email = await getSlackUserEmail({ teamId, slackUserId });
@@ -54,13 +56,9 @@ async function saveOrConnect({ teamId, slackUserId, content, sourceMeta }) {
   if (mumblUserId) {
     const connection = await connectSlackUser({ teamId, slackUserId, mumblUserId });
     const dump = await saveSlackDump({ connection, content, sourceMeta });
-    return ephemeralLink({ text: "saved. only you can see this.", url: dumpUrl(dump.id), label: "open in mumbl ->" });
+    return slackSavedDumpPayload({ url: dumpUrl(dump.id) });
   }
 
   const pending = await createPendingSlackDump({ teamId, slackUserId, content, sourceMeta });
-  return ephemeralLink({
-    text: "connect your mumbl account to start saving thoughts from Slack.",
-    url: slackConnectUrl(pending.id),
-    label: "connect ->",
-  });
+  return slackConnectPayload({ url: slackConnectUrl(pending.id) });
 }

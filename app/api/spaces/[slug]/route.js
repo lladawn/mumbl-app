@@ -64,7 +64,7 @@ export async function GET(request, { params }) {
       .select("id")
       .eq("space_id", space.id)
       .gte("created_at", startOfTodayIso());
-    const [reactionsResult, activeReactionsResult, heartbeatsResult, todayReactionsResult] = await Promise.all([
+    const [reactionsResult, activeReactionsResult, heartbeatsResult, todayReactionsResult, slackTeamReadsResult] = await Promise.all([
       postIds.length
         ? supabase.from("reactions").select("post_id,label").in("post_id", postIds)
         : Promise.resolve({ data: [], error: null }),
@@ -79,12 +79,14 @@ export async function GET(request, { params }) {
           ? supabase.from("reactions").select("label,created_at").in("post_id", todayPostIds).gte("created_at", startOfTodayIso())
           : Promise.resolve({ data: [], error: null });
       }),
+      supabase.from("slack_space_channels").select("*").eq("space_id", space.id).maybeSingle(),
     ]);
 
     if (reactionsResult.error) throw reactionsResult.error;
     if (activeReactionsResult.error) throw activeReactionsResult.error;
     if (heartbeatsResult.error) throw heartbeatsResult.error;
     if (todayReactionsResult.error) throw todayReactionsResult.error;
+    if (slackTeamReadsResult.error && !isMissingSlackTeamReadsTable(slackTeamReadsResult.error)) throw slackTeamReadsResult.error;
 
     return ok({
       space: serializeSpace(
@@ -95,6 +97,7 @@ export async function GET(request, { params }) {
         activeReactionsResult.data,
         {
           roomVibe: getTopReactionLabels(todayReactionsResult.data),
+          slackTeamReads: slackTeamReadsResult.error ? null : slackTeamReadsResult.data,
           postsPage: {
             limit: postLimit,
             count: postCount || 0,
@@ -108,6 +111,11 @@ export async function GET(request, { params }) {
   } catch (error) {
     return serverError(error);
   }
+}
+
+function isMissingSlackTeamReadsTable(error) {
+  const message = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
+  return error?.code === "42P01" || error?.code === "PGRST205" || message.includes("slack_space_channels");
 }
 
 function parsePostLimit(value) {

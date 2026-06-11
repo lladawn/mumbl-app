@@ -94,9 +94,11 @@ In Slack app settings:
 - OAuth redirect URL: `https://mumbl.wtf/api/slack/oauth/callback`
 - Slash command request URL: `https://mumbl.wtf/api/slack/commands`
 - Interactivity request URL: `https://mumbl.wtf/api/slack/interactions`
-- Bot scopes: `commands`, `users:read`, `users:read.email`
+- Core bot scopes: `commands`, `users:read`, `users:read.email`
 
 Set `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`, and `MUMBL_SLACK_TOKEN_ENCRYPTION_KEY` in the deployment environment. Install through `/api/slack/install`.
+
+Optional team-read Slack posting is creator-enabled per room. If a creator switches it on, Mumbl starts an optional Slack permission upgrade that asks for `chat:write` and `groups:write` so it can create one private channel and post published team reads there. It still does not request Slack history scopes.
 
 Slack reminders are intentionally not part of the beta because frequent scheduling does not fit the current free-tier posture.
 

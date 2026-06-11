@@ -15,6 +15,7 @@ import PublicSpacePanel from "./space/PublicSpacePanel";
 import RoomDescriptionPanel from "./space/RoomDescriptionPanel";
 import RoomVibeBar from "./space/RoomVibeBar";
 import SideQuestsPanel from "./space/SideQuestsPanel";
+import SlackTeamReadsPanel from "./space/SlackTeamReadsPanel";
 import Toast from "./Toast";
 
 export default function SpacePageClient({ slug, tab }) {
@@ -31,6 +32,8 @@ export default function SpacePageClient({ slug, tab }) {
     dismissFirstPost,
     updateVisibility,
     updateDescription,
+    startTeamReadsSlackSetup,
+    updateTeamReadsSlackPosting,
   } = useRemoteSpace(slug, postTypeFilter);
   const [selectedType, setSelectedType] = useState("thought");
   const [composeAnonymous, setComposeAnonymous] = useState(true);
@@ -197,6 +200,14 @@ export default function SpacePageClient({ slug, tab }) {
             <p>the heartbeat is generated from anonymised posts and reactions. no manager cave, no separate dashboard.</p>
           </div>
           {hasCreatorToken && <RoomDescriptionPanel space={space} updateDescription={updateDescription} onToast={setToast} />}
+          {hasCreatorToken && (
+            <SlackTeamReadsPanel
+              space={space}
+              startSetup={startTeamReadsSlackSetup}
+              updatePosting={updateTeamReadsSlackPosting}
+              onToast={setToast}
+            />
+          )}
           {hasCreatorToken && <PublicSpacePanel space={space} updateVisibility={updateVisibility} onToast={setToast} />}
         </aside>
       </div>

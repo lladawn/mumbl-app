@@ -1,10 +1,11 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { assertSlackEnv, getServerEnv } from "./env";
-import { hashToken } from "./hash";
+import { createToken, hashToken } from "./hash";
 import { getSupabaseAdmin } from "./supabase";
-import { cleanString } from "./validation";
+import { cleanString, slugify } from "./validation";
 
 const SLACK_OAUTH_SCOPES = ["commands", "users:read", "users:read.email"];
+const SLACK_TEAM_READS_SCOPES = ["chat:write", "groups:write"];
 const TOKEN_ALGORITHM = "aes-256-gcm";
 const MAX_SLACK_AGE_SECONDS = 60 * 5;
 
@@ -15,6 +16,18 @@ export function slackInstallUrl() {
     scope: SLACK_OAUTH_SCOPES.join(","),
     redirect_uri: `${appUrl}/api/slack/oauth/callback`,
     state: createSlackState(),
+  });
+
+  return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
+}
+
+export function slackTeamReadsInstallUrl({ setupId, setupToken }) {
+  const { appUrl, slackClientId } = assertSlackEnv();
+  const params = new URLSearchParams({
+    client_id: slackClientId,
+    scope: SLACK_TEAM_READS_SCOPES.join(","),
+    redirect_uri: `${appUrl}/api/slack/team-reads/oauth/callback`,
+    state: createSlackState({ setupId, setupToken }),
   });
 
   return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
@@ -40,13 +53,39 @@ export async function exchangeSlackCode(code) {
   return result;
 }
 
+export async function exchangeSlackTeamReadsCode(code) {
+  const { appUrl, slackClientId, slackClientSecret } = assertSlackEnv();
+  const body = new URLSearchParams({
+    client_id: slackClientId,
+    client_secret: slackClientSecret,
+    code,
+    redirect_uri: `${appUrl}/api/slack/team-reads/oauth/callback`,
+  });
+  const response = await fetch("https://slack.com/api/oauth.v2.access", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) {
+    throw new Error(result.error || "Slack team reads OAuth failed.");
+  }
+  return result;
+}
+
 export async function storeSlackInstallation(oauthResult) {
   const teamId = cleanString(oauthResult.team?.id, 80);
   const accessToken = cleanString(oauthResult.access_token, 4096);
   if (!teamId || !accessToken) throw new Error("Slack OAuth response was missing workspace access.");
 
-  const encryptedToken = encryptSlackToken(accessToken);
   const supabase = getSupabaseAdmin();
+  const { data: current } = await supabase
+    .from("slack_installations")
+    .select("scopes")
+    .eq("slack_team_id", teamId)
+    .maybeSingle();
+  const nextScopes = mergeScopes(current?.scopes, oauthResult.scope);
+  const encryptedToken = encryptSlackToken(accessToken);
   const { error } = await supabase.from("slack_installations").upsert(
     {
       slack_team_id: teamId,
@@ -55,10 +94,7 @@ export async function storeSlackInstallation(oauthResult) {
       bot_access_token_ciphertext: encryptedToken.ciphertext,
       bot_access_token_iv: encryptedToken.iv,
       bot_access_token_tag: encryptedToken.tag,
-      scopes: cleanString(oauthResult.scope, 1000)
-        .split(",")
-        .map((scope) => scope.trim())
-        .filter(Boolean),
+      scopes: nextScopes,
       beta_status: "active",
       updated_at: new Date().toISOString(),
     },
@@ -98,6 +134,136 @@ export async function getSlackInstallation(teamId) {
   const { data, error } = await supabase.from("slack_installations").select("*").eq("slack_team_id", teamId).single();
   if (error) throw error;
   return data;
+}
+
+export async function createTeamReadsSetup({ spaceId }) {
+  const setupToken = createToken();
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("slack_team_read_setups")
+    .insert({
+      space_id: spaceId,
+      setup_token_hash: hashToken(setupToken),
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+
+  return { setupId: data.id, setupToken };
+}
+
+export async function consumeTeamReadsSetup({ setupId, setupToken }) {
+  const supabase = getSupabaseAdmin();
+  const now = new Date().toISOString();
+  const { data: setup, error } = await supabase
+    .from("slack_team_read_setups")
+    .select("*, spaces(id, slug, name)")
+    .eq("id", setupId)
+    .eq("setup_token_hash", hashToken(setupToken))
+    .is("consumed_at", null)
+    .gt("expires_at", now)
+    .single();
+  if (error) throw error;
+
+  const { error: updateError } = await supabase.from("slack_team_read_setups").update({ consumed_at: now }).eq("id", setup.id);
+  if (updateError) throw updateError;
+  return setup;
+}
+
+export async function createSlackSpaceChannel({ oauthResult, setup }) {
+  const teamId = cleanString(oauthResult.team?.id, 80);
+  const accessToken = cleanString(oauthResult.access_token, 4096);
+  if (!teamId || !accessToken) throw new Error("Slack team reads install was missing workspace access.");
+
+  const channel = await createPrivateChannel({
+    token: accessToken,
+    name: channelNameForSpace(setup.spaces),
+  });
+  const createdBy = cleanString(oauthResult.authed_user?.id, 80);
+  if (createdBy) {
+    await inviteUserToSlackChannel({ token: accessToken, channelId: channel.id, slackUserId: createdBy });
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("slack_space_channels")
+    .upsert(
+      {
+        space_id: setup.space_id,
+        slack_team_id: teamId,
+        slack_channel_id: channel.id,
+        slack_channel_name: channel.name,
+        posting_enabled: true,
+        is_private: true,
+        created_by_slack_user_id: createdBy || null,
+        last_post_error: null,
+        last_post_error_at: null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "space_id" },
+    )
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function findSlackSpaceChannel(spaceId) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.from("slack_space_channels").select("*").eq("space_id", spaceId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateSlackSpacePosting({ spaceId, postingEnabled }) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("slack_space_channels")
+    .update({ posting_enabled: postingEnabled, updated_at: new Date().toISOString() })
+    .eq("space_id", spaceId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function postTeamReadToSlack({ space, post }) {
+  const channel = await findSlackSpaceChannel(space.id);
+  if (!channel?.posting_enabled) return { posted: false, reason: "not_enabled" };
+
+  const installation = await getSlackInstallation(channel.slack_team_id);
+  const token = decryptSlackToken({
+    ciphertext: installation.bot_access_token_ciphertext,
+    iv: installation.bot_access_token_iv,
+    tag: installation.bot_access_token_tag,
+  });
+
+  const payload = teamReadMessage({ space, post, channel });
+  const result = await slackApi("chat.postMessage", token, payload);
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("slack_space_channels")
+    .update({
+      last_posted_at: new Date().toISOString(),
+      last_post_error: null,
+      last_post_error_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", channel.id);
+  if (error) throw error;
+  return { posted: true, result };
+}
+
+export async function recordSlackTeamReadFailure({ spaceId, error }) {
+  const supabase = getSupabaseAdmin();
+  await supabase
+    .from("slack_space_channels")
+    .update({
+      last_post_error: cleanString(error?.message || "couldn't post to Slack", 500),
+      last_post_error_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("space_id", spaceId);
 }
 
 export async function getSlackUserEmail({ teamId, slackUserId }) {
@@ -241,11 +407,33 @@ export function ephemeralText(text) {
   };
 }
 
-export function ephemeralLink({ text, url, label }) {
-  return {
-    response_type: "ephemeral",
-    text: `${text} <${url}|${label}>`,
-  };
+export function slackSavingPayload() {
+  return blockResponse({
+    text: "saving to mumbl...",
+    blocks: [
+      section("*saving to mumbl...*\nkeeping it private while mumbl files it away."),
+    ],
+  });
+}
+
+export function slackSavedDumpPayload({ url, shortcut = false }) {
+  return blockResponse({
+    text: shortcut ? "saved to mumbl privately." : "saved. only you can see this.",
+    blocks: [
+      section(shortcut ? "*saved to mumbl privately.*\nthat Slack message is now in your private dump." : "*saved. only you can see this.*\nprivate dump first. team read only if you choose later."),
+      actions([{ text: "open in mumbl", url }]),
+    ],
+  });
+}
+
+export function slackConnectPayload({ url, shortcut = false }) {
+  return blockResponse({
+    text: "connect your mumbl account to save from Slack.",
+    blocks: [
+      section(shortcut ? "*connect mumbl once.*\nthen this message can land in your private dump." : "*connect mumbl once.*\nthen `/mumbl` can save thoughts without leaving Slack."),
+      actions([{ text: "connect mumbl", url }]),
+    ],
+  });
 }
 
 export async function postSlackResponse(responseUrl, payload) {
@@ -267,13 +455,130 @@ export function verifySlackState(state) {
   return decoded;
 }
 
-function createSlackState() {
+function createSlackState(extra = {}) {
   const payload = {
     nonce: randomBytes(16).toString("base64url"),
     iat: Date.now(),
+    ...extra,
   };
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${encoded}.${signState(encoded)}`;
+}
+
+function mergeScopes(existingScopes = [], nextScopeText = "") {
+  const scopes = new Set(Array.isArray(existingScopes) ? existingScopes : []);
+  cleanString(nextScopeText, 1000)
+    .split(",")
+    .map((scope) => scope.trim())
+    .filter(Boolean)
+    .forEach((scope) => scopes.add(scope));
+  return [...scopes];
+}
+
+async function createPrivateChannel({ token, name }) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const suffix = attempt ? `-${randomBytes(2).toString("hex")}` : "";
+    try {
+      const result = await slackApi("conversations.create", token, {
+        name: `${name}${suffix}`.slice(0, 80),
+        is_private: true,
+      });
+      return result.channel;
+    } catch (error) {
+      if (error.slack?.error !== "name_taken") throw error;
+    }
+  }
+  throw new Error("couldn't create a unique Slack channel name.");
+}
+
+async function inviteUserToSlackChannel({ token, channelId, slackUserId }) {
+  try {
+    await slackApi("conversations.invite", token, {
+      channel: channelId,
+      users: slackUserId,
+    });
+  } catch {
+    // Channel creation still succeeds if Slack cannot invite the setup user.
+  }
+}
+
+async function slackApi(method, token, body) {
+  const response = await fetch(`https://slack.com/api/${method}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json();
+  if (!response.ok || result.ok === false) {
+    const error = new Error(result.error || `${method} failed`);
+    error.slack = result;
+    throw error;
+  }
+  return result;
+}
+
+function channelNameForSpace(space) {
+  return `mumbl-${slugify(space?.slug || space?.name || "team-reads")}`.slice(0, 80);
+}
+
+function teamReadMessage({ space, post, channel }) {
+  const author = post.is_anonymous ? "anonymous team read" : cleanString(post.display_name, 48) || "someone brave";
+  const title = cleanString(post.field_note_title, 120) || "team read";
+  const preview = cleanString(post.content, 900);
+  const url = `${getServerEnv().appUrl}/r/${space.slug}/reads`;
+  return {
+    channel: channel.slack_channel_id,
+    text: `${author}: ${title}`,
+    blocks: [
+      section(`*${escapeSlackText(title)}*\n_${escapeSlackText(author)}_`),
+      section(escapeSlackText(preview)),
+      actions([{ text: "read in mumbl", url }]),
+      context(`from ${space.name} on mumbl`),
+    ],
+  };
+}
+
+function blockResponse({ text, blocks }) {
+  return {
+    response_type: "ephemeral",
+    text,
+    blocks,
+  };
+}
+
+function section(text) {
+  return {
+    type: "section",
+    text: { type: "mrkdwn", text },
+  };
+}
+
+function actions(buttons) {
+  return {
+    type: "actions",
+    elements: buttons.map((button) => ({
+      type: "button",
+      text: { type: "plain_text", text: button.text },
+      url: button.url,
+    })),
+  };
+}
+
+function context(text) {
+  return {
+    type: "context",
+    elements: [{ type: "mrkdwn", text }],
+  };
+}
+
+function escapeSlackText(text) {
+  return cleanString(text, 3000)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
 
 function decodeState(state) {

@@ -2,6 +2,7 @@ import { badRequest, notFound, ok, serverError } from "../../../../../../src/ser
 import { enforceRateLimit } from "../../../../../../src/server/rateLimit";
 import { applyOwnerFilter, assertExpectedAuthenticatedOwner, resolveRequestOwner } from "../../../../../../src/server/auth";
 import { serializeFieldNote } from "../../../../../../src/server/dumps";
+import { postTeamReadToSlack, recordSlackTeamReadFailure } from "../../../../../../src/server/slack";
 import { getSupabaseAdmin } from "../../../../../../src/server/supabase";
 import { cleanString } from "../../../../../../src/server/validation";
 
@@ -30,7 +31,7 @@ export async function POST(request, { params }) {
 
     const [{ data: fieldNote, error: noteError }, { data: space, error: spaceError }] = await Promise.all([
       applyOwnerFilter(supabase.from("field_notes").select("*").eq("id", fieldNoteId), owner).single(),
-      supabase.from("spaces").select("id").eq("slug", slug).single(),
+      supabase.from("spaces").select("id,slug,name").eq("slug", slug).single(),
     ]);
     if (noteError?.code === "PGRST116") return notFound("field note not found");
     if (spaceError?.code === "PGRST116") return notFound("space not found");
@@ -75,6 +76,12 @@ export async function POST(request, { params }) {
     }
 
     await supabase.from("spaces").update({ first_post_done: true }).eq("id", space.id);
+
+    try {
+      await postTeamReadToSlack({ space, post });
+    } catch (slackError) {
+      await recordSlackTeamReadFailure({ spaceId: space.id, error: slackError });
+    }
 
     return ok({ fieldNote: serializeFieldNote(updatedNote), post });
   } catch (error) {

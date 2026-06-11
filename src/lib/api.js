@@ -182,6 +182,24 @@ export async function updateRemoteSpaceDescription({ slug, description }) {
   return parseJson(response);
 }
 
+export async function startSlackTeamReadsSetup({ slug }) {
+  const response = await fetch(`/api/spaces/${slug}/slack/team-reads/setup`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ creatorToken: getCreatorToken(slug) }),
+  });
+  return parseJson(response);
+}
+
+export async function updateSlackTeamReadsPosting({ slug, postingEnabled }) {
+  const response = await fetch(`/api/spaces/${slug}/slack/team-reads`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ creatorToken: getCreatorToken(slug), postingEnabled }),
+  });
+  return parseJson(response);
+}
+
 export async function dismissRemoteFirstPost(slug) {
   const response = await fetch(`/api/spaces/${slug}/first-post-dismissed`, {
     method: "POST",

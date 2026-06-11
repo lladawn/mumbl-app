@@ -2199,6 +2199,34 @@ textarea:focus {
   line-height: 1.45;
 }
 
+.slack-team-reads-panel {
+  display: grid;
+  gap: 14px;
+  background: #f7f7ff;
+}
+
+.slack-team-reads-panel h3 {
+  margin-bottom: 8px;
+}
+
+.slack-channel-status {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+
+.slack-channel-status strong {
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+}
+
+.warning-copy {
+  color: #8a3d14;
+}
+
 .reads-intro {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

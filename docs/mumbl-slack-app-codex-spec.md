@@ -55,12 +55,17 @@ opt out anytime: `/mumbl remind off`
 
 ### slack app config
 
-**scopes needed (bot token):**
+**core beta scopes needed (bot token):**
 - `commands` — for /mumbl slash command
-- `chat:write` — to send ephemeral confirmations and DMs
-- `im:write` — to open DM channels for daily check-in
-- `users:read` — to get user timezone for scheduled reminders
+- `users:read` — to read the requesting user's Slack profile
 - `users:read.email` — to match slack user to mumbl account on first use
+
+**optional team reads add-on scopes:**
+- `chat:write` — to post published team reads into the room's private Slack channel
+- `groups:write` — to create one private channel for a Mumbl room after creator opt-in
+
+**future reminder scopes, not in beta:**
+- `im:write` — to open DM channels for daily check-in
 
 **do NOT request:**
 - `channels:history`
@@ -68,6 +73,8 @@ opt out anytime: `/mumbl remind off`
 - `channels:read` (broad)
 
 keep scopes minimal. this is critical for marketplace approval and user trust.
+
+team-read posting to slack is optional per mumbl room. the core app should not ask for write/channel scopes until a room creator explicitly enables that add-on as a permission upgrade.
 
 **event subscriptions needed:**
 - `message.im` — to receive replies to daily check-in DM

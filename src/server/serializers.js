@@ -15,6 +15,7 @@ export function serializeSpace(space, posts = [], heartbeats = [], reactionRows 
     publicName: space.public_name || "",
     createdAt: new Date(space.created_at).getTime(),
     dailyPrompt: extras.dailyPrompt ? serializePrompt(extras.dailyPrompt) : null,
+    slackTeamReads: extras.slackTeamReads ? serializeSlackTeamReads(extras.slackTeamReads) : null,
     roomVibe: extras.roomVibe || [],
     postsPage: extras.postsPage || {
       limit: posts.length,
@@ -25,6 +26,18 @@ export function serializeSpace(space, posts = [], heartbeats = [], reactionRows 
     },
     posts: posts.map((post) => serializePost(post, reactionRows, activeReactionKeys)),
     heartbeats: heartbeats.map(serializeHeartbeat),
+  };
+}
+
+function serializeSlackTeamReads(row) {
+  return {
+    channelId: row.slack_channel_id || "",
+    channelName: row.slack_channel_name || "",
+    postingEnabled: row.posting_enabled === true,
+    isPrivate: row.is_private !== false,
+    lastPostedAt: row.last_posted_at ? new Date(row.last_posted_at).getTime() : null,
+    lastPostError: row.last_post_error || "",
+    lastPostErrorAt: row.last_post_error_at ? new Date(row.last_post_error_at).getTime() : null,
   };
 }
 
