@@ -24,7 +24,6 @@ import {
   slackDumpSavedModalView,
   slackFieldNoteEditModalView,
   slackFieldNoteDraftingModalView,
-  slackFieldNoteDraftReadyModalView,
   slackFieldNoteDraftErrorModalView,
   slackFieldNotePublishedModalView,
   slackFieldNoteSavedModalView,
@@ -32,6 +31,7 @@ import {
   slackSavedDumpPayload,
   slackLoadingModalView,
   slackPinnedSpacesView,
+  slackPublishedReadsView,
   slackPublishOptionsView,
   slackPublishPreviewView,
   slackRoomModalView,
@@ -57,7 +57,7 @@ export async function POST(request) {
       try {
         if (actionId === "start_room_modal") {
           const teamId = slackTeamId(payload);
-          const viewId = cleanString(payload.view?.id, 120);
+          const viewId = slackModalViewId(payload);
           if (viewId) {
             await updateSlackView({
               teamId,
@@ -73,7 +73,7 @@ export async function POST(request) {
         }
         if (actionId === "new_private_dump") {
           const teamId = slackTeamId(payload);
-          const viewId = cleanString(payload.view?.id, 120);
+          const viewId = slackModalViewId(payload);
           if (viewId) {
             await updateSlackView({ teamId, viewId, view: slackDumpModalView() });
           } else {
@@ -108,7 +108,7 @@ export async function POST(request) {
         if (actionId === "review_field_note_drafts") {
           const teamId = slackTeamId(payload);
           const slackUserId = cleanString(payload.user?.id, 80);
-          const viewId = cleanString(payload.view?.id, 120);
+          const viewId = slackModalViewId(payload);
           if (viewId) {
             await updateSlackView({
               teamId,
@@ -146,10 +146,51 @@ export async function POST(request) {
             });
           }
         }
+        if (actionId === "review_published_reads") {
+          const teamId = slackTeamId(payload);
+          const slackUserId = cleanString(payload.user?.id, 80);
+          const viewId = slackModalViewId(payload);
+          if (viewId) {
+            await updateSlackView({
+              teamId,
+              viewId,
+              view: slackLoadingModalView({ title: "published reads", message: "loading your published reads..." }),
+            });
+            after(async () => {
+              try {
+                await updateSlackView({
+                  teamId,
+                  viewId,
+                  view: await slackPublishedReadsView({ teamId, slackUserId }),
+                });
+              } catch (error) {
+                console.error("Slack published reads update failed", { message: error.message, slackError: error.slack?.error });
+              }
+            });
+          } else {
+            const result = await openSlackLoadingModal({
+              teamId,
+              triggerId: cleanString(payload.trigger_id, 200),
+              title: "published reads",
+              message: "loading your published reads...",
+            });
+            after(async () => {
+              try {
+                await updateSlackView({
+                  teamId,
+                  viewId: cleanString(result.view?.id, 120),
+                  view: await slackPublishedReadsView({ teamId, slackUserId }),
+                });
+              } catch (error) {
+                console.error("Slack published reads update failed", { message: error.message, slackError: error.slack?.error });
+              }
+            });
+          }
+        }
         if (actionId === "manage_pinned_spaces") {
           const teamId = slackTeamId(payload);
           const slackUserId = cleanString(payload.user?.id, 80);
-          const viewId = cleanString(payload.view?.id, 120);
+          const viewId = slackModalViewId(payload);
           if (viewId) {
             await updateSlackView({
               teamId,
@@ -190,7 +231,7 @@ export async function POST(request) {
         if (actionId === "unpin_pinned_space_start") {
           const teamId = slackTeamId(payload);
           const slackUserId = cleanString(payload.user?.id, 80);
-          const viewId = cleanString(payload.view?.id, 120);
+          const viewId = slackModalViewId(payload);
           if (viewId) {
             await updateSlackView({
               teamId,
@@ -207,7 +248,7 @@ export async function POST(request) {
           const teamId = slackTeamId(payload);
           const slackUserId = cleanString(payload.user?.id, 80);
           const fieldNoteId = cleanString(payload.actions?.[0]?.value, 64);
-          const viewId = cleanString(payload.view?.id, 120);
+          const viewId = slackModalViewId(payload);
           if (viewId) {
             await updateSlackView({
               teamId,
@@ -298,7 +339,7 @@ export async function POST(request) {
           await updateSlackView({
             teamId,
             viewId: cleanString(payload.view?.id, 120),
-            view: slackFieldNoteDraftReadyModalView(result),
+            view: slackFieldNoteEditModalView(result.fieldNote),
           });
         } catch (error) {
           await updateSlackView({
@@ -497,6 +538,10 @@ export async function POST(request) {
 
 function slackTeamId(payload) {
   return cleanString(payload.team?.id || payload.user?.team_id, 80);
+}
+
+function slackModalViewId(payload) {
+  return payload.view?.type === "modal" ? cleanString(payload.view?.id, 120) : "";
 }
 
 function selectedSlackOptionValues(options) {

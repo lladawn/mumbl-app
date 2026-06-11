@@ -508,6 +508,16 @@ export async function slackFieldNoteReviewPickerView({ teamId, slackUserId }) {
   }
 }
 
+export async function slackPublishedReadsView({ teamId, slackUserId }) {
+  try {
+    const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+    const fieldNotes = await recentSlackPublishedFieldNotes(connection);
+    return fieldNotes.length ? slackPublishedReadsModal({ fieldNotes }) : slackNoPublishedReadsModal();
+  } catch (error) {
+    return slackFieldNoteDraftUnavailableModal(error.message || "connect mumbl first.");
+  }
+}
+
 export async function slackPinnedSpacesView({ teamId, slackUserId }) {
   const connection = await findSlackConnection({ teamId, slackUserId });
   if (!connection) return slackPinnedSpacesEmptyModal({ connected: false });
@@ -722,6 +732,19 @@ export async function recentSlackFieldNoteDrafts(connection) {
   return data || [];
 }
 
+export async function recentSlackPublishedFieldNotes(connection) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("field_notes")
+    .select("id, title, content, published_at, spaces:team_room_id(id,slug,name)")
+    .eq("user_id", connection.mumbl_user_id)
+    .eq("is_published", true)
+    .order("published_at", { ascending: false })
+    .limit(10);
+  if (error) throw error;
+  return data || [];
+}
+
 export async function getSlackFieldNoteDraft({ teamId, slackUserId, fieldNoteId }) {
   const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
   const supabase = getSupabaseAdmin();
@@ -750,7 +773,7 @@ export async function updateSlackFieldNoteDraft({ teamId, slackUserId, fieldNote
     .eq("user_id", connection.mumbl_user_id)
     .eq("is_published", false)
     .eq("id", cleanString(fieldNoteId, 64))
-    .select("id, title")
+    .select("id, title, content")
     .single();
   if (error) throw error;
   return {
@@ -1018,7 +1041,7 @@ export async function createSlackFieldNoteDraft({ teamId, slackUserId, dumpIds }
       title: draft.title || "field note",
       content: draft.content,
     })
-    .select("id, title")
+    .select("id, title, content")
     .single();
   if (noteError) throw noteError;
 
@@ -1421,6 +1444,7 @@ async function slackAppHomeBlocks({ teamId, slackUserId }) {
     actions([
       { text: "draft team read", actionId: "draft_team_read" },
       { text: "review drafts", actionId: "review_field_note_drafts" },
+      { text: "published reads", actionId: "review_published_reads" },
     ]),
     divider(),
     section(
@@ -1565,6 +1589,45 @@ function slackNoFieldNoteDraftsModal() {
     blocks: [
       section("*no private field-note drafts yet.*\nDraft one from recent dumps first."),
       actions([{ text: "open your dump", url: `${appUrl}/dump` }]),
+    ],
+  };
+}
+
+function slackPublishedReadsModal({ fieldNotes }) {
+  const { appUrl } = getServerEnv();
+  const blocks = [
+    section("*published reads*\nField notes you have already published from Mumbl or Slack."),
+  ];
+
+  fieldNotes.slice(0, 10).forEach((fieldNote) => {
+    const space = fieldNote.spaces || {};
+    const destination = space.name ? `in ${escapeSlackText(space.name)}` : "published";
+    blocks.push(
+      section(`*${escapeSlackText(fieldNote.title || "team read")}*\n${destination}`),
+      actions([{ text: "open read", url: space.slug ? `${appUrl}/r/${space.slug}/reads` : `${appUrl}/dump?fieldNote=${encodeURIComponent(fieldNote.id)}` }]),
+    );
+  });
+
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "published reads" },
+    close: { type: "plain_text", text: "done" },
+    blocks,
+  };
+}
+
+function slackNoPublishedReadsModal() {
+  const { appUrl } = getServerEnv();
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "published reads" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section("*nothing published yet.*\nReview a draft when one feels ready for a team read."),
+      actions([
+        { text: "review drafts", actionId: "review_field_note_drafts", style: "primary" },
+        { text: "open your dump", url: `${appUrl}/dump` },
+      ]),
     ],
   };
 }
