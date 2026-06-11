@@ -452,6 +452,40 @@ export async function openSlackFieldNoteDraftModal({ teamId, slackUserId, trigge
   });
 }
 
+export async function openSlackLoadingModal({ teamId, triggerId, title = "loading", message = "opening mumbl..." }) {
+  const installation = await getSlackInstallation(teamId);
+  const token = decryptSlackToken({
+    ciphertext: installation.bot_access_token_ciphertext,
+    iv: installation.bot_access_token_iv,
+    tag: installation.bot_access_token_tag,
+  });
+
+  return slackApi("views.open", token, {
+    trigger_id: triggerId,
+    view: slackLoadingModal({ title, message }),
+  });
+}
+
+export async function slackFieldNoteDraftPickerView({ teamId, slackUserId }) {
+  try {
+    const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+    const dumps = await recentSlackPrivateDumps(connection);
+    return dumps.length ? slackFieldNoteDraftModal({ dumps }) : slackFieldNoteNoDumpsModal();
+  } catch (error) {
+    return slackFieldNoteDraftUnavailableModal(error.message || "save a private dump first, then come back here.");
+  }
+}
+
+export async function slackFieldNoteReviewPickerView({ teamId, slackUserId }) {
+  try {
+    const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+    const fieldNotes = await recentSlackFieldNoteDrafts(connection);
+    return fieldNotes.length ? slackFieldNoteReviewModal({ fieldNotes }) : slackNoFieldNoteDraftsModal();
+  } catch (error) {
+    return slackFieldNoteDraftUnavailableModal(error.message || "connect mumbl first.");
+  }
+}
+
 export async function openSlackFieldNoteReviewModal({ teamId, slackUserId, triggerId }) {
   const installation = await getSlackInstallation(teamId);
   const token = decryptSlackToken({
@@ -688,6 +722,174 @@ export async function updateSlackFieldNoteDraft({ teamId, slackUserId, fieldNote
   };
 }
 
+export async function pinSlackSpaceBySlug({ teamId, slackUserId, slug }) {
+  const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+  const space = await findSpaceForSlackPin(slug);
+  await pinSlackSpace({ connection, spaceId: space.id });
+  return { space };
+}
+
+export async function pinSlackSpaceForMumblUser({ mumblUserId, spaceId }) {
+  const supabase = getSupabaseAdmin();
+  const { data: connection, error } = await supabase
+    .from("slack_connections")
+    .select("*")
+    .eq("mumbl_user_id", mumblUserId)
+    .order("last_used_at", { ascending: false, nullsFirst: false })
+    .order("linked_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!connection) throw new Error("connect Slack once before pinning this room.");
+  await pinSlackSpace({ connection, spaceId });
+  return connection;
+}
+
+export async function slackPublishOptionsView({ teamId, slackUserId, fieldNoteId }) {
+  const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+  const [fieldNote, pinnedSpaces] = await Promise.all([
+    getSlackFieldNoteDraft({ teamId, slackUserId, fieldNoteId }),
+    listSlackPinnedSpaces(connection),
+  ]);
+  return pinnedSpaces.length ? slackFieldNotePublishOptionsModal({ fieldNote, pinnedSpaces }) : slackNoPinnedSpacesModal();
+}
+
+export async function slackPublishPreviewView({ teamId, slackUserId, fieldNoteId, spaceId, isAnonymous, displayName }) {
+  const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+  const [fieldNote, pinnedSpace] = await Promise.all([
+    getSlackFieldNoteDraft({ teamId, slackUserId, fieldNoteId }),
+    getPinnedSpace({ connection, spaceId }),
+  ]);
+  return slackFieldNotePublishPreviewModal({
+    fieldNote,
+    space: pinnedSpace.spaces,
+    isAnonymous,
+    displayName,
+  });
+}
+
+export async function publishSlackFieldNoteDraft({ teamId, slackUserId, fieldNoteId, spaceId, isAnonymous, displayName }) {
+  const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+  const sessionToken = `slack:${teamId}:${slackUserId}`;
+  const sessionTokenHash = hashToken(sessionToken);
+  const supabase = getSupabaseAdmin();
+  await enforceRateLimit({ supabase, action: "post", sessionToken });
+
+  const [{ data: fieldNote, error: noteError }, pinnedSpace] = await Promise.all([
+    supabase
+      .from("field_notes")
+      .select("*")
+      .eq("user_id", connection.mumbl_user_id)
+      .eq("is_published", false)
+      .eq("id", cleanString(fieldNoteId, 64))
+      .single(),
+    getPinnedSpace({ connection, spaceId }),
+  ]);
+  if (noteError) throw noteError;
+
+  const space = pinnedSpace.spaces;
+  const authorName = isAnonymous ? null : cleanString(displayName, 48) || "someone brave";
+  const { data: post, error: postError } = await supabase
+    .from("posts")
+    .insert({
+      space_id: space.id,
+      type: "field_note",
+      field_note_title: fieldNote.title,
+      content: fieldNote.content,
+      is_anonymous: isAnonymous,
+      display_name: authorName,
+    })
+    .select()
+    .single();
+  if (postError) throw postError;
+
+  const { data: updatedNote, error: updateError } = await supabase
+    .from("field_notes")
+    .update({
+      team_room_id: space.id,
+      is_published: true,
+      published_post_id: post.id,
+      published_at: new Date().toISOString(),
+    })
+    .eq("id", fieldNote.id)
+    .select("id,title")
+    .single();
+  if (updateError) throw updateError;
+
+  if (isAnonymous) {
+    await supabase.from("anon_audit").insert({ post_id: post.id, session_token_hash: sessionTokenHash });
+  }
+
+  await Promise.all([
+    supabase.from("spaces").update({ first_post_done: true }).eq("id", space.id),
+    supabase.from("slack_pinned_spaces").update({ last_used_at: new Date().toISOString() }).eq("id", pinnedSpace.id),
+  ]);
+
+  try {
+    await postTeamReadToSlack({ space, post });
+  } catch (slackError) {
+    await recordSlackTeamReadFailure({ spaceId: space.id, error: slackError });
+  }
+
+  return {
+    fieldNote: updatedNote,
+    space,
+    url: `${getServerEnv().appUrl}/r/${space.slug}/reads`,
+  };
+}
+
+async function findSpaceForSlackPin(slug) {
+  const cleanedSlug = cleanString(slug, 64);
+  if (!cleanedSlug) throw new Error("space slug is required.");
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.from("spaces").select("id,slug,name").eq("slug", cleanedSlug).single();
+  if (error?.code === "PGRST116") throw new Error("couldn't find that Mumbl space.");
+  if (error) throw error;
+  return data;
+}
+
+async function pinSlackSpace({ connection, spaceId }) {
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.from("slack_pinned_spaces").upsert(
+    {
+      mumbl_user_id: connection.mumbl_user_id,
+      slack_team_id: connection.slack_team_id,
+      slack_user_id: connection.slack_user_id,
+      space_id: spaceId,
+    },
+    { onConflict: "slack_team_id,slack_user_id,space_id" },
+  );
+  if (error) throw error;
+}
+
+async function listSlackPinnedSpaces(connection) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("slack_pinned_spaces")
+    .select("id,space_id,last_used_at,created_at,spaces(id,slug,name)")
+    .eq("slack_team_id", connection.slack_team_id)
+    .eq("slack_user_id", connection.slack_user_id)
+    .order("last_used_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (error) throw error;
+  return data || [];
+}
+
+async function getPinnedSpace({ connection, spaceId }) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("slack_pinned_spaces")
+    .select("id,space_id,spaces(id,slug,name)")
+    .eq("slack_team_id", connection.slack_team_id)
+    .eq("slack_user_id", connection.slack_user_id)
+    .eq("space_id", cleanString(spaceId, 64))
+    .single();
+  if (error?.code === "PGRST116") throw new Error("pin that Mumbl space before publishing from Slack.");
+  if (error) throw error;
+  return data;
+}
+
 export async function createSlackFieldNoteDraft({ teamId, slackUserId, dumpIds }) {
   const cleanedDumpIds = Array.isArray(dumpIds) ? dumpIds.map((id) => cleanString(id, 64)).filter(Boolean) : [];
   if (!cleanedDumpIds.length) throw new Error("choose at least one dump.");
@@ -778,7 +980,7 @@ export function slackHelpPayload() {
   return blockResponse({
     text: "use /mumbl to save a private thought or create a room.",
     blocks: [
-      section("*mumbl in Slack*\n`/mumbl the thing I want to keep` saves a private dump.\n`/mumbl room platform team` creates a Mumbl room from Slack."),
+      section("*mumbl in Slack*\n`/mumbl the thing I want to keep` saves a private dump.\n`/mumbl room platform team` creates a Mumbl room from Slack.\n`/mumbl pin platform-team` adds a room to your Slack publish list."),
       context("Private dumps stay private. Team reads only post to Slack if you enable them."),
     ],
   });
@@ -935,8 +1137,11 @@ export function slackFieldNoteSavedModalView({ fieldNote, url }) {
     close: { type: "plain_text", text: "done" },
     blocks: [
       section(`*${escapeSlackText(fieldNote.title || "field note draft")}*`),
-      section("Saved privately. Open it in Mumbl when you are ready to publish to team reads."),
-      actions([{ text: "open in mumbl", url }]),
+      section("Saved privately. Publish to a pinned Mumbl space when it feels ready."),
+      actions([
+        { text: "publish to team read", actionId: "publish_field_note_start", value: fieldNote.id },
+        { text: "open in mumbl", url },
+      ]),
     ],
   };
 }
@@ -949,6 +1154,20 @@ export function slackFieldNoteDraftErrorModalView(message) {
     blocks: [
       section("*couldn't draft that field note yet.*"),
       context(cleanString(message, 180) || "Try fewer dumps or open Mumbl to draft there."),
+    ],
+  };
+}
+
+export function slackFieldNotePublishedModalView({ fieldNote, space, url }) {
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "published" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section(`*${escapeSlackText(fieldNote.title || "team read")}*`),
+      section(`Published to *${escapeSlackText(space.name)}* team reads.`),
+      actions([{ text: "open team reads", url }]),
+      context("If Slack team reads are enabled for that room, Mumbl posted one message in the linked channel."),
     ],
   };
 }
@@ -1046,7 +1265,14 @@ async function slackApi(method, token, body) {
   const result = await response.json();
   if (!response.ok || result.ok === false) {
     const error = new Error(result.error || `${method} failed`);
+    console.error("Slack API failed", {
+      method,
+      status: response.status,
+      slackError: result.error,
+      response: result,
+    });
     error.slack = result;
+    error.slackMethod = method;
     throw error;
   }
   return result;
@@ -1115,6 +1341,17 @@ function slackRoomModal({ initialName = "" }) {
         },
       },
       context("Mumbl creates the room privately first. Team reads on Slack stay optional."),
+    ],
+  };
+}
+
+function slackLoadingModal({ title, message }) {
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: truncatePlain(title, 24) },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section(`*${escapeSlackText(message)}*`),
     ],
   };
 }
@@ -1205,6 +1442,90 @@ function slackNoFieldNoteDraftsModal() {
   };
 }
 
+function slackNoPinnedSpacesModal() {
+  const { appUrl } = getServerEnv();
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "pin a space" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section("*no pinned Mumbl spaces yet.*\nUse `/mumbl pin space-slug` in Slack, or pin a room from Mumbl."),
+      actions([{ text: "open mumbl", url: `${appUrl}/create` }]),
+    ],
+  };
+}
+
+function slackFieldNotePublishOptionsModal({ fieldNote, pinnedSpaces }) {
+  return {
+    type: "modal",
+    callback_id: "publish_field_note_options",
+    private_metadata: fieldNote.id,
+    title: { type: "plain_text", text: "publish draft" },
+    submit: { type: "plain_text", text: "preview" },
+    close: { type: "plain_text", text: "cancel" },
+    blocks: [
+      section(`*${escapeSlackText(fieldNote.title || "field note draft")}*`),
+      {
+        type: "input",
+        block_id: "publish_space",
+        label: { type: "plain_text", text: "Mumbl space" },
+        element: {
+          type: "static_select",
+          action_id: "value",
+          placeholder: { type: "plain_text", text: "choose a pinned space" },
+          options: pinnedSpaces.map((pin) => pinnedSpaceOption(pin)),
+        },
+      },
+      {
+        type: "input",
+        block_id: "publish_identity",
+        label: { type: "plain_text", text: "identity" },
+        element: {
+          type: "static_select",
+          action_id: "value",
+          initial_option: identityOption("anonymous"),
+          options: [identityOption("anonymous"), identityOption("handle")],
+        },
+      },
+      {
+        type: "input",
+        block_id: "publish_handle",
+        optional: true,
+        label: { type: "plain_text", text: "handle, if using one" },
+        element: {
+          type: "plain_text_input",
+          action_id: "value",
+          max_length: 48,
+          placeholder: { type: "plain_text", text: "sam from infra" },
+        },
+      },
+      context("Slack identity is never used. Anonymous stays anonymous; handle means only the text you choose."),
+    ],
+  };
+}
+
+function slackFieldNotePublishPreviewModal({ fieldNote, space, isAnonymous, displayName }) {
+  const author = isAnonymous ? "anonymous team read" : cleanString(displayName, 48) || "someone brave";
+  return {
+    type: "modal",
+    callback_id: "publish_field_note_confirm",
+    private_metadata: JSON.stringify({
+      fieldNoteId: fieldNote.id,
+      spaceId: space.id,
+      isAnonymous,
+      displayName: isAnonymous ? "" : author,
+    }),
+    title: { type: "plain_text", text: "publish?" },
+    submit: { type: "plain_text", text: "publish" },
+    close: { type: "plain_text", text: "cancel" },
+    blocks: [
+      section(`*${escapeSlackText(fieldNote.title || "team read")}*\n_${escapeSlackText(author)}_`),
+      section(escapeSlackText(truncatePlain(fieldNote.content, 900))),
+      context(`Publishing to ${space.name}. This may also post one message in the linked Slack team-read channel.`),
+    ],
+  };
+}
+
 function slackFieldNoteNoDumpsModal() {
   const { appUrl } = getServerEnv();
   return {
@@ -1255,6 +1576,28 @@ function fieldNoteOption(fieldNote) {
   };
 }
 
+function pinnedSpaceOption(pin) {
+  const space = pin.spaces || {};
+  return {
+    text: { type: "plain_text", text: truncatePlain(space.name || space.slug || "Mumbl space", 75) },
+    value: space.id,
+    description: { type: "plain_text", text: truncatePlain(space.slug || "space", 75) },
+  };
+}
+
+function identityOption(value) {
+  if (value === "handle") {
+    return {
+      text: { type: "plain_text", text: "publish with handle" },
+      value: "handle",
+    };
+  }
+  return {
+    text: { type: "plain_text", text: "anonymous team read" },
+    value: "anonymous",
+  };
+}
+
 function blockResponse({ text, blocks, replaceOriginal = false }) {
   return {
     response_type: "ephemeral",
@@ -1279,6 +1622,8 @@ function actions(buttons) {
       text: { type: "plain_text", text: button.text },
       ...(button.url ? { url: button.url } : {}),
       ...(button.actionId ? { action_id: button.actionId } : {}),
+      ...(button.value ? { value: button.value } : {}),
+      ...(button.style ? { style: button.style } : {}),
     })),
   };
 }

@@ -100,7 +100,7 @@ In Slack app settings:
 
 Set `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`, and `MUMBL_SLACK_TOKEN_ENCRYPTION_KEY` in the deployment environment. Install through `/api/slack/install`.
 
-`/mumbl room platform team` creates a Mumbl room from Slack and returns a one-time creator handoff link for opening the room in a browser. `/mumbl start platform team` remains an alias. App Home can draft a private field note from selected recent dumps, but review and publishing still happen in Mumbl. Optional team-read Slack posting is creator-enabled per room. If a creator switches it on, Mumbl starts an optional Slack permission upgrade that asks for `chat:write` and `groups:write` so it can create one private channel and post published team reads there. It still does not request Slack history scopes.
+`/mumbl room platform team` creates a Mumbl room from Slack and returns a one-time creator handoff link for opening the room in a browser. `/mumbl start platform team` remains an alias. `/mumbl pin platform-team` explicitly adds a Mumbl room to that Slack user's publish list without tracking room membership. App Home can draft, review, edit, and publish private field notes to pinned Mumbl spaces. Optional team-read Slack posting is creator-enabled per room. If a creator switches it on, Mumbl starts an optional Slack permission upgrade that asks for `chat:write` and `groups:write` so it can create one private channel and post published team reads there. It still does not request Slack history scopes.
 
 Slack reminders are intentionally not part of the beta because frequent scheduling does not fit the current free-tier posture.
 

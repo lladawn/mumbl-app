@@ -10,6 +10,7 @@ import {
   findSlackConnection,
   getSlackUserEmail,
   parseVerifiedSlackForm,
+  pinSlackSpaceBySlug,
   postSlackResponse,
   saveSlackDump,
   slackConnectPayload,
@@ -29,9 +30,11 @@ export async function POST(request) {
     const responseUrl = cleanString(form.get("response_url"), 2000);
     const triggerId = cleanString(form.get("trigger_id"), 200);
     const roomName = parseRoomCommand(text);
+    const pinSlug = parsePinCommand(text);
 
     if (!teamId || !slackUserId) return ok(ephemeralText("couldn't tell which Slack workspace this came from."));
     if (!text || text.toLowerCase() === "help") return ok(slackHelpPayload());
+    if (pinSlug !== null && !pinSlug) return ok(ephemeralText("try `/mumbl pin your-space-slug`."));
     if (roomName !== null && !roomName) {
       after(async () => {
         try {
@@ -48,10 +51,12 @@ export async function POST(request) {
         const result =
           roomName !== null
             ? await startRoomFromSlack({ teamId, slackUserId, name: roomName })
+            : pinSlug !== null
+              ? await pinSpaceFromSlack({ teamId, slackUserId, slug: pinSlug })
             : await saveOrConnect({ teamId, slackUserId, content: text, sourceMeta: { trigger: "slash_command" } });
         await postSlackResponse(responseUrl, result);
       } catch (error) {
-        await postSlackResponse(responseUrl, ephemeralText(error.message || "couldn't save that to mumbl yet."));
+        await postSlackResponse(responseUrl, ephemeralText(error.message || "couldn't finish that Mumbl action yet."));
       }
     });
 
@@ -70,8 +75,21 @@ function parseRoomCommand(text) {
   return null;
 }
 
+function parsePinCommand(text) {
+  const trimmed = cleanString(text, 4000);
+  const lower = trimmed.toLowerCase();
+  if (lower === "pin") return "";
+  if (lower.startsWith("pin ")) return cleanString(trimmed.slice(4), 64);
+  return null;
+}
+
 async function startRoomFromSlack({ teamId, slackUserId, name }) {
   return createSlackStartedSpacePayload({ teamId, slackUserId, name });
+}
+
+async function pinSpaceFromSlack({ teamId, slackUserId, slug }) {
+  const { space } = await pinSlackSpaceBySlug({ teamId, slackUserId, slug });
+  return ephemeralText(`${space.name} is pinned for team reads.`);
 }
 
 async function saveOrConnect({ teamId, slackUserId, content, sourceMeta }) {

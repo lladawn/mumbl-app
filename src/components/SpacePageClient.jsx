@@ -33,6 +33,7 @@ export default function SpacePageClient({ slug, tab }) {
     updateVisibility,
     updateDescription,
     startTeamReadsSlackSetup,
+    pinTeamReadsSlackSpace,
     updateTeamReadsSlackPosting,
   } = useRemoteSpace(slug, postTypeFilter);
   const [selectedType, setSelectedType] = useState("thought");
@@ -204,6 +205,7 @@ export default function SpacePageClient({ slug, tab }) {
             <SlackTeamReadsPanel
               space={space}
               startSetup={startTeamReadsSlackSetup}
+              pinSpace={pinTeamReadsSlackSpace}
               updatePosting={updateTeamReadsSlackPosting}
               onToast={setToast}
             />

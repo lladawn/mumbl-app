@@ -200,6 +200,15 @@ export async function updateSlackTeamReadsPosting({ slug, postingEnabled }) {
   return parseJson(response);
 }
 
+export async function pinSlackSpaceForPublishing({ slug }) {
+  const auth = await authRequestContext();
+  const response = await fetch(`/api/spaces/${slug}/slack/pin`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...auth.headers },
+  });
+  return parseJson(response);
+}
+
 export async function dismissRemoteFirstPost(slug) {
   const response = await fetch(`/api/spaces/${slug}/first-post-dismissed`, {
     method: "POST",

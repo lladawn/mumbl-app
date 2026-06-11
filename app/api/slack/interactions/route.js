@@ -10,10 +10,13 @@ import {
   findSlackConnection,
   getSlackFieldNoteDraft,
   getSlackUserEmail,
+  openSlackLoadingModal,
   parseVerifiedSlackForm,
+  publishSlackFieldNoteDraft,
   postSlackResponse,
   saveSlackDump,
   createSlackFieldNoteDraft,
+  slackFieldNoteDraftPickerView,
   slackConnectPayload,
   slackConnectUrl,
   slackDumpConnectModalView,
@@ -22,11 +25,13 @@ import {
   slackFieldNoteDraftingModalView,
   slackFieldNoteDraftReadyModalView,
   slackFieldNoteDraftErrorModalView,
+  slackFieldNotePublishedModalView,
   slackFieldNoteSavedModalView,
+  slackFieldNoteReviewPickerView,
   slackSavedDumpPayload,
+  slackPublishOptionsView,
+  slackPublishPreviewView,
   openSlackDumpModal,
-  openSlackFieldNoteDraftModal,
-  openSlackFieldNoteReviewModal,
   openSlackRoomModal,
   updateSlackView,
   updateSlackFieldNoteDraft,
@@ -56,21 +61,80 @@ export async function POST(request) {
           });
         }
         if (actionId === "draft_team_read") {
-          await openSlackFieldNoteDraftModal({
+          const result = await openSlackLoadingModal({
             teamId: slackTeamId(payload),
-            slackUserId: cleanString(payload.user?.id, 80),
             triggerId: cleanString(payload.trigger_id, 200),
+            title: "draft team read",
+            message: "loading your recent private dumps...",
+          });
+          after(async () => {
+            try {
+              await updateSlackView({
+                teamId: slackTeamId(payload),
+                viewId: cleanString(result.view?.id, 120),
+                view: await slackFieldNoteDraftPickerView({
+                  teamId: slackTeamId(payload),
+                  slackUserId: cleanString(payload.user?.id, 80),
+                }),
+              });
+            } catch (error) {
+              console.error("Slack draft picker update failed", { message: error.message, slackError: error.slack?.error });
+            }
           });
         }
         if (actionId === "review_field_note_drafts") {
-          await openSlackFieldNoteReviewModal({
+          const result = await openSlackLoadingModal({
             teamId: slackTeamId(payload),
-            slackUserId: cleanString(payload.user?.id, 80),
             triggerId: cleanString(payload.trigger_id, 200),
+            title: "review drafts",
+            message: "loading your private drafts...",
+          });
+          after(async () => {
+            try {
+              await updateSlackView({
+                teamId: slackTeamId(payload),
+                viewId: cleanString(result.view?.id, 120),
+                view: await slackFieldNoteReviewPickerView({
+                  teamId: slackTeamId(payload),
+                  slackUserId: cleanString(payload.user?.id, 80),
+                }),
+              });
+            } catch (error) {
+              console.error("Slack draft review update failed", { message: error.message, slackError: error.slack?.error });
+            }
+          });
+        }
+        if (actionId === "publish_field_note_start") {
+          const fieldNoteId = cleanString(payload.actions?.[0]?.value, 64);
+          const result = await openSlackLoadingModal({
+            teamId: slackTeamId(payload),
+            triggerId: cleanString(payload.trigger_id, 200),
+            title: "publish draft",
+            message: "loading pinned spaces...",
+          });
+          after(async () => {
+            try {
+              await updateSlackView({
+                teamId: slackTeamId(payload),
+                viewId: cleanString(result.view?.id, 120),
+                view: await slackPublishOptionsView({
+                  teamId: slackTeamId(payload),
+                  slackUserId: cleanString(payload.user?.id, 80),
+                  fieldNoteId,
+                }),
+              });
+            } catch (error) {
+              console.error("Slack publish options update failed", { message: error.message, slackError: error.slack?.error });
+            }
           });
         }
       } catch (error) {
-        console.error("Slack App Home action failed", error);
+        console.error("Slack action failed", {
+          actionId,
+          message: error.message,
+          slackError: error.slack?.error,
+          slackResponse: error.slack,
+        });
       }
       return ok({});
     }
@@ -180,6 +244,57 @@ export async function POST(request) {
       }
     }
 
+    if (payload.type === "view_submission" && payload.view?.callback_id === "publish_field_note_options") {
+      const teamId = slackTeamId(payload);
+      const slackUserId = cleanString(payload.user?.id, 80);
+      const fieldNoteId = cleanString(payload.view?.private_metadata, 64);
+      const spaceId = cleanString(payload.view?.state?.values?.publish_space?.value?.selected_option?.value, 64);
+      const identity = cleanString(payload.view?.state?.values?.publish_identity?.value?.selected_option?.value, 24);
+      const displayName = cleanString(payload.view?.state?.values?.publish_handle?.value?.value, 48);
+      const isAnonymous = identity !== "handle";
+      if (!spaceId) {
+        return ok({
+          response_action: "errors",
+          errors: { publish_space: "choose a Mumbl space." },
+        });
+      }
+      if (!isAnonymous && !displayName) {
+        return ok({
+          response_action: "errors",
+          errors: { publish_handle: "add the handle to show, or choose anonymous." },
+        });
+      }
+
+      try {
+        const view = await slackPublishPreviewView({ teamId, slackUserId, fieldNoteId, spaceId, isAnonymous, displayName });
+        return ok({ response_action: "update", view });
+      } catch (error) {
+        return ok({
+          response_action: "errors",
+          errors: { publish_space: error.message || "couldn't prepare that publish preview." },
+        });
+      }
+    }
+
+    if (payload.type === "view_submission" && payload.view?.callback_id === "publish_field_note_confirm") {
+      const teamId = slackTeamId(payload);
+      const slackUserId = cleanString(payload.user?.id, 80);
+      const metadata = parseViewMetadata(payload.view?.private_metadata);
+      try {
+        const result = await publishSlackFieldNoteDraft({
+          teamId,
+          slackUserId,
+          fieldNoteId: metadata.fieldNoteId,
+          spaceId: metadata.spaceId,
+          isAnonymous: metadata.isAnonymous !== false,
+          displayName: metadata.displayName,
+        });
+        return ok({ response_action: "update", view: slackFieldNotePublishedModalView(result) });
+      } catch (error) {
+        return ok({ response_action: "update", view: slackFieldNoteDraftErrorModalView(error.message || "couldn't publish that draft.") });
+      }
+    }
+
     if (payload.type === "view_submission" && payload.view?.callback_id === "create_mumbl_room") {
       const teamId = slackTeamId(payload);
       const slackUserId = cleanString(payload.user?.id, 80);
@@ -240,6 +355,14 @@ function slackTeamId(payload) {
 
 function selectedSlackOptionValues(options) {
   return Array.isArray(options) ? options.map((option) => cleanString(option?.value, 64)).filter(Boolean) : [];
+}
+
+function parseViewMetadata(value) {
+  try {
+    return JSON.parse(value || "{}");
+  } catch {
+    return {};
+  }
 }
 
 async function saveModalDump({ teamId, slackUserId, content }) {

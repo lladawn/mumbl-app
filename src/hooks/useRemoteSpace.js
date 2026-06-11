@@ -5,6 +5,7 @@ import {
   createRemotePost,
   dismissRemoteFirstPost,
   fetchSpace,
+  pinSlackSpaceForPublishing,
   startSlackTeamReadsSetup,
   toggleRemoteReaction,
   updateSlackTeamReadsPosting,
@@ -92,6 +93,10 @@ export function useRemoteSpace(slug, postType = "") {
     await refresh();
   }
 
+  async function pinTeamReadsSlackSpace() {
+    return pinSlackSpaceForPublishing({ slug });
+  }
+
   return {
     space,
     status,
@@ -105,6 +110,7 @@ export function useRemoteSpace(slug, postType = "") {
     updateVisibility,
     updateDescription,
     startTeamReadsSlackSetup,
+    pinTeamReadsSlackSpace,
     updateTeamReadsSlackPosting,
   };
 }

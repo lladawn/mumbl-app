@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { trackEvent } from "../../lib/analytics";
 
-export default function SlackTeamReadsPanel({ space, startSetup, updatePosting, onToast }) {
+export default function SlackTeamReadsPanel({ space, startSetup, pinSpace, updatePosting, onToast }) {
   const channel = space.slackTeamReads;
   const [isSaving, setIsSaving] = useState(false);
   const [postingEnabled, setPostingEnabled] = useState(channel?.postingEnabled === true);
@@ -40,6 +40,21 @@ export default function SlackTeamReadsPanel({ space, startSetup, updatePosting, 
     }
   }
 
+  async function handlePin() {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      await pinSpace();
+      trackEvent("slack_space_pinned_for_publishing");
+      onToast("room pinned for Slack team-read publishing.");
+    } catch (error) {
+      trackEvent("slack_space_pin_failed");
+      onToast(error.message || "couldn't pin this room for Slack.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <section className="panel slack-team-reads-panel" aria-busy={isSaving}>
       <div>
@@ -48,6 +63,9 @@ export default function SlackTeamReadsPanel({ space, startSetup, updatePosting, 
           optional. mumbl creates one private Slack channel and posts published team reads there. no channel history, no member tracking.
         </p>
       </div>
+      <button className="share-button" type="button" onClick={handlePin} disabled={isSaving}>
+        add to Slack publish list
+      </button>
       {channel ? (
         <>
           <div className="slack-channel-status">
