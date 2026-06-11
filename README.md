@@ -87,7 +87,7 @@ Until those variables exist, API routes return a setup `503`.
 
 ## Slack Beta Setup
 
-The Slack app is a free beta entry point for private dumps. It supports `/mumbl [text]`, `/mumbl room [team name]`, a `save_to_mumbl` message shortcut, App Home private dumping, and App Home field-note drafting from recent private dumps. It does not read channel history.
+The Slack app is a free beta entry point for private dumps. It supports `/mumbl [text]`, `/mumbl room [team name]`, a `save_to_mumbl` message shortcut, App Home private dumping, and App Home field-note drafting/review from recent private dumps. It does not read channel history.
 
 In Slack app settings:
 

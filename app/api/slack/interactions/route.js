@@ -8,6 +8,7 @@ import {
   ephemeralText,
   findMumblUserByEmail,
   findSlackConnection,
+  getSlackFieldNoteDraft,
   getSlackUserEmail,
   parseVerifiedSlackForm,
   postSlackResponse,
@@ -17,14 +18,18 @@ import {
   slackConnectUrl,
   slackDumpConnectModalView,
   slackDumpSavedModalView,
+  slackFieldNoteEditModalView,
   slackFieldNoteDraftingModalView,
   slackFieldNoteDraftReadyModalView,
   slackFieldNoteDraftErrorModalView,
+  slackFieldNoteSavedModalView,
   slackSavedDumpPayload,
   openSlackDumpModal,
   openSlackFieldNoteDraftModal,
+  openSlackFieldNoteReviewModal,
   openSlackRoomModal,
   updateSlackView,
+  updateSlackFieldNoteDraft,
 } from "../../../../src/server/slack";
 import { cleanString } from "../../../../src/server/validation";
 
@@ -52,6 +57,13 @@ export async function POST(request) {
         }
         if (actionId === "draft_team_read") {
           await openSlackFieldNoteDraftModal({
+            teamId: slackTeamId(payload),
+            slackUserId: cleanString(payload.user?.id, 80),
+            triggerId: cleanString(payload.trigger_id, 200),
+          });
+        }
+        if (actionId === "review_field_note_drafts") {
+          await openSlackFieldNoteReviewModal({
             teamId: slackTeamId(payload),
             slackUserId: cleanString(payload.user?.id, 80),
             triggerId: cleanString(payload.trigger_id, 200),
@@ -114,6 +126,58 @@ export async function POST(request) {
       });
 
       return ok({ response_action: "update", view: slackFieldNoteDraftingModalView() });
+    }
+
+    if (payload.type === "view_submission" && payload.view?.callback_id === "review_field_note_drafts") {
+      const teamId = slackTeamId(payload);
+      const slackUserId = cleanString(payload.user?.id, 80);
+      const fieldNoteId = cleanString(payload.view?.state?.values?.field_note_id?.value?.selected_option?.value, 64);
+      if (!fieldNoteId) {
+        return ok({
+          response_action: "errors",
+          errors: { field_note_id: "choose a draft." },
+        });
+      }
+
+      try {
+        const fieldNote = await getSlackFieldNoteDraft({ teamId, slackUserId, fieldNoteId });
+        return ok({ response_action: "update", view: slackFieldNoteEditModalView(fieldNote) });
+      } catch (error) {
+        return ok({
+          response_action: "errors",
+          errors: { field_note_id: error.message || "couldn't open that draft." },
+        });
+      }
+    }
+
+    if (payload.type === "view_submission" && payload.view?.callback_id === "edit_field_note_draft") {
+      const teamId = slackTeamId(payload);
+      const slackUserId = cleanString(payload.user?.id, 80);
+      const fieldNoteId = cleanString(payload.view?.private_metadata, 64);
+      const title = cleanString(payload.view?.state?.values?.field_note_title?.value?.value, 120);
+      const content = cleanString(payload.view?.state?.values?.field_note_content?.value?.value, 4000);
+      if (!title) {
+        return ok({
+          response_action: "errors",
+          errors: { field_note_title: "title the draft first." },
+        });
+      }
+      if (!content) {
+        return ok({
+          response_action: "errors",
+          errors: { field_note_content: "write the field note first." },
+        });
+      }
+
+      try {
+        const result = await updateSlackFieldNoteDraft({ teamId, slackUserId, fieldNoteId, title, content });
+        return ok({ response_action: "update", view: slackFieldNoteSavedModalView(result) });
+      } catch (error) {
+        return ok({
+          response_action: "errors",
+          errors: { field_note_content: error.message || "couldn't save that draft." },
+        });
+      }
     }
 
     if (payload.type === "view_submission" && payload.view?.callback_id === "create_mumbl_room") {

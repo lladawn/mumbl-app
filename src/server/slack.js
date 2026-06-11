@@ -452,6 +452,29 @@ export async function openSlackFieldNoteDraftModal({ teamId, slackUserId, trigge
   });
 }
 
+export async function openSlackFieldNoteReviewModal({ teamId, slackUserId, triggerId }) {
+  const installation = await getSlackInstallation(teamId);
+  const token = decryptSlackToken({
+    ciphertext: installation.bot_access_token_ciphertext,
+    iv: installation.bot_access_token_iv,
+    tag: installation.bot_access_token_tag,
+  });
+
+  let view;
+  try {
+    const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+    const fieldNotes = await recentSlackFieldNoteDrafts(connection);
+    view = fieldNotes.length ? slackFieldNoteReviewModal({ fieldNotes }) : slackNoFieldNoteDraftsModal();
+  } catch (error) {
+    view = slackFieldNoteDraftUnavailableModal(error.message || "connect mumbl first.");
+  }
+
+  return slackApi("views.open", token, {
+    trigger_id: triggerId,
+    view,
+  });
+}
+
 export async function updateSlackView({ teamId, viewId, view }) {
   const installation = await getSlackInstallation(teamId);
   const token = decryptSlackToken({
@@ -613,6 +636,56 @@ export async function recentSlackPrivateDumps(connection) {
     .limit(MAX_SLACK_DRAFT_DUMPS);
   if (error) throw error;
   return data || [];
+}
+
+export async function recentSlackFieldNoteDrafts(connection) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("field_notes")
+    .select("id, title, content, created_at, source_dump_ids")
+    .eq("user_id", connection.mumbl_user_id)
+    .eq("is_published", false)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getSlackFieldNoteDraft({ teamId, slackUserId, fieldNoteId }) {
+  const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("field_notes")
+    .select("id, title, content, created_at, source_dump_ids")
+    .eq("user_id", connection.mumbl_user_id)
+    .eq("is_published", false)
+    .eq("id", cleanString(fieldNoteId, 64))
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateSlackFieldNoteDraft({ teamId, slackUserId, fieldNoteId, title, content }) {
+  const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+  const cleanedTitle = cleanString(title, 120);
+  const cleanedContent = cleanString(content, 4000);
+  if (!cleanedTitle) throw new Error("field note title is required.");
+  if (!cleanedContent) throw new Error("field note content is required.");
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("field_notes")
+    .update({ title: cleanedTitle, content: cleanedContent })
+    .eq("user_id", connection.mumbl_user_id)
+    .eq("is_published", false)
+    .eq("id", cleanString(fieldNoteId, 64))
+    .select("id, title")
+    .single();
+  if (error) throw error;
+  return {
+    fieldNote: data,
+    url: `${getServerEnv().appUrl}/dump?fieldNote=${encodeURIComponent(data.id)}`,
+  };
 }
 
 export async function createSlackFieldNoteDraft({ teamId, slackUserId, dumpIds }) {
@@ -804,6 +877,70 @@ export function slackFieldNoteDraftReadyModalView({ fieldNote, url, visibilityRe
   };
 }
 
+export function slackFieldNoteEditModalView(fieldNote) {
+  const content = cleanString(fieldNote.content, 4000);
+  if (content.length > 3000) {
+    const { appUrl } = getServerEnv();
+    return {
+      type: "modal",
+      title: { type: "plain_text", text: "open in mumbl" },
+      close: { type: "plain_text", text: "done" },
+      blocks: [
+        section("*this draft is too long for Slack editing.*\nOpen it in Mumbl to keep the whole thing intact."),
+        actions([{ text: "open in mumbl", url: `${appUrl}/dump?fieldNote=${encodeURIComponent(fieldNote.id)}` }]),
+      ],
+    };
+  }
+
+  return {
+    type: "modal",
+    callback_id: "edit_field_note_draft",
+    private_metadata: fieldNote.id,
+    title: { type: "plain_text", text: "edit draft" },
+    submit: { type: "plain_text", text: "save" },
+    close: { type: "plain_text", text: "cancel" },
+    blocks: [
+      {
+        type: "input",
+        block_id: "field_note_title",
+        label: { type: "plain_text", text: "title" },
+        element: {
+          type: "plain_text_input",
+          action_id: "value",
+          initial_value: cleanString(fieldNote.title, 120) || "field note",
+          max_length: 120,
+        },
+      },
+      {
+        type: "input",
+        block_id: "field_note_content",
+        label: { type: "plain_text", text: "field note" },
+        element: {
+          type: "plain_text_input",
+          action_id: "value",
+          initial_value: content,
+          multiline: true,
+          max_length: 3000,
+        },
+      },
+      context("Saving keeps this private. Publish to team reads from Mumbl after one last review."),
+    ],
+  };
+}
+
+export function slackFieldNoteSavedModalView({ fieldNote, url }) {
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "draft saved" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section(`*${escapeSlackText(fieldNote.title || "field note draft")}*`),
+      section("Saved privately. Open it in Mumbl when you are ready to publish to team reads."),
+      actions([{ text: "open in mumbl", url }]),
+    ],
+  };
+}
+
 export function slackFieldNoteDraftErrorModalView(message) {
   return {
     type: "modal",
@@ -944,6 +1081,8 @@ function slackAppHomeBlocks() {
     actions([{ text: "new private dump", actionId: "new_private_dump" }]),
     section("*draft a team read*\nChoose a few recent private dumps and Mumbl will turn them into a private field-note draft."),
     actions([{ text: "draft team read", actionId: "draft_team_read" }]),
+    section("*review drafts*\nEdit recent private field-note drafts before anything goes to the team."),
+    actions([{ text: "review drafts", actionId: "review_field_note_drafts" }]),
     section("*start a team space from Slack*\nType `/mumbl room platform team` to create the room without leaving Slack."),
     actions([{ text: "start a team room", actionId: "start_room_modal" }]),
     section("*team reads on Slack*\nAfter a room is created, use its `enable Slack team reads` button to create one private channel."),
@@ -1029,6 +1168,43 @@ function slackFieldNoteDraftModal({ dumps }) {
   };
 }
 
+function slackFieldNoteReviewModal({ fieldNotes }) {
+  return {
+    type: "modal",
+    callback_id: "review_field_note_drafts",
+    title: { type: "plain_text", text: "review drafts" },
+    submit: { type: "plain_text", text: "edit" },
+    close: { type: "plain_text", text: "cancel" },
+    blocks: [
+      {
+        type: "input",
+        block_id: "field_note_id",
+        label: { type: "plain_text", text: "draft" },
+        element: {
+          type: "static_select",
+          action_id: "value",
+          placeholder: { type: "plain_text", text: "choose a draft" },
+          options: fieldNotes.map((fieldNote) => fieldNoteOption(fieldNote)),
+        },
+      },
+      context("Drafts stay private here. Publishing still happens from Mumbl."),
+    ],
+  };
+}
+
+function slackNoFieldNoteDraftsModal() {
+  const { appUrl } = getServerEnv();
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "no drafts" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section("*no private field-note drafts yet.*\nDraft one from recent dumps first."),
+      actions([{ text: "open your dump", url: `${appUrl}/dump` }]),
+    ],
+  };
+}
+
 function slackFieldNoteNoDumpsModal() {
   const { appUrl } = getServerEnv();
   return {
@@ -1060,6 +1236,18 @@ function dumpOption(dump) {
   return {
     text: { type: "plain_text", text: truncatePlain(firstLine(dump.content), 75) },
     value: dump.id,
+    description: {
+      type: "plain_text",
+      text: truncatePlain(date.toLocaleDateString("en-US", { month: "short", day: "numeric" }), 75),
+    },
+  };
+}
+
+function fieldNoteOption(fieldNote) {
+  const date = new Date(fieldNote.created_at);
+  return {
+    text: { type: "plain_text", text: truncatePlain(fieldNote.title || firstLine(fieldNote.content), 75) },
+    value: fieldNote.id,
     description: {
       type: "plain_text",
       text: truncatePlain(date.toLocaleDateString("en-US", { month: "short", day: "numeric" }), 75),
