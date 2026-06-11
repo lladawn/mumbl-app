@@ -269,6 +269,8 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
   return {
     space: insertedSpace,
     creatorToken,
+    creatorLinked: Boolean(connection?.mumbl_user_id),
+    pinned: Boolean(connection),
     openUrl: slackSpaceHandoffUrl(handoff),
     roomUrl: `${getServerEnv().appUrl}/r/${insertedSpace.slug}`,
     teamReadsUrl: slackTeamReadsInstallUrl(teamReadsSetup),
@@ -786,7 +788,8 @@ export async function pinSlackSpaceBySlug({ teamId, slackUserId, slug }) {
   const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
   const space = await findSpaceForSlackPin(slug);
   await pinSlackSpace({ connection, spaceId: space.id });
-  return { space };
+  const channelJoin = await inviteSlackUserToSpaceChannel({ teamId, slackUserId, spaceId: space.id });
+  return { space, channelJoin };
 }
 
 export async function pinSlackSpaceForMumblUser({ mumblUserId, spaceId }) {
@@ -802,6 +805,11 @@ export async function pinSlackSpaceForMumblUser({ mumblUserId, spaceId }) {
   if (error) throw error;
   if (!connection) throw new Error("connect Slack once before pinning this room.");
   await pinSlackSpace({ connection, spaceId });
+  await inviteSlackUserToSpaceChannel({
+    teamId: connection.slack_team_id,
+    slackUserId: connection.slack_user_id,
+    spaceId,
+  });
   return connection;
 }
 
@@ -1012,6 +1020,42 @@ async function getPinnedSpace({ connection, spaceId }) {
   return data;
 }
 
+async function inviteSlackUserToSpaceChannel({ teamId, slackUserId, spaceId }) {
+  const supabase = getSupabaseAdmin();
+  const { data: channel, error } = await supabase
+    .from("slack_space_channels")
+    .select("slack_channel_id, slack_channel_name, posting_enabled")
+    .eq("slack_team_id", cleanString(teamId, 80))
+    .eq("space_id", cleanString(spaceId, 64))
+    .maybeSingle();
+  if (error) throw error;
+  if (!channel?.slack_channel_id) return { joined: false, reason: "no_slack_channel" };
+
+  try {
+    const installation = await getSlackInstallation(teamId);
+    const token = decryptSlackToken({
+      ciphertext: installation.bot_access_token_ciphertext,
+      iv: installation.bot_access_token_iv,
+      tag: installation.bot_access_token_tag,
+    });
+    await slackApi("conversations.invite", token, {
+      channel: channel.slack_channel_id,
+      users: cleanString(slackUserId, 80),
+    });
+    return { joined: true, channelName: channel.slack_channel_name };
+  } catch (error) {
+    if (error.slack?.error === "already_in_channel") {
+      return { joined: true, alreadyInChannel: true, channelName: channel.slack_channel_name };
+    }
+    console.error("Slack channel invite after pin failed", {
+      message: error.message,
+      slackError: error.slack?.error,
+      spaceId,
+    });
+    return { joined: false, reason: error.slack?.error || "invite_failed", channelName: channel.slack_channel_name };
+  }
+}
+
 export async function createSlackFieldNoteDraft({ teamId, slackUserId, dumpIds }) {
   const cleanedDumpIds = Array.isArray(dumpIds) ? dumpIds.map((id) => cleanString(id, 64)).filter(Boolean) : [];
   if (!cleanedDumpIds.length) throw new Error("choose at least one dump.");
@@ -1118,34 +1162,47 @@ export function slackRoomNeedsNamePayload() {
   });
 }
 
-export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl }) {
+export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl, creatorLinked, pinned }) {
+  const status = creatorLinked
+    ? "linked to your Mumbl login and pinned in Slack."
+    : "created from Slack. Connect once to claim creator access in Mumbl.";
   return blockResponse({
     text: `created a mumbl room for ${space.name}.`,
     blocks: [
-      section(`*created a mumbl room for ${escapeSlackText(space.name)}.*\nprivate dumps stay private. team reads only post to Slack if you enable them.`),
+      section(`*${escapeSlackText(space.name)} is ready.*\n${status}`),
       actions([
-        { text: "open room", url: openUrl },
-        { text: "open invite link", url: roomUrl },
-        { text: "enable Slack team reads", url: teamReadsUrl },
+        { text: "create Slack reads channel", url: teamReadsUrl, style: "primary" },
+        { text: creatorLinked ? "open room" : "claim room", url: openUrl },
       ]),
-      context(`invite link: <${roomUrl}|${roomUrl}>`),
+      context(
+        pinned
+          ? `Pinned for publishing. Invite link: <${roomUrl}|${roomUrl}>`
+          : `Use /mumbl pin ${space.slug} after connecting Mumbl. Invite link: <${roomUrl}|${roomUrl}>`,
+      ),
     ],
   });
 }
 
-export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUrl }) {
+export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUrl, creatorLinked, pinned }) {
   return {
     type: "modal",
     title: { type: "plain_text", text: "room created" },
     close: { type: "plain_text", text: "done" },
     blocks: [
-      section(`*created a mumbl room for ${escapeSlackText(space.name)}.*\nIt is ready for team reads. Open it once to save creator access in this browser.`),
+      section(
+        creatorLinked
+          ? `*${escapeSlackText(space.name)} is ready.*\nIt is linked to your Mumbl login and pinned in Slack.`
+          : `*${escapeSlackText(space.name)} is ready.*\nConnect once to claim creator access in Mumbl.`,
+      ),
       actions([
-        { text: "open room", url: openUrl },
-        { text: "open invite link", url: roomUrl },
-        { text: "enable Slack team reads", url: teamReadsUrl },
+        { text: "create Slack reads channel", url: teamReadsUrl, style: "primary" },
+        { text: creatorLinked ? "open room" : "claim room", url: openUrl },
       ]),
-      context("Publishing to Mumbl team reads works now. Posting those reads into a Slack channel stays optional."),
+      context(
+        pinned
+          ? "Pinned for publishing. Slack reads channel is optional and only mirrors published team reads."
+          : "After connecting, Mumbl can pin this space for publishing from Slack.",
+      ),
     ],
   };
 }

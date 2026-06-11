@@ -12,6 +12,7 @@ import {
   parseVerifiedSlackForm,
   pinSlackSpaceBySlug,
   postSlackResponse,
+  publishSlackAppHome,
   saveSlackDump,
   slackConnectPayload,
   slackConnectUrl,
@@ -55,6 +56,13 @@ export async function POST(request) {
               ? await pinSpaceFromSlack({ teamId, slackUserId, slug: pinSlug })
             : await saveOrConnect({ teamId, slackUserId, content: text, sourceMeta: { trigger: "slash_command" } });
         await postSlackResponse(responseUrl, result);
+        if (roomName !== null || pinSlug !== null) {
+          try {
+            await publishSlackAppHome({ teamId, slackUserId });
+          } catch (error) {
+            console.error("Slack App Home refresh after command failed", { message: error.message, slackError: error.slack?.error });
+          }
+        }
       } catch (error) {
         await postSlackResponse(responseUrl, ephemeralText(error.message || "couldn't finish that Mumbl action yet."));
       }
@@ -88,8 +96,11 @@ async function startRoomFromSlack({ teamId, slackUserId, name }) {
 }
 
 async function pinSpaceFromSlack({ teamId, slackUserId, slug }) {
-  const { space } = await pinSlackSpaceBySlug({ teamId, slackUserId, slug });
-  return ephemeralText(`${space.name} is pinned for team reads.`);
+  const { space, channelJoin } = await pinSlackSpaceBySlug({ teamId, slackUserId, slug });
+  const channelText = channelJoin?.joined
+    ? ` You're also in the ${channelJoin.channelName ? `#${channelJoin.channelName}` : "Slack reads"} channel.`
+    : "";
+  return ephemeralText(`${space.name} is pinned for team reads.${channelText}`);
 }
 
 async function saveOrConnect({ teamId, slackUserId, content, sourceMeta }) {

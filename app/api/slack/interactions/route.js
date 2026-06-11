@@ -495,6 +495,13 @@ export async function POST(request) {
 
       try {
         const view = await createSlackStartedSpaceModalView({ teamId, slackUserId, name: roomName });
+        after(async () => {
+          try {
+            await publishSlackAppHome({ teamId, slackUserId });
+          } catch (error) {
+            console.error("Slack App Home refresh after room creation failed", { message: error.message, slackError: error.slack?.error });
+          }
+        });
         return ok({ response_action: "update", view });
       } catch (error) {
         return ok({
