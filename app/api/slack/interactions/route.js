@@ -41,6 +41,7 @@ import {
   openSlackDumpModal,
   openSlackRoomModal,
   publishSlackAppHome,
+  removeSlackUserFromPinnedSpaceChannel,
   updateSlackView,
   updateSlackFieldNoteDraft,
   unpinSlackPinnedSpace,
@@ -347,8 +348,17 @@ export async function POST(request) {
       const slackUserId = cleanString(payload.user?.id, 80);
       const metadata = parseViewMetadata(payload.view?.private_metadata);
       try {
-        await unpinSlackPinnedSpace({ teamId, slackUserId, pinId: metadata.pinId });
+        const unpinned = await unpinSlackPinnedSpace({ teamId, slackUserId, pinId: metadata.pinId });
         after(async () => {
+          try {
+            await removeSlackUserFromPinnedSpaceChannel({ teamId, slackUserId, spaceId: unpinned.space_id });
+          } catch (error) {
+            console.error("Slack channel removal after unpin failed", {
+              message: error.message,
+              slackError: error.slack?.error,
+              spaceId: unpinned.space_id,
+            });
+          }
           try {
             await publishSlackAppHome({ teamId, slackUserId });
           } catch (error) {
