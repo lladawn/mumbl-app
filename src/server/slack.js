@@ -254,6 +254,10 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
     slack_team_id: teamId,
     created_by_slack_user_id: slackUserId,
   });
+  const connection = await findSlackConnection({ teamId, slackUserId });
+  if (connection) {
+    await pinSlackSpace({ connection, spaceId: insertedSpace.id });
+  }
 
   const handoff = await createCreatorHandoff({ spaceId: insertedSpace.id, creatorToken });
   const teamReadsSetup = await createTeamReadsSetup({ spaceId: insertedSpace.id });
@@ -1017,13 +1021,13 @@ export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUr
     title: { type: "plain_text", text: "room created" },
     close: { type: "plain_text", text: "done" },
     blocks: [
-      section(`*created a mumbl room for ${escapeSlackText(space.name)}.*\nOpen it once to save creator access in this browser.`),
+      section(`*created a mumbl room for ${escapeSlackText(space.name)}.*\nIt is ready for team reads. Open it once to save creator access in this browser.`),
       actions([
         { text: "open room", url: openUrl },
         { text: "open invite link", url: roomUrl },
         { text: "enable Slack team reads", url: teamReadsUrl },
       ]),
-      context("Private dumps stay private. Team reads only post to Slack if you enable them."),
+      context("Publishing to Mumbl team reads works now. Posting those reads into a Slack channel stays optional."),
     ],
   };
 }
@@ -1302,21 +1306,21 @@ function teamReadMessage({ space, post, channel }) {
 function slackAppHomeBlocks() {
   const { appUrl } = getServerEnv();
   return [
-    section("*mumbl*\nprivate dump first. team read only when you choose."),
-    section("*save a private thought*\nType `/mumbl the thing you want to keep` anywhere in Slack, or write it here."),
+    section("*mumbl*\nA private place to catch work thoughts, shape the useful ones, and publish team reads only when you choose."),
+    section("*1. save private dumps*\nType `/mumbl the thing you want to keep` anywhere in Slack, right-click a message, or write one here."),
     actions([{ text: "new private dump", actionId: "new_private_dump" }]),
-    section("*draft a team read*\nChoose a few recent private dumps and Mumbl will turn them into a private field-note draft."),
+    section("*2. draft from the useful thread*\nChoose recent private dumps. Mumbl creates a private field-note draft; nothing posts to the team yet."),
     actions([{ text: "draft team read", actionId: "draft_team_read" }]),
-    section("*review drafts*\nEdit recent private field-note drafts before anything goes to the team."),
+    section("*3. review, edit, publish*\nEdit drafts in Slack, then publish to a pinned Mumbl space as anonymous or with a handle you choose."),
     actions([{ text: "review drafts", actionId: "review_field_note_drafts" }]),
-    section("*start a team space from Slack*\nType `/mumbl room platform team` to create the room without leaving Slack."),
+    section("*need a team space?*\nCreate one from Slack, or pin an existing room with `/mumbl pin space-slug`."),
     actions([{ text: "start a team room", actionId: "start_room_modal" }]),
-    section("*team reads on Slack*\nAfter a room is created, use its `enable Slack team reads` button to create one private channel."),
+    section("*team reads on Slack*\nIf a Mumbl room has Slack team reads enabled, published reads appear as one clean channel message. Replies stay in that Slack thread."),
     actions([
       { text: "open your dump", url: `${appUrl}/dump` },
       { text: "create on mumbl", url: `${appUrl}/create` },
     ]),
-    context("No channel history. No member tracking. Only what you explicitly send or publish."),
+    context("No channel history. No member tracking. Slack identity is never used for anonymous reads."),
   ];
 }
 
@@ -1446,11 +1450,15 @@ function slackNoPinnedSpacesModal() {
   const { appUrl } = getServerEnv();
   return {
     type: "modal",
-    title: { type: "plain_text", text: "pin a space" },
+    title: { type: "plain_text", text: "team space needed" },
     close: { type: "plain_text", text: "done" },
     blocks: [
-      section("*no pinned Mumbl spaces yet.*\nUse `/mumbl pin space-slug` in Slack, or pin a room from Mumbl."),
-      actions([{ text: "open mumbl", url: `${appUrl}/create` }]),
+      section("*choose where this team read should live.*\nCreate a Mumbl team space from Slack, or pin an existing room with `/mumbl pin space-slug`."),
+      actions([
+        { text: "create team space", actionId: "start_room_modal", style: "primary" },
+        { text: "open mumbl", url: `${appUrl}/create` },
+      ]),
+      context("After a space is pinned, come back to this draft and publish it to team reads."),
     ],
   };
 }
