@@ -75,6 +75,7 @@ Future improvements:
 Current compromise:
 - Slack is free during beta. There is no 30-day countdown, no credit card, and no usage gate.
 - The beta supports only explicit user actions: `/mumbl [text]` and the `save_to_mumbl` message shortcut.
+- `/mumbl start [team name]` can create a Mumbl room from Slack with an expiring creator handoff link.
 - The Slack app requests `commands`, `users:read`, and `users:read.email` only. It does not request channel history or message history scopes.
 - Team-read posting to Slack is optional per room. When a creator enables it, Mumbl asks for an optional `chat:write` and `groups:write` permission upgrade only so it can create one private channel and post published team reads.
 - Slack daily check-in reminders are deferred because a 15-minute scheduler does not fit the free-tier posture.

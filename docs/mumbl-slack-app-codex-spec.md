@@ -81,8 +81,12 @@ team-read posting to slack is optional per mumbl room. the core app should not a
 
 **slash commands:**
 - `/mumbl [text]` — save a dump
+- `/mumbl start [team name]` — create a mumbl room from Slack and return a one-time creator handoff link
 - `/mumbl remind [time]` — enable daily check-in
 - `/mumbl remind off` — disable daily check-in
+
+**event subscriptions:**
+- `app_home_opened` — publish the private Mumbl App Home surface
 
 ---
 
