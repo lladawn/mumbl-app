@@ -478,20 +478,6 @@ export async function openSlackLoadingModal({ teamId, triggerId, title = "loadin
   });
 }
 
-export async function openSlackModalView({ teamId, triggerId, view }) {
-  const installation = await getSlackInstallation(teamId);
-  const token = decryptSlackToken({
-    ciphertext: installation.bot_access_token_ciphertext,
-    iv: installation.bot_access_token_iv,
-    tag: installation.bot_access_token_tag,
-  });
-
-  return slackApi("views.open", token, {
-    trigger_id: triggerId,
-    view,
-  });
-}
-
 export function slackLoadingModalView({ title = "loading", message = "opening mumbl..." } = {}) {
   return slackLoadingModal({ title, message });
 }

@@ -38,7 +38,6 @@ import {
   slackUnpinPinnedSpaceConfirmView,
   openSlackDumpModal,
   openSlackRoomModal,
-  openSlackModalView,
   publishSlackAppHome,
   updateSlackView,
   updateSlackFieldNoteDraft,
@@ -85,126 +84,40 @@ export async function POST(request) {
           }
         }
         if (actionId === "draft_team_read") {
-          const result = await openSlackLoadingModal({
-            teamId: slackTeamId(payload),
-            triggerId: cleanString(payload.trigger_id, 200),
+          await showLoadingThenReplace({
+            payload,
             title: "draft team read",
             message: "loading your recent private dumps...",
-          });
-          after(async () => {
-            try {
-              await updateSlackView({
-                teamId: slackTeamId(payload),
-                viewId: cleanString(result.view?.id, 120),
-                view: await slackFieldNoteDraftPickerView({
-                  teamId: slackTeamId(payload),
-                  slackUserId: cleanString(payload.user?.id, 80),
-                }),
-              });
-            } catch (error) {
-              console.error("Slack draft picker update failed", { message: error.message, slackError: error.slack?.error });
-            }
+            buildView: ({ teamId, slackUserId }) => slackFieldNoteDraftPickerView({ teamId, slackUserId }),
+            logLabel: "Slack draft picker update failed",
           });
         }
         if (actionId === "review_field_note_drafts") {
-          const teamId = slackTeamId(payload);
-          const slackUserId = cleanString(payload.user?.id, 80);
-          const viewId = slackModalViewId(payload);
-          if (viewId) {
-            await updateSlackView({
-              teamId,
-              viewId,
-              view: await slackFieldNoteReviewPickerView({ teamId, slackUserId }),
-            });
-          } else {
-            await openSlackModalView({
-              teamId,
-              triggerId: cleanString(payload.trigger_id, 200),
-              view: await slackFieldNoteReviewPickerView({ teamId, slackUserId }),
-            });
-          }
+          await showLoadingThenReplace({
+            payload,
+            title: "review drafts",
+            message: "loading your private drafts...",
+            buildView: ({ teamId, slackUserId }) => slackFieldNoteReviewPickerView({ teamId, slackUserId }),
+            logLabel: "Slack draft review update failed",
+          });
         }
         if (actionId === "review_published_reads") {
-          const teamId = slackTeamId(payload);
-          const slackUserId = cleanString(payload.user?.id, 80);
-          const viewId = slackModalViewId(payload);
-          if (viewId) {
-            await updateSlackView({
-              teamId,
-              viewId,
-              view: slackLoadingModalView({ title: "published reads", message: "loading your published reads..." }),
-            });
-            after(async () => {
-              try {
-                await updateSlackView({
-                  teamId,
-                  viewId,
-                  view: await slackPublishedReadsView({ teamId, slackUserId }),
-                });
-              } catch (error) {
-                console.error("Slack published reads update failed", { message: error.message, slackError: error.slack?.error });
-              }
-            });
-          } else {
-            const result = await openSlackLoadingModal({
-              teamId,
-              triggerId: cleanString(payload.trigger_id, 200),
-              title: "published reads",
-              message: "loading your published reads...",
-            });
-            after(async () => {
-              try {
-                await updateSlackView({
-                  teamId,
-                  viewId: cleanString(result.view?.id, 120),
-                  view: await slackPublishedReadsView({ teamId, slackUserId }),
-                });
-              } catch (error) {
-                console.error("Slack published reads update failed", { message: error.message, slackError: error.slack?.error });
-              }
-            });
-          }
+          await showLoadingThenReplace({
+            payload,
+            title: "published reads",
+            message: "loading your published reads...",
+            buildView: ({ teamId, slackUserId }) => slackPublishedReadsView({ teamId, slackUserId }),
+            logLabel: "Slack published reads update failed",
+          });
         }
         if (actionId === "manage_pinned_spaces") {
-          const teamId = slackTeamId(payload);
-          const slackUserId = cleanString(payload.user?.id, 80);
-          const viewId = slackModalViewId(payload);
-          if (viewId) {
-            await updateSlackView({
-              teamId,
-              viewId,
-              view: slackLoadingModalView({ title: "pinned spaces", message: "loading your pinned teamspaces..." }),
-            });
-            after(async () => {
-              try {
-                await updateSlackView({
-                  teamId,
-                  viewId,
-                  view: await slackPinnedSpacesView({ teamId, slackUserId }),
-                });
-              } catch (error) {
-                console.error("Slack pinned spaces update failed", { message: error.message, slackError: error.slack?.error });
-              }
-            });
-          } else {
-            const result = await openSlackLoadingModal({
-              teamId,
-              triggerId: cleanString(payload.trigger_id, 200),
-              title: "pinned spaces",
-              message: "loading your pinned teamspaces...",
-            });
-            after(async () => {
-              try {
-                await updateSlackView({
-                  teamId,
-                  viewId: cleanString(result.view?.id, 120),
-                  view: await slackPinnedSpacesView({ teamId, slackUserId }),
-                });
-              } catch (error) {
-                console.error("Slack pinned spaces update failed", { message: error.message, slackError: error.slack?.error });
-              }
-            });
-          }
+          await showLoadingThenReplace({
+            payload,
+            title: "pinned spaces",
+            message: "loading your pinned teamspaces...",
+            buildView: ({ teamId, slackUserId }) => slackPinnedSpacesView({ teamId, slackUserId }),
+            logLabel: "Slack pinned spaces update failed",
+          });
         }
         if (actionId === "unpin_pinned_space_start") {
           const teamId = slackTeamId(payload);
@@ -223,49 +136,14 @@ export async function POST(request) {
           }
         }
         if (actionId === "publish_field_note_start") {
-          const teamId = slackTeamId(payload);
-          const slackUserId = cleanString(payload.user?.id, 80);
           const fieldNoteId = cleanString(payload.actions?.[0]?.value, 64);
-          const viewId = slackModalViewId(payload);
-          if (viewId) {
-            await updateSlackView({
-              teamId,
-              viewId,
-              view: slackLoadingModalView({
-                title: "publish draft",
-                message: "loading pinned spaces...",
-              }),
-            });
-            after(async () => {
-              try {
-                await updateSlackView({
-                  teamId,
-                  viewId,
-                  view: await slackPublishOptionsView({ teamId, slackUserId, fieldNoteId }),
-                });
-              } catch (error) {
-                console.error("Slack publish options update failed", { message: error.message, slackError: error.slack?.error });
-              }
-            });
-          } else {
-            const result = await openSlackLoadingModal({
-              teamId,
-              triggerId: cleanString(payload.trigger_id, 200),
-              title: "publish draft",
-              message: "loading pinned spaces...",
-            });
-            after(async () => {
-              try {
-                await updateSlackView({
-                  teamId,
-                  viewId: cleanString(result.view?.id, 120),
-                  view: await slackPublishOptionsView({ teamId, slackUserId, fieldNoteId }),
-                });
-              } catch (error) {
-                console.error("Slack publish options update failed", { message: error.message, slackError: error.slack?.error });
-              }
-            });
-          }
+          await showLoadingThenReplace({
+            payload,
+            title: "publish draft",
+            message: "loading pinned spaces...",
+            buildView: ({ teamId, slackUserId }) => slackPublishOptionsView({ teamId, slackUserId, fieldNoteId }),
+            logLabel: "Slack publish options update failed",
+          });
         }
       } catch (error) {
         console.error("Slack action failed", {
@@ -527,6 +405,49 @@ function slackTeamId(payload) {
 
 function slackModalViewId(payload) {
   return payload.view?.type === "modal" ? cleanString(payload.view?.id, 120) : "";
+}
+
+async function showLoadingThenReplace({ payload, title, message, buildView, logLabel }) {
+  const teamId = slackTeamId(payload);
+  const slackUserId = cleanString(payload.user?.id, 80);
+  let viewId = slackModalViewId(payload);
+
+  if (viewId) {
+    await updateSlackView({
+      teamId,
+      viewId,
+      view: slackLoadingModalView({ title, message }),
+    });
+  } else {
+    const result = await openSlackLoadingModal({
+      teamId,
+      triggerId: cleanString(payload.trigger_id, 200),
+      title,
+      message,
+    });
+    viewId = cleanString(result.view?.id, 120);
+  }
+
+  try {
+    await updateSlackView({
+      teamId,
+      viewId,
+      view: await buildView({ teamId, slackUserId }),
+    });
+  } catch (error) {
+    console.error(logLabel, { message: error.message, slackError: error.slack?.error, slackResponse: error.slack });
+    if (viewId) {
+      try {
+        await updateSlackView({
+          teamId,
+          viewId,
+          view: slackFieldNoteDraftErrorModalView(error.message || "Slack could not load that view yet."),
+        });
+      } catch (updateError) {
+        console.error("Slack error modal update failed", { message: updateError.message, slackError: updateError.slack?.error });
+      }
+    }
+  }
 }
 
 function selectedSlackOptionValues(options) {
