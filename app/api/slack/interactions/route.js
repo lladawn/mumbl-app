@@ -14,7 +14,10 @@ import {
   saveSlackDump,
   slackConnectPayload,
   slackConnectUrl,
+  slackDumpConnectModalView,
+  slackDumpSavedModalView,
   slackSavedDumpPayload,
+  openSlackDumpModal,
   openSlackRoomModal,
 } from "../../../../src/server/slack";
 import { cleanString } from "../../../../src/server/validation";
@@ -29,18 +32,40 @@ export async function POST(request) {
     if (payload.type === "block_actions") {
       const actionId = cleanString(payload.actions?.[0]?.action_id, 80);
       if (actionId === "start_room_modal") {
-        after(async () => {
-          try {
-            await openSlackRoomModal({
-              teamId: cleanString(payload.team?.id, 80),
-              triggerId: cleanString(payload.trigger_id, 200),
-            });
-          } catch {
-            // Slack will leave the App Home as-is if the modal cannot open.
-          }
+        await openSlackRoomModal({
+          teamId: cleanString(payload.team?.id, 80),
+          triggerId: cleanString(payload.trigger_id, 200),
+        });
+      }
+      if (actionId === "new_private_dump") {
+        await openSlackDumpModal({
+          teamId: cleanString(payload.team?.id, 80),
+          triggerId: cleanString(payload.trigger_id, 200),
         });
       }
       return ok({});
+    }
+
+    if (payload.type === "view_submission" && payload.view?.callback_id === "create_private_dump") {
+      const teamId = cleanString(payload.team?.id, 80);
+      const slackUserId = cleanString(payload.user?.id, 80);
+      const content = cleanString(payload.view?.state?.values?.dump_content?.value?.value, 4000);
+      if (!content) {
+        return ok({
+          response_action: "errors",
+          errors: { dump_content: "write the thought first." },
+        });
+      }
+
+      try {
+        const view = await saveModalDump({ teamId, slackUserId, content });
+        return ok({ response_action: "update", view });
+      } catch (error) {
+        return ok({
+          response_action: "errors",
+          errors: { dump_content: error.message || "couldn't save that to mumbl yet." },
+        });
+      }
     }
 
     if (payload.type === "view_submission" && payload.view?.callback_id === "create_mumbl_room") {
@@ -95,6 +120,26 @@ export async function POST(request) {
   } catch (error) {
     return serverError(error);
   }
+}
+
+async function saveModalDump({ teamId, slackUserId, content }) {
+  const sourceMeta = { trigger: "app_home_modal" };
+  const existingConnection = await findSlackConnection({ teamId, slackUserId });
+  if (existingConnection) {
+    const dump = await saveSlackDump({ connection: existingConnection, content, sourceMeta });
+    return slackDumpSavedModalView({ url: dumpUrl(dump.id) });
+  }
+
+  const email = await getSlackUserEmail({ teamId, slackUserId });
+  const mumblUserId = await findMumblUserByEmail(email);
+  if (mumblUserId) {
+    const connection = await connectSlackUser({ teamId, slackUserId, mumblUserId });
+    const dump = await saveSlackDump({ connection, content, sourceMeta });
+    return slackDumpSavedModalView({ url: dumpUrl(dump.id) });
+  }
+
+  const pending = await createPendingSlackDump({ teamId, slackUserId, content, sourceMeta });
+  return slackDumpConnectModalView({ url: slackConnectUrl(pending.id) });
 }
 
 async function saveOrConnect({ teamId, slackUserId, content, sourceMeta }) {

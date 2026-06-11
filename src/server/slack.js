@@ -412,6 +412,20 @@ export async function openSlackRoomModal({ teamId, triggerId, initialName = "" }
   });
 }
 
+export async function openSlackDumpModal({ teamId, triggerId }) {
+  const installation = await getSlackInstallation(teamId);
+  const token = decryptSlackToken({
+    ciphertext: installation.bot_access_token_ciphertext,
+    iv: installation.bot_access_token_iv,
+    tag: installation.bot_access_token_tag,
+  });
+
+  return slackApi("views.open", token, {
+    trigger_id: triggerId,
+    view: slackDumpModal(),
+  });
+}
+
 export async function getSlackUserEmail({ teamId, slackUserId }) {
   const installation = await getSlackInstallation(teamId);
   const token = decryptSlackToken({
@@ -634,6 +648,31 @@ export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUr
   };
 }
 
+export function slackDumpSavedModalView({ url }) {
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "saved" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section("*saved to mumbl privately.*"),
+      actions([{ text: "open in mumbl", url }]),
+      context("Private dump first. Team read only if you choose later."),
+    ],
+  };
+}
+
+export function slackDumpConnectModalView({ url }) {
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: "connect mumbl" },
+    close: { type: "plain_text", text: "done" },
+    blocks: [
+      section("*connect mumbl once.*\nThen this thought can land in your private dump."),
+      actions([{ text: "connect mumbl", url }]),
+    ],
+  };
+}
+
 export async function postSlackResponse(responseUrl, payload) {
   const cleanedUrl = cleanString(responseUrl, 2000);
   if (!cleanedUrl) return;
@@ -758,7 +797,8 @@ function slackAppHomeBlocks() {
   const { appUrl } = getServerEnv();
   return [
     section("*mumbl*\nprivate dump first. team read only when you choose."),
-    section("*save a private thought*\nType `/mumbl the thing you want to keep` anywhere in Slack."),
+    section("*save a private thought*\nType `/mumbl the thing you want to keep` anywhere in Slack, or write it here."),
+    actions([{ text: "new private dump", actionId: "new_private_dump" }]),
     section("*start a team space from Slack*\nType `/mumbl room platform team` to create the room without leaving Slack."),
     actions([{ text: "start a team room", actionId: "start_room_modal" }]),
     section("*team reads on Slack*\nAfter a room is created, use its `enable Slack team reads` button to create one private channel."),
@@ -791,6 +831,31 @@ function slackRoomModal({ initialName = "" }) {
         },
       },
       context("Mumbl creates the room privately first. Team reads on Slack stay optional."),
+    ],
+  };
+}
+
+function slackDumpModal() {
+  return {
+    type: "modal",
+    callback_id: "create_private_dump",
+    title: { type: "plain_text", text: "new private dump" },
+    submit: { type: "plain_text", text: "save" },
+    close: { type: "plain_text", text: "cancel" },
+    blocks: [
+      {
+        type: "input",
+        block_id: "dump_content",
+        label: { type: "plain_text", text: "thought" },
+        element: {
+          type: "plain_text_input",
+          action_id: "value",
+          multiline: true,
+          max_length: 4000,
+          placeholder: { type: "plain_text", text: "the thing worth keeping" },
+        },
+      },
+      context("Only this text is saved. Mumbl does not read the channel around it."),
     ],
   };
 }
