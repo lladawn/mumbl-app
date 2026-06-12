@@ -17,6 +17,10 @@ Use this every time we move work from `dev` to `main`.
    this reads `NEXT_PUBLIC_SUPABASE_URL` from `.env.local`
 3. run `npm run db:status`
 4. run `npm run db:push` only after confirming the linked project is staging
+5. for pattern graph migrations, confirm pgvector is available before testing:
+   ```sql
+   select * from extensions where name = 'vector';
+   ```
 
 ## Before releasing to production
 
@@ -24,12 +28,15 @@ Use this every time we move work from `dev` to `main`.
 2. open PR from `dev` into `main`
 3. confirm production env vars are set only in Vercel `Production`
 4. confirm staging env vars are set only in Vercel `Preview`
-5. run `npm run db:link:prod`
+5. confirm `MUMBL_ENABLE_PATTERN_TEST_TOOLS` is disabled or unset in production
+6. confirm production pattern thresholds are intentional, normally first insight at 10 and interval 25
+7. if launching pattern graph to users with existing logged-in private dumps, run or schedule the approved signal/count backfill before relying on `/dump/map`
+8. run `npm run db:link:prod`
    this reads `NEXT_PUBLIC_SUPABASE_URL` from `.env.production.local`
-6. run `npm run db:status`
-7. run `npm run db:push` only if the production schema needs a migration
-8. merge `dev` into `main`
-9. verify the production deployment on `mumbl.wtf`
+9. run `npm run db:status`
+10. run `npm run db:push` only if the production schema needs a migration
+11. merge `dev` into `main`
+12. verify the production deployment on `mumbl.wtf`
 
 ## After release
 
@@ -38,6 +45,9 @@ Use this every time we move work from `dev` to `main`.
 3. smoke test `/explore`
 4. confirm analytics are behaving as expected
 5. confirm cron secrets still match the intended environment
+6. smoke test logged-in private dumps and `/dump/map`
+7. confirm `/patterns` loads only the current user's private insights
+8. confirm Slack pattern notifications contain only a link/pointer, not private insight text
 
 ## Environment files to keep separate
 
@@ -53,6 +63,13 @@ Use this every time we move work from `dev` to `main`.
 - `CRON_SECRET`
 - `NEXT_PUBLIC_ENABLE_ANALYTICS`
 - `NEXT_PUBLIC_UMAMI_WEBSITE_ID`
+- `OPENAI_API_KEY`
+- `OPENAI_SIGNAL_MODEL`
+- `ANTHROPIC_API_KEY`
+- `ANTHROPIC_INSIGHT_MODEL`
+- `MUMBL_PATTERN_GRAPH_FIRST_INSIGHT_AT`
+- `MUMBL_PATTERN_GRAPH_INSIGHT_INTERVAL`
+- `MUMBL_ENABLE_PATTERN_TEST_TOOLS`
 
 ## Rule of thumb
 

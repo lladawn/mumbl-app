@@ -2,7 +2,6 @@ export const SESSION_KEY = "mumbl:session";
 export const RECENT_SPACE_KEY = "mumbl:recent-space";
 export const CREATOR_TOKEN_PREFIX = "mumbl:creator-token:";
 export const POST_EDIT_TOKEN_PREFIX = "mumbl:post-edit-token:";
-export const DUMP_MEMORY_OPT_IN_KEY = "mumbl:dump-memory-opt-in";
 
 export function loadSession() {
   const existing = window.localStorage.getItem(SESSION_KEY);
@@ -26,15 +25,6 @@ export function forgetRecentSlug(slug) {
   if (window.localStorage.getItem(RECENT_SPACE_KEY) === slug) {
     window.localStorage.removeItem(RECENT_SPACE_KEY);
   }
-}
-
-export function getDumpMemoryOptIn() {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(DUMP_MEMORY_OPT_IN_KEY) === "true";
-}
-
-export function setDumpMemoryOptIn(isEnabled) {
-  window.localStorage.setItem(DUMP_MEMORY_OPT_IN_KEY, isEnabled ? "true" : "false");
 }
 
 export function saveCreatorToken(slug, token) {

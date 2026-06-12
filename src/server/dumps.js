@@ -5,8 +5,6 @@ export function serializeDump(dump) {
     visibility: dump.visibility,
     teamRoomId: dump.team_room_id || "",
     aiReflection: dump.ai_reflection || "",
-    supermemoryId: dump.supermemory_id || "",
-    supermemoryStatus: dump.supermemory_status || "",
     source: dump.source || "web",
     sourceMeta: dump.source_meta || {},
     publishedAt: dump.published_at ? new Date(dump.published_at).getTime() : null,

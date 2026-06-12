@@ -1,13 +1,15 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { after } from "next/server";
 import { assertSlackEnv, getServerEnv } from "./env";
+import { processSavedPrivateDump } from "./dumpPatterns";
 import { draftFieldNote } from "./fieldNotes";
 import { createToken, hashToken } from "./hash";
 import { enforceRateLimit } from "./rateLimit";
 import { getSupabaseAdmin } from "./supabase";
 import { cleanString, slugify } from "./validation";
 
-const SLACK_OAUTH_SCOPES = ["commands", "users:read", "users:read.email"];
-const SLACK_TEAM_READS_SCOPES = ["chat:write", "groups:write", "groups:read"];
+const SLACK_OAUTH_SCOPES = ["commands", "users:read", "users:read.email", "im:write", "chat:write"];
+const SLACK_TEAM_READS_SCOPES = ["groups:write", "groups:read"];
 const TOKEN_ALGORITHM = "aes-256-gcm";
 const MAX_SLACK_AGE_SECONDS = 60 * 5;
 const MAX_SLACK_DRAFT_DUMPS = 10;
@@ -424,6 +426,76 @@ export async function publishSlackAppHome({ teamId, slackUserId }) {
   });
 }
 
+export async function sendSlackPatternNotification({ teamId, slackUserId, patternId }) {
+  let installation;
+  try {
+    installation = await getSlackInstallation(teamId);
+  } catch (error) {
+    if (isMissingSlackInstallationError(error)) {
+      console.warn("Slack pattern notification skipped: no installation for workspace", { teamId });
+      return { notified: false, reason: "missing_installation" };
+    }
+    throw error;
+  }
+
+  const missingScopes = missingSlackScopes(installation.scopes, ["im:write", "chat:write"]);
+  if (missingScopes.length) {
+    console.warn("Slack pattern notification skipped: installation is missing scopes", {
+      teamId,
+      missingScopes,
+      provided: installation.scopes || [],
+    });
+    return { notified: false, reason: "missing_scope", needed: missingScopes.join(",") };
+  }
+
+  let token;
+  try {
+    token = decryptSlackToken({
+      ciphertext: installation.bot_access_token_ciphertext,
+      iv: installation.bot_access_token_iv,
+      tag: installation.bot_access_token_tag,
+    });
+  } catch (error) {
+    console.warn("Slack pattern notification skipped: installation token could not be decrypted", {
+      teamId,
+      message: error.message,
+    });
+    return { notified: false, reason: "token_decrypt_failed" };
+  }
+
+  const { appUrl } = getServerEnv();
+  let dm;
+  try {
+    dm = await slackApi("conversations.open", token, { users: slackUserId });
+    await slackApi("chat.postMessage", token, {
+      channel: dm.channel.id,
+      text: "Mumbl noticed a private work pattern. Open Mumbl to read it.",
+      blocks: [
+        section("*mumbl noticed a private pattern*\nOpen Mumbl to read it. Slack only gets this pointer, not the pattern itself."),
+        actions([{ text: "view private pattern", url: `${appUrl}/patterns?pattern=${encodeURIComponent(patternId)}` }]),
+        context("Only your logged-in Mumbl account can read the insight."),
+      ],
+    });
+  } catch (error) {
+    if (error.slack?.error === "missing_scope") {
+      console.warn("Slack pattern notification skipped: missing Slack scope", {
+        teamId,
+        needed: error.slack?.needed,
+        provided: error.slack?.provided,
+      });
+      return { notified: false, reason: "missing_scope", needed: error.slack?.needed };
+    }
+    throw error;
+  }
+
+  const supabase = getSupabaseAdmin();
+  await supabase
+    .from("patterns")
+    .update({ delivered_slack: true, delivered_at: new Date().toISOString() })
+    .eq("id", patternId);
+  return { notified: true, channelId: dm.channel.id };
+}
+
 export async function openSlackRoomModal({ teamId, triggerId, initialName = "" }) {
   const installation = await getSlackInstallation(teamId);
   const token = decryptSlackToken({
@@ -672,6 +744,18 @@ export async function saveSlackDump({ connection, content, sourceMeta = {} }) {
     .select("id, created_at")
     .single();
   if (error) throw error;
+
+  if (connection.mumbl_user_id) {
+    after(async () => {
+      await processSavedPrivateDump({
+        supabase,
+        dumpId: dump.id,
+        userId: connection.mumbl_user_id,
+        content: cleanedContent,
+        source: "slack",
+      });
+    });
+  }
 
   await supabase
     .from("slack_connections")
@@ -1627,7 +1711,9 @@ function teamReadMessage({ space, post, channel }) {
 async function slackAppHomeBlocks({ teamId, slackUserId }) {
   const { appUrl } = getServerEnv();
   const connection = await findSlackConnection({ teamId, slackUserId });
-  const pinnedSpaces = connection ? await listSlackPinnedSpaces(connection) : [];
+  const [pinnedSpaces, pendingPattern] = connection
+    ? await Promise.all([listSlackPinnedSpaces(connection), findPendingPattern(connection.mumbl_user_id)])
+    : [[], null];
   const topPinnedSpaces = pinnedSpaces.slice(0, 5);
   const pinnedList = topPinnedSpaces
     .map((pin) => {
@@ -1636,7 +1722,7 @@ async function slackAppHomeBlocks({ teamId, slackUserId }) {
     })
     .join("\n");
 
-  return [
+  const blocks = [
     section("*mumbl*\nCatch work thoughts privately. Shape the useful ones into team reads when they are ready."),
     actions([
       { text: "new private dump", actionId: "new_private_dump", style: "primary" },
@@ -1672,6 +1758,51 @@ async function slackAppHomeBlocks({ teamId, slackUserId }) {
     section("*team reads on Slack*\nIf a Mumbl room has Slack team reads enabled, published reads appear as one clean channel message. Replies stay in that Slack thread."),
     context("No channel history. No member tracking. Slack identity is never used for anonymous reads."),
   ];
+
+  if (pendingPattern) {
+    blocks.splice(
+      2,
+      0,
+      section("*something private is ready*\nMumbl noticed a work pattern from your private dump."),
+      actions([{ text: "view private pattern", url: `${appUrl}/patterns?pattern=${encodeURIComponent(pendingPattern.id)}` }]),
+      context("Slack gets the pointer. The actual pattern stays in Mumbl."),
+      divider(),
+    );
+  }
+
+  return blocks;
+}
+
+async function findPendingPattern(mumblUserId) {
+  if (!mumblUserId) return null;
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("patterns")
+    .select("id")
+    .eq("user_id", mumblUserId)
+    .or("user_dismissed.is.null,user_dismissed.eq.false")
+    .is("user_confirmed", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (isMissingPatternTable(error)) return null;
+  if (error) throw error;
+  return data;
+}
+
+function isMissingPatternTable(error) {
+  const message = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
+  return error?.code === "42P01" || error?.code === "PGRST205" || message.includes("could not find the table");
+}
+
+function isMissingSlackInstallationError(error) {
+  const message = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
+  return error?.code === "PGRST116" || message.includes("cannot coerce") || message.includes("0 rows");
+}
+
+function missingSlackScopes(scopes, requiredScopes) {
+  const installedScopes = new Set(Array.isArray(scopes) ? scopes : []);
+  return requiredScopes.filter((scope) => !installedScopes.has(scope));
 }
 
 function slackRoomModal({ initialName = "" }) {

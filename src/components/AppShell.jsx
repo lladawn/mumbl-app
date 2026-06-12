@@ -12,7 +12,7 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
   const [joinOpen, setJoinOpen] = useState(false);
   const recentSlug = useRecentSlug();
-  const dumpActive = pathname?.startsWith("/dump");
+  const dumpActive = pathname?.startsWith("/dump") || pathname?.startsWith("/patterns");
   const missionActive = pathname?.startsWith("/mission");
 
   return (

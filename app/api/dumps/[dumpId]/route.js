@@ -1,5 +1,6 @@
 import { badRequest, notFound, ok, serverError } from "../../../../src/server/http";
 import { applyOwnerFilter, assertExpectedAuthenticatedOwner, resolveRequestOwner } from "../../../../src/server/auth";
+import { cleanupPatternGraphAfterDumpDelete } from "../../../../src/server/dumpPatterns";
 import { makeLocalReflection, serializeDump } from "../../../../src/server/dumps";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 import { cleanString } from "../../../../src/server/validation";
@@ -58,6 +59,9 @@ export async function DELETE(request, { params }) {
     const { error, count } = await applyOwnerFilter(supabase.from("dumps").delete({ count: "exact" }).eq("id", dumpId), owner);
     if (error) throw error;
     if (!count) return notFound("dump not found");
+    if (owner.userId) {
+      await cleanupPatternGraphAfterDumpDelete({ supabase, userId: owner.userId, dumpIds: [dumpId], source: "web" });
+    }
 
     return ok({ deleted: true });
   } catch (error) {

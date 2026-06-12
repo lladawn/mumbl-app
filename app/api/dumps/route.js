@@ -1,6 +1,8 @@
+import { after } from "next/server";
 import { badRequest, ok, serverError } from "../../../src/server/http";
 import { applyOwnerFilter, assertExpectedAuthenticatedOwner, ownerInsertFields, resolveRequestOwner } from "../../../src/server/auth";
 import { serializeDump, serializeFieldNote, makeLocalReflection } from "../../../src/server/dumps";
+import { cleanupPatternGraphAfterDumpDelete, processSavedPrivateDump } from "../../../src/server/dumpPatterns";
 import { getSupabaseAdmin } from "../../../src/server/supabase";
 import { cleanString } from "../../../src/server/validation";
 
@@ -59,6 +61,12 @@ export async function POST(request) {
     }
     if (error) throw error;
 
+    if (owner.userId) {
+      after(async () => {
+        await processSavedPrivateDump({ supabase, dumpId: dump.id, userId: owner.userId, content, source: "web" });
+      });
+    }
+
     return ok({ dump: serializeDump(dump) });
   } catch (error) {
     return serverError(error);
@@ -86,6 +94,9 @@ export async function DELETE(request) {
       owner,
     );
     if (error) throw error;
+    if (owner.userId && count) {
+      await cleanupPatternGraphAfterDumpDelete({ supabase, userId: owner.userId, dumpIds, source: "web_bulk" });
+    }
 
     return ok({ deleted: count || 0 });
   } catch (error) {

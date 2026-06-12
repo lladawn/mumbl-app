@@ -85,10 +85,11 @@ Core bot token scopes:
 - `commands`: required for `/mumbl`.
 - `users:read`: required to read the Slack user profile during explicit user actions.
 - `users:read.email`: required to match Slack users to existing Mumbl login emails and connect their private dump.
+- `im:write`: required to open a DM when Mumbl has a private pattern notification pointer.
+- `chat:write`: required to send the private pattern notification pointer and Slack response messages.
 
 Optional team-read bot token scopes:
 
-- `chat:write`: posts published Mumbl team reads into the linked Slack reads channel.
 - `groups:write`: creates one private Slack reads channel for a Mumbl room.
 - `groups:read`: receives join events for Mumbl-created private Slack reads channels so Mumbl can auto-pin that room for connected users.
 
@@ -274,7 +275,7 @@ Common Slack errors:
 - `operation_timeout`: the endpoint did not acknowledge Slack quickly enough. Check Vercel logs around `/api/slack/commands` or `/api/slack/interactions`.
 - `invalid_arguments`: Slack rejected a Block Kit view. Check logs for `response_metadata.messages`.
 - App Home does not update: confirm `app_home_opened` event subscription and `SLACK_SIGNING_SECRET`.
-- Team reads channel is not created: confirm optional scopes include `chat:write`, `groups:write`, and `groups:read`.
+- Team reads channel is not created: confirm core scopes include `chat:write` and optional scopes include `groups:write` and `groups:read`.
 - `/mumbl pin` does not join the Slack reads channel: confirm the room has a row in `slack_space_channels` and the bot still has access to that private channel.
 
 Useful Vercel log labels:

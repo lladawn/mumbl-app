@@ -80,14 +80,45 @@ export async function fetchDumps() {
   return parseJson(response);
 }
 
-export async function fetchDumpMap({ includePrivateDumps = false } = {}) {
+export async function fetchDumpMap() {
   const sessionToken = loadSession();
   const auth = await authRequestContext();
   const params = privateSessionParams(sessionToken, auth);
-  if (includePrivateDumps) params.set("includePrivateDumps", "true");
   const response = await fetch(`/api/dumps/map?${params.toString()}`, {
     headers: auth.headers,
     cache: "no-store",
+  });
+  return parseJson(response);
+}
+
+export async function fetchPatterns({ includeDismissed = false } = {}) {
+  const sessionToken = loadSession();
+  const auth = await authRequestContext();
+  const params = privateSessionParams(sessionToken, auth);
+  if (includeDismissed) params.set("includeDismissed", "true");
+  const response = await fetch(`/api/patterns?${params.toString()}`, {
+    headers: auth.headers,
+    cache: "no-store",
+  });
+  return parseJson(response);
+}
+
+export async function testGeneratePatternInsight() {
+  const auth = await authRequestContext();
+  const response = await fetch("/api/patterns/test-generate", {
+    method: "POST",
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
+  });
+  return parseJson(response);
+}
+
+export async function sendPatternFeedback({ patternId, confirmed }) {
+  const auth = await authRequestContext();
+  const response = await fetch(`/api/patterns/${patternId}/feedback`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ confirmed, sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
   });
   return parseJson(response);
 }

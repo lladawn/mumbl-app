@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createDump,
   deleteDump,
@@ -14,11 +14,12 @@ import {
   publishFieldNote,
   savePublicProfile,
   setFieldNotePublic,
+  testGeneratePatternInsight,
   updateDump,
   updateFieldNote,
 } from "../lib/api";
 import { AUTH_CHANGED_EVENT, linkCurrentDumpSession } from "../lib/auth";
-import { getDumpMemoryOptIn, getRecentSlug, setDumpMemoryOptIn } from "../lib/storage";
+import { getRecentSlug } from "../lib/storage";
 import { EditIcon, TrashIcon } from "./ActionIcons";
 import Toast from "./Toast";
 
@@ -463,6 +464,9 @@ export default function DumpPageClient({ mode = "home" }) {
         <div className="dump-nav">
           <Link className="ghost-button button-link" href="/dump/map">
             see the map
+          </Link>
+          <Link className="ghost-button button-link" href="/patterns">
+            patterns
           </Link>
           <button className="ghost-button" type="button" onClick={() => setPublicModalOpen(true)}>
             go public
@@ -1120,39 +1124,56 @@ function GoPublicModal({
 }
 
 function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
-  const [graphState, setGraphState] = useState({ status: "loading", graph: null, supermemory: null });
+  const [graphState, setGraphState] = useState({ status: "loading", graph: null, memory: null });
   const [selectedPatternId, setSelectedPatternId] = useState("");
-  const [includePrivateDumps, setIncludePrivateDumps] = useState(false);
+  const [testToolsEnabled, setTestToolsEnabled] = useState(false);
+  const [isTestingInsight, setIsTestingInsight] = useState(false);
 
-  useEffect(() => {
-    setIncludePrivateDumps(getDumpMemoryOptIn());
-  }, []);
+  const loadGraph = useCallback(
+    async ({ quiet = false } = {}) => {
+      if (!quiet) {
+        setGraphState((current) => ({ ...current, status: "loading" }));
+      }
+      const result = await fetchDumpMap();
+      setGraphState({ status: "ready", graph: result.graph, memory: result.memory });
+      setTestToolsEnabled(result.testToolsEnabled === true);
+      return result;
+    },
+    [],
+  );
 
   useEffect(() => {
     let mounted = true;
-    async function loadGraph() {
+    async function loadMountedGraph() {
       try {
-        const result = await fetchDumpMap({ includePrivateDumps });
+        const result = await fetchDumpMap();
         if (!mounted) return;
-        setGraphState({ status: "ready", graph: result.graph, supermemory: result.supermemory });
+        setGraphState({ status: "ready", graph: result.graph, memory: result.memory });
+        setTestToolsEnabled(result.testToolsEnabled === true);
       } catch (error) {
         if (!mounted) return;
-        setGraphState({ status: "error", graph: null, supermemory: null });
+        setGraphState({ status: "error", graph: null, memory: null });
         setToast(error.message || "couldn't build the graph yet.");
       }
     }
-    loadGraph();
+    loadMountedGraph();
     return () => {
       mounted = false;
     };
-  }, [includePrivateDumps, setToast]);
+  }, [setToast]);
 
-  function handlePrivateDumpMemoryToggle(event) {
-    const isEnabled = event.target.checked;
-    setDumpMemoryOptIn(isEnabled);
-    setIncludePrivateDumps(isEnabled);
-    setGraphState((current) => ({ ...current, status: "loading" }));
-    setToast(isEnabled ? "private dumps can now shape only your memory graph." : "memory graph is back to field notes only.");
+  async function handleTestGenerateInsight() {
+    if (isTestingInsight) return;
+    setIsTestingInsight(true);
+    try {
+      const result = await testGeneratePatternInsight();
+      await loadGraph({ quiet: true });
+      setToast(result.pattern ? "test insight generated. map refreshed." : result.message || "no insight generated yet.");
+    } catch (error) {
+      setToast(error.message || "couldn't generate a test insight.");
+    } finally {
+      setIsTestingInsight(false);
+    }
   }
 
   const graph = graphState.graph || {
@@ -1163,9 +1184,9 @@ function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
     patterns: [],
     insights: [],
   };
-  const evidenceNodes = graph.nodes.filter((node) => node.kind === (includePrivateDumps ? "dump" : "field_note"));
+  const evidenceNodes = graph.nodes.filter((node) => node.kind === "dump");
   const themes = graph.nodes.filter((node) => node.kind === "theme");
-  const sourceName = includePrivateDumps ? "opted-in dumps" : "field notes";
+  const sourceName = "private dumps";
   const patterns = graph.patterns?.length
     ? graph.patterns
     : [
@@ -1185,7 +1206,7 @@ function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
   const patternEvidence = evidenceNodes.filter((node) => selectedPattern?.evidenceIds?.includes(node.id)).slice(0, 4);
   const summary = graph.summary || {
     headline: themes[0] ? `${themes[0].label} keeps coming back` : "No strong pattern yet",
-    detail: graphState.supermemory?.source === "supermemory" ? `Reading your ${sourceName} for repeat work patterns.` : map.summary,
+    detail: graphState.memory?.source === "pattern_graph" ? `Reading your ${sourceName} for repeat work patterns.` : map.summary,
     nextStep: dumps.length > 2 ? "Turn one useful thread into a field note when it is ready for the team." : "Add more raw material before trusting the read.",
   };
   const insights = graph.insights?.length
@@ -1194,20 +1215,20 @@ function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
         {
           label: "source",
           value: sourceName,
-          detail: includePrivateDumps ? "Private dumps are opted in for this browser." : "Private dumps stay out by default.",
+          detail: "Logged-in private dumps shape this map. Nothing gets posted.",
           tone: "blue",
         },
       ];
-  const memoryStatus = graphState.supermemory || {};
-  const sourceCount = includePrivateDumps ? dumps.length : fieldNotes.length;
+  const memoryStatus = graphState.memory || {};
+  const sourceCount = dumps.length;
   const isGraphLoading = graphState.status === "loading";
   const statusLabel =
     isGraphLoading ? "checking memory" : memoryStatus.label || (memoryStatus.configured ? "memory ready" : "local only");
   const statusValue =
     isGraphLoading
-      ? "syncing..."
+      ? "checking..."
       : memoryStatus.status === "active"
-        ? `${sourceName} connected`
+        ? "private patterns ready"
         : memoryStatus.status === "unavailable"
           ? "local, lower confidence"
           : memoryStatus.status === "waiting"
@@ -1232,41 +1253,37 @@ function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
           <h1>your working map</h1>
           <p>See what keeps coming up, what it might mean, and which thread is worth turning into a team read.</p>
         </div>
-        <Link className="ghost-button button-link" href="/dump">
-          back to dump
-        </Link>
+        <div className="dump-nav">
+          <Link className="ghost-button button-link" href="/patterns">
+            patterns
+          </Link>
+          <Link className="ghost-button button-link" href="/dump">
+            back to dump
+          </Link>
+        </div>
       </div>
       <div className="dump-map-panel">
         {status === "loading" ? <div className="empty-state">looking for patterns...</div> : null}
         {status !== "loading" && sourceCount < 1 ? (
-          <div className="empty-state">
-            {includePrivateDumps ? "write a dump to start your private map." : "draft a field note to start the working map."}
-          </div>
+          <div className="empty-state">write a logged-in private dump to start your working map.</div>
         ) : null}
         {status !== "loading" && sourceCount >= 1 && (
           <>
             <div className={`dump-graph-status ${memoryStatus.status || "local"}`}>
               <span>{statusLabel}</span>
               <strong>{statusValue}</strong>
+              {testToolsEnabled && (
+                <button className="ghost-button dump-map-test-button" type="button" onClick={handleTestGenerateInsight} disabled={isTestingInsight || isGraphLoading}>
+                  {isTestingInsight ? "generating..." : "regenerate"}
+                </button>
+              )}
               {statusDetail && <p>{statusDetail}</p>}
             </div>
-
-            <label className={`dump-memory-toggle ${includePrivateDumps ? "on" : ""}`}>
-              <input type="checkbox" checked={includePrivateDumps} onChange={handlePrivateDumpMemoryToggle} />
-              <span>
-                <strong>use private dumps for my graph</strong>
-                <small>
-                  {includePrivateDumps
-                    ? "only for your private graph. nothing gets posted."
-                    : "off by default. published/drafted field notes shape this view."}
-                </small>
-              </span>
-            </label>
 
             {isGraphLoading ? (
               <div className="dump-map-loading">
                 <strong>reading your {sourceName}...</strong>
-                <p>The map only uses private dumps if you switch them on.</p>
+                <p>Pattern reads stay private to your logged-in dump.</p>
               </div>
             ) : (
               <>
@@ -1326,7 +1343,7 @@ function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
                       </div>
                     </div>
                     <div className="dump-pattern-evidence">
-                      <small>{includePrivateDumps ? "private evidence" : "field note evidence"}</small>
+                      <small>private evidence</small>
                       {patternEvidence.length ? (
                         patternEvidence.map((dump) => (
                           <div className="dump-pattern-evidence-item" key={dump.id}>
@@ -1335,7 +1352,7 @@ function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
                           </div>
                         ))
                       ) : (
-                        <p>No connected evidence yet. Draft a field note or opt private dumps in for a richer read.</p>
+                        <p>No connected evidence yet. Keep dumping and the graph will get a richer read.</p>
                       )}
                     </div>
                   </article>

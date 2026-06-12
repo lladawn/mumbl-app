@@ -132,7 +132,20 @@ The service role key must stay server-only. It is used only in Next.js route han
 
 ## Extension Schema
 
-The extension adds `memory_entries` for future Supermemory sync tracking and `space_plans` for future flat pricing. These tables exist as runway only; there is no Supermemory or billing UI yet.
+The old `memory_entries`/Supermemory runway is dormant. Private dump patterns now use Supabase pgvector through server routes, with `dump_signals`, `patterns`, and `user_dump_counts` owned by authenticated users.
+
+The pattern graph is private user sensemaking, not room analytics:
+
+- Logged-in private dumps are processed asynchronously after save.
+- Anonymous/session-only dumps are not processed.
+- OpenAI extracts structured signals and embeddings.
+- Anthropic generates milestone insights.
+- `/dump/map` uses local graph data plus pgvector search over the authenticated user's own signals.
+- `/patterns` lets the authenticated owner confirm or dismiss generated insights.
+- Pattern APIs must not expose source dump content, and Slack notifications must only link back to Mumbl without including private insight text.
+- Deleting logged-in private dumps should clean up generated pattern rows that cite those dumps and reconcile the active private dump count.
+
+See `docs/pattern-graph.md` for the operational flow, env vars, migrations, and staging QA steps.
 
 ## Public Space Runway
 
