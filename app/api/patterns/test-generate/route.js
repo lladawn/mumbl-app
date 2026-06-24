@@ -7,7 +7,11 @@ import { cleanString } from "../../../../src/server/validation";
 
 export async function POST(request) {
   try {
-    if (!getServerEnv().patternGraphTestToolsEnabled) {
+    const env = getServerEnv();
+    if (!env.patternGraphEnabled) {
+      return badRequest("pattern graph is disabled");
+    }
+    if (!env.patternGraphTestToolsEnabled) {
       return badRequest("pattern test tools are disabled");
     }
 

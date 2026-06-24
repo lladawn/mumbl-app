@@ -11,6 +11,7 @@ import {
   fetchDumpMap,
   fetchDumps,
   fetchPublicProfileForSession,
+  fetchSavedRooms,
   publishFieldNote,
   savePublicProfile,
   setFieldNotePublic,
@@ -19,7 +20,7 @@ import {
   updateFieldNote,
 } from "../lib/api";
 import { AUTH_CHANGED_EVENT, linkCurrentDumpSession } from "../lib/auth";
-import { getRecentSlug } from "../lib/storage";
+import { getRecentSlug, getRoomAccessToken } from "../lib/storage";
 import { EditIcon, TrashIcon } from "./ActionIcons";
 import Toast from "./Toast";
 
@@ -32,6 +33,7 @@ const placeholders = [
 ];
 
 const MAX_DUMP_CHARS = 4000;
+const patternGraphUiEnabled = process.env.NEXT_PUBLIC_ENABLE_PATTERN_GRAPH === "true";
 
 export default function DumpPageClient({ mode = "home" }) {
   const [dumps, setDumps] = useState([]);
@@ -44,6 +46,7 @@ export default function DumpPageClient({ mode = "home" }) {
   const [expandedId, setExpandedId] = useState("");
   const [recentSlug, setRecentSlug] = useState("");
   const [shareSlug, setShareSlug] = useState("");
+  const [savedRooms, setSavedRooms] = useState([]);
   const [publishAnonymous, setPublishAnonymous] = useState(true);
   const [displayName, setDisplayName] = useState("");
   const [publicProfile, setPublicProfile] = useState(null);
@@ -113,6 +116,7 @@ export default function DumpPageClient({ mode = "home" }) {
       if (event.detail?.status === "anonymous") {
         setDumps([]);
         setFieldNotes([]);
+        setSavedRooms([]);
         setPublicProfile(null);
         setPublicProfileStatus("loading");
       }
@@ -148,6 +152,12 @@ export default function DumpPageClient({ mode = "home" }) {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  function handleDumpKeyDown(event) {
+    if (event.key !== "Enter" || !event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
   }
 
   async function handleUpdateDump(dump, nextContent, nextWantsReflection) {
@@ -462,17 +472,21 @@ export default function DumpPageClient({ mode = "home" }) {
           <p>Write the messy thing. Keep it private. Turn only the useful thread into a field note later.</p>
         </div>
         <div className="dump-nav">
-          <Link className="ghost-button button-link" href="/dump/map">
-            see the map
-          </Link>
-          <Link className="ghost-button button-link" href="/patterns">
-            patterns
-          </Link>
+          {patternGraphUiEnabled && (
+            <>
+              <Link className="ghost-button button-link" href="/dump/map">
+                see the map
+              </Link>
+              <Link className="ghost-button button-link" href="/patterns">
+                patterns
+              </Link>
+            </>
+          )}
           <button className="ghost-button" type="button" onClick={() => setPublicModalOpen(true)}>
             go public
           </button>
           {recentSlug && (
-            <Link className="ghost-button button-link" href={`/r/${recentSlug}/reads`}>
+            <Link className="ghost-button button-link" href={roomLinkFor(recentSlug)}>
               team reads
             </Link>
           )}
@@ -484,6 +498,7 @@ export default function DumpPageClient({ mode = "home" }) {
           <textarea
             value={content}
             onChange={(event) => setContent(event.target.value)}
+            onKeyDown={handleDumpKeyDown}
             maxLength={MAX_DUMP_CHARS}
             placeholder={placeholder}
             autoFocus={mode === "new"}
@@ -603,10 +618,11 @@ export default function DumpPageClient({ mode = "home" }) {
           </div>
         </section>
       ) : (
-        <FieldNoteDrafts
-          fieldNotes={fieldNotes}
-          recentSlug={recentSlug}
-          shareSlug={shareSlug}
+          <FieldNoteDrafts
+            fieldNotes={fieldNotes}
+            recentSlug={recentSlug}
+            savedRooms={savedRooms}
+            shareSlug={shareSlug}
           setShareSlug={setShareSlug}
           publishAnonymous={publishAnonymous}
           setPublishAnonymous={setPublishAnonymous}
@@ -645,10 +661,11 @@ export default function DumpPageClient({ mode = "home" }) {
   async function loadDumpState(isMounted = () => true) {
     try {
       await repairLoggedInSessionLink();
-      const [result, profileResult] = await Promise.all([fetchDumps(), fetchPublicProfileForSession()]);
+      const [result, profileResult, roomsResult] = await Promise.all([fetchDumps(), fetchPublicProfileForSession(), fetchSavedRooms()]);
       if (!isMounted()) return;
       setDumps(result.dumps || []);
       setFieldNotes(result.fieldNotes || []);
+      setSavedRooms(roomsResult.savedRooms || []);
       const nextProfile = profileResult.profile || null;
       setPublicProfile(nextProfile);
       setPublicProfileStatus(profileResult.migrationRequired ? "migration" : "ready");
@@ -673,6 +690,11 @@ export default function DumpPageClient({ mode = "home" }) {
       // The following fetch will surface auth/migration errors in the normal page flow.
     }
   }
+}
+
+function roomLinkFor(slug) {
+  const accessToken = getRoomAccessToken(slug);
+  return `/r/${slug}/reads${accessToken ? `?key=${encodeURIComponent(accessToken)}` : ""}`;
 }
 
 function appendSpeechTranscript(current, transcript) {
@@ -819,6 +841,7 @@ function DumpCard({ dump, expanded, setExpandedId, selected, toggleSelected, upd
 function FieldNoteDrafts({
   fieldNotes,
   recentSlug,
+  savedRooms,
   shareSlug,
   setShareSlug,
   publishAnonymous,
@@ -843,6 +866,7 @@ function FieldNoteDrafts({
           fieldNote={fieldNote}
           key={fieldNote.id}
           recentSlug={recentSlug}
+          savedRooms={savedRooms}
           shareSlug={shareSlug}
           setShareSlug={setShareSlug}
           publishAnonymous={publishAnonymous}
@@ -863,6 +887,7 @@ function FieldNoteDrafts({
 function FieldNoteDraft({
   fieldNote,
   recentSlug,
+  savedRooms,
   shareSlug,
   setShareSlug,
   publishAnonymous,
@@ -931,15 +956,40 @@ function FieldNoteDraft({
       )}
       {!isPublished && (
         <div className="dump-share-fields">
-          <label>
-            room slug
-            <input
-              value={shareSlug}
-              onChange={(event) => setShareSlug(event.target.value)}
-              placeholder={recentSlug || "backend-team"}
-              disabled={isMutating}
-            />
-          </label>
+          {savedRooms.length ? (
+            <label>
+              publish to
+              <select value={shareSlug} onChange={(event) => setShareSlug(event.target.value)} disabled={isMutating}>
+                <option value="">{recentSlug ? `recent: ${recentSlug}` : "choose a saved room"}</option>
+                {savedRooms.map((room) => (
+                  <option value={room.slug} key={room.id || room.slug}>
+                    {room.name || room.slug}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label>
+              room slug
+              <input
+                value={shareSlug}
+                onChange={(event) => setShareSlug(event.target.value)}
+                placeholder={recentSlug || "backend-team"}
+                disabled={isMutating}
+              />
+            </label>
+          )}
+          {savedRooms.length > 0 && (
+            <label>
+              other room slug
+              <input
+                value={shareSlug}
+                onChange={(event) => setShareSlug(event.target.value)}
+                placeholder="paste slug if it is not saved yet"
+                disabled={isMutating}
+              />
+            </label>
+          )}
           <label className={`display-name-row ${publishAnonymous ? "hidden" : ""}`}>
             display handle
             <input

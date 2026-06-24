@@ -1,4 +1,5 @@
 import { cleanString } from "./validation";
+import { decryptContentFields, decryptContentRows } from "./encryption";
 
 export function normalizeHandle(value) {
   return cleanString(value, 32)
@@ -13,22 +14,25 @@ export function isValidHandle(handle) {
 }
 
 export function serializePublicProfile(profile, fieldNotes = []) {
+  const readableProfile = decryptContentFields("public_profiles", profile, ["display_name", "bio"]);
+  const readableFieldNotes = decryptContentRows("field_notes", fieldNotes, ["title", "content"]);
   return {
-    id: profile.id,
-    handle: profile.handle,
-    displayName: profile.display_name || profile.handle,
-    bio: profile.bio || "",
-    createdAt: new Date(profile.created_at).getTime(),
-    posts: fieldNotes.map(serializePublicFieldNote),
+    id: readableProfile.id,
+    handle: readableProfile.handle,
+    displayName: readableProfile.display_name || readableProfile.handle,
+    bio: readableProfile.bio || "",
+    createdAt: new Date(readableProfile.created_at).getTime(),
+    posts: readableFieldNotes.map(serializePublicFieldNote),
   };
 }
 
 export function serializePublicFieldNote(note) {
+  const readableNote = decryptContentFields("field_notes", note, ["title", "content"]);
   return {
-    id: note.id,
-    title: note.title,
-    content: note.content,
-    publishedAt: note.public_published_at ? new Date(note.public_published_at).getTime() : null,
-    createdAt: new Date(note.created_at).getTime(),
+    id: readableNote.id,
+    title: readableNote.title,
+    content: readableNote.content,
+    publishedAt: readableNote.public_published_at ? new Date(readableNote.public_published_at).getTime() : null,
+    createdAt: new Date(readableNote.created_at).getTime(),
   };
 }

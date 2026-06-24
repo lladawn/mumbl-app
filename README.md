@@ -81,8 +81,8 @@ The frontend now uses these backend route handlers for spaces, posts, reactions,
 
 1. Create a Supabase project.
 2. Copy `.env.example` to `.env.local`.
-3. Fill in `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `MUMBL_TOKEN_HASH_SECRET`, `MUMBL_SIDE_QUEST_ENCRYPTION_KEY`, and `CRON_SECRET`.
-   Pattern graph work also needs `OPENAI_API_KEY`, `OPENAI_SIGNAL_MODEL`, `ANTHROPIC_API_KEY`, and `ANTHROPIC_INSIGHT_MODEL`.
+3. Fill in `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `MUMBL_TOKEN_HASH_SECRET`, `MUMBL_CONTENT_ENCRYPTION_KEY`, `MUMBL_SIDE_QUEST_ENCRYPTION_KEY`, and `CRON_SECRET`.
+   Pattern graph work also needs `MUMBL_ENABLE_PATTERN_GRAPH=true`, `OPENAI_API_KEY`, `OPENAI_SIGNAL_MODEL`, `ANTHROPIC_API_KEY`, and `ANTHROPIC_INSIGHT_MODEL`.
 4. Authenticate the Supabase CLI with `npx supabase login`.
 5. Run `npm run db:link -- your-project-ref` or `npm run db:link -- https://your-project.supabase.co`.
    `npm run db:link:staging` reads `.env.local`; `npm run db:link:prod` reads `.env.production.local`.
@@ -94,6 +94,8 @@ For account/session continuity, enable Supabase Google OAuth and allow `/auth/ca
 Creator access starts with the local room creator token. When a logged-in creator presents that token, or opens a Slack-created room handoff while logged in, Mumbl links the room to their auth account so creator controls survive across browsers without tracking normal room membership.
 
 Creators can delete test or unused rooms from the room danger zone. Deleting a room hard-deletes the room reads/feed signal, frees the slug, and leaves user-owned field notes in the author's dump with their room/post linkage cleared.
+
+User-entered and user-derived text is encrypted into per-row `encrypted_payload` JSON before it is stored. The rollout backfills existing rows, uses `0030_scrub_plaintext_content.sql` as a verification scrub, then `0031_drop_legacy_plaintext_content_columns.sql` removes the legacy plaintext columns. This is server-side field encryption, not end-to-end encryption: Mumbl route handlers can decrypt content when needed to render rooms, draft field notes, generate heartbeats, and serve owner-scoped private data.
 
 Until those variables exist, API routes return a setup `503`.
 

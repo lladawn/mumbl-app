@@ -14,6 +14,19 @@ export async function GET(request) {
     if (!sessionToken) return badRequest("session token is required");
 
     const env = getServerEnv();
+    if (!env.patternGraphEnabled) {
+      return ok({
+        graph: emptyGraph("private patterns are off in this environment."),
+        memory: {
+          status: "disabled",
+          label: "patterns off",
+          detail: "private pattern graph is not enabled here.",
+          source: "none",
+        },
+        testToolsEnabled: false,
+      });
+    }
+
     const supabase = getSupabaseAdmin();
     const owner = await resolveRequestOwner({ request, sessionToken });
     assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner);
@@ -32,7 +45,7 @@ export async function GET(request) {
 
     const [{ data: dumps, error: dumpsError }, { data: signals, error: signalsError }, { data: patterns, error: patternsError }] =
       await Promise.all([
-        applyOwnerFilter(supabase.from("dumps").select("id, content, created_at").eq("visibility", "private"), owner)
+        applyOwnerFilter(supabase.from("dumps").select("id, encrypted_payload, created_at").eq("visibility", "private"), owner)
           .order("created_at", { ascending: false })
           .limit(80),
         supabase
@@ -43,7 +56,7 @@ export async function GET(request) {
           .limit(80),
         supabase
           .from("patterns")
-          .select("id, dump_ids, summary, question, user_confirmed, user_dismissed, triggered_at_count, created_at")
+          .select("id, dump_ids, encrypted_payload, user_confirmed, user_dismissed, triggered_at_count, created_at")
           .eq("user_id", owner.userId)
           .or("user_dismissed.is.null,user_dismissed.eq.false")
           .order("created_at", { ascending: false })

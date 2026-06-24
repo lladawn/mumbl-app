@@ -1,7 +1,9 @@
 import { badRequest, notFound, ok, serverError } from "../../../../../src/server/http";
 import { resolveRequestOwner } from "../../../../../src/server/auth";
 import { enforceRateLimit } from "../../../../../src/server/rateLimit";
+import { decryptContentFields, encryptContentFields, withoutEncryptedPayload } from "../../../../../src/server/encryption";
 import { createToken, hashToken } from "../../../../../src/server/hash";
+import { assertRoomAccess, cleanRoomAccessToken, saveRoomAccessForUser } from "../../../../../src/server/roomAccess";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
 import { cleanString, isValidPostType } from "../../../../../src/server/validation";
 
@@ -17,6 +19,7 @@ export async function POST(request, { params }) {
     const promptId = cleanString(body.promptId, 64) || null;
     const dumpId = cleanString(body.dumpId, 64) || null;
     const fieldNoteTitle = type === "field_note" ? cleanString(body.title, 120) : null;
+    const accessToken = cleanRoomAccessToken(body.accessToken);
 
     if (!slug) return badRequest("space slug is required");
     if (!isValidPostType(type)) return badRequest("unsupported post type");
@@ -28,9 +31,11 @@ export async function POST(request, { params }) {
     const owner = await resolveRequestOwner({ request, sessionToken });
     await enforceRateLimit({ supabase, action: "post", sessionToken: owner.userId ? `auth-post:${owner.userId}` : sessionToken });
 
-    const { data: space, error: spaceError } = await supabase.from("spaces").select("id").eq("slug", slug).single();
+    const { data: space, error: spaceError } = await supabase.from("spaces").select("id,read_token_hash,is_public,creator_user_id").eq("slug", slug).single();
     if (spaceError?.code === "PGRST116") return notFound("space not found");
     if (spaceError) throw spaceError;
+    assertRoomAccess({ space, accessToken, owner });
+    await saveRoomAccessForUser({ supabase, owner, space, accessToken });
 
     const editToken = createToken();
     const { data: post, error: postError } = await supabase
@@ -39,11 +44,13 @@ export async function POST(request, { params }) {
         space_id: space.id,
         prompt_id: promptId,
         dump_id: dumpId,
-        field_note_title: fieldNoteTitle,
         type,
-        content,
         is_anonymous: isAnonymous,
-        display_name: displayName,
+        encrypted_payload: encryptContentFields("posts", {
+          content,
+          display_name: displayName,
+          field_note_title: fieldNoteTitle,
+        }),
       })
       .select()
       .single();
@@ -70,7 +77,7 @@ export async function POST(request, { params }) {
     const { error: updateError } = await supabase.from("spaces").update({ first_post_done: true }).eq("id", space.id);
     if (updateError) throw updateError;
 
-    return ok({ post, editToken });
+    return ok({ post: withoutEncryptedPayload(decryptContentFields("posts", post, ["content", "display_name", "field_note_title"])), editToken });
   } catch (error) {
     return serverError(error);
   }

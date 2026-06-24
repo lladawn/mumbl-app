@@ -1,9 +1,11 @@
 import { badRequest, notFound, ok, serverError } from "../../../../src/server/http";
 import { resolveRequestOwner } from "../../../../src/server/auth";
 import { claimCreatorAccess, resolveCreatorAccess } from "../../../../src/server/creatorAccess";
+import { encryptContentFields } from "../../../../src/server/encryption";
 import { hashToken } from "../../../../src/server/hash";
 import { getOrCreateKnownPublicRoom } from "../../../../src/server/demoRoom";
 import { getTopReactionLabels, startOfTodayIso } from "../../../../src/server/roomVibe";
+import { assertRoomAccess, cleanRoomAccessToken, saveRoomAccessForUser } from "../../../../src/server/roomAccess";
 import { serializeSpace, summariseReactions } from "../../../../src/server/serializers";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 import { cleanString } from "../../../../src/server/validation";
@@ -25,6 +27,7 @@ export async function GET(request, { params }) {
     const postLimit = parsePostLimit(url.searchParams.get("limit"));
     const postCursor = parsePostCursor(url.searchParams.get("before"));
     const postType = parsePostType(url.searchParams.get("type"));
+    const accessToken = cleanRoomAccessToken(url.searchParams.get("key") || url.searchParams.get("accessToken"));
     const supabase = getSupabaseAdmin();
 
     let { data: space, error: spaceError } = await supabase.from("spaces").select("*").eq("slug", slug).single();
@@ -34,6 +37,8 @@ export async function GET(request, { params }) {
       spaceError = null;
     }
     if (spaceError) throw spaceError;
+    assertRoomAccess({ space, accessToken, owner });
+    await saveRoomAccessForUser({ supabase, owner, space, accessToken });
 
     let postsQuery = supabase
       .from("posts")
@@ -180,11 +185,10 @@ export async function PATCH(request, { params }) {
     if (Object.hasOwn(body, "isPublic")) {
       const isPublic = body.isPublic === true;
       updates.is_public = isPublic;
-      updates.public_name = isPublic ? cleanString(body.publicName, 80) || null : null;
     }
 
     if (Object.hasOwn(body, "description")) {
-      updates.description = cleanString(body.description, 180) || null;
+      updates.description_changed = true;
     }
 
     if (!slug) return badRequest("space slug is required");
@@ -193,7 +197,7 @@ export async function PATCH(request, { params }) {
     const supabase = getSupabaseAdmin();
     const { data: space, error: spaceError } = await supabase
       .from("spaces")
-      .select("id,creator_token_hash,creator_user_id")
+      .select("id,creator_token_hash,creator_user_id,encrypted_payload")
       .eq("slug", slug)
       .single();
     if (spaceError?.code === "PGRST116") return notFound("space not found");
@@ -204,6 +208,17 @@ export async function PATCH(request, { params }) {
       return badRequest("creator token did not match");
     }
     if (access.shouldClaim) await claimCreatorAccess({ supabase, spaceId: space.id, userId: access.owner.userId });
+
+    const encryptedFields = {};
+    if (Object.hasOwn(body, "isPublic")) encryptedFields.public_name = body.isPublic === true ? cleanString(body.publicName, 80) || null : null;
+    if (Object.hasOwn(body, "description")) encryptedFields.description = cleanString(body.description, 180) || null;
+    if (Object.keys(encryptedFields).length) {
+      updates.encrypted_payload = {
+        ...(space.encrypted_payload || {}),
+        ...encryptContentFields("spaces", encryptedFields),
+      };
+    }
+    delete updates.description_changed;
 
     const { data: updatedSpace, error: updateError } = await supabase
       .from("spaces")

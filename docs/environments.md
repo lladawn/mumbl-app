@@ -88,8 +88,11 @@ Use different values per environment:
 - Preview / `dev`: staging Supabase URL, anon key, service role key, staging cron secret
 - Production / `main`: production Supabase URL, anon key, service role key, production cron secret
 
-Pattern graph variables are also environment-specific:
+Content encryption and pattern graph variables are also environment-specific:
 
+- `MUMBL_CONTENT_ENCRYPTION_KEY`
+- `MUMBL_ENABLE_PATTERN_GRAPH`
+- `NEXT_PUBLIC_ENABLE_PATTERN_GRAPH`
 - `OPENAI_API_KEY`
 - `OPENAI_SIGNAL_MODEL`
 - `ANTHROPIC_API_KEY`
@@ -98,7 +101,9 @@ Pattern graph variables are also environment-specific:
 - `MUMBL_PATTERN_GRAPH_INSIGHT_INTERVAL`
 - `MUMBL_ENABLE_PATTERN_TEST_TOOLS`
 
-Use lower pattern thresholds and `MUMBL_ENABLE_PATTERN_TEST_TOOLS=true` only in local or staging. Production should keep test tools disabled and use the intended cadence unless product explicitly changes it.
+`MUMBL_CONTENT_ENCRYPTION_KEY` is server-only and lane-specific. A row encrypted in one lane cannot be decrypted in another lane unless the key is intentionally shared, so production, staging, and local data should use separate keys.
+
+Use `MUMBL_ENABLE_PATTERN_GRAPH=true` only in environments where the private pattern graph should run, and pair it with `NEXT_PUBLIC_ENABLE_PATTERN_GRAPH=true` only when the UI should link to the feature. Production can safely ship the code with both flags false or unset, which hides pattern links and disables pattern APIs, async processing, insight generation, and Slack pattern pointers. Use lower pattern thresholds and `MUMBL_ENABLE_PATTERN_TEST_TOOLS=true` only in local or staging. Production should keep test tools disabled and use the intended cadence unless product explicitly changes it.
 
 Supabase Auth needs environment-specific redirect URLs in the Supabase dashboard. Add each lane's callback URL, such as `http://127.0.0.1:3000/auth/callback`, the Vercel Preview callback URL, and `https://mumbl.wtf/auth/callback`.
 

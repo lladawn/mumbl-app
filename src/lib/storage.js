@@ -1,6 +1,7 @@
 export const SESSION_KEY = "mumbl:session";
 export const RECENT_SPACE_KEY = "mumbl:recent-space";
 export const CREATOR_TOKEN_PREFIX = "mumbl:creator-token:";
+export const ROOM_ACCESS_TOKEN_PREFIX = "mumbl:room-access-token:";
 export const POST_EDIT_TOKEN_PREFIX = "mumbl:post-edit-token:";
 
 export function loadSession() {
@@ -39,6 +40,20 @@ export function clearCreatorToken(slug) {
   window.localStorage.removeItem(`${CREATOR_TOKEN_PREFIX}${slug}`);
 }
 
+export function saveRoomAccessToken(slug, token) {
+  if (!slug || !token) return;
+  window.localStorage.setItem(`${ROOM_ACCESS_TOKEN_PREFIX}${slug}`, token);
+}
+
+export function getRoomAccessToken(slug) {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(`${ROOM_ACCESS_TOKEN_PREFIX}${slug}`) || "";
+}
+
+export function clearRoomAccessToken(slug) {
+  window.localStorage.removeItem(`${ROOM_ACCESS_TOKEN_PREFIX}${slug}`);
+}
+
 export function savePostEditToken(postId, token) {
   if (!postId || !token) return;
   window.localStorage.setItem(`${POST_EDIT_TOKEN_PREFIX}${postId}`, token);
@@ -61,6 +76,18 @@ export function listCreatorTokens() {
       token: window.localStorage.getItem(key) || "",
     }))
     .filter((item) => item.slug && item.token);
+}
+
+export function listRoomAccessTokens() {
+  if (typeof window === "undefined") return [];
+  return Object.keys(window.localStorage)
+    .filter((key) => key.startsWith(ROOM_ACCESS_TOKEN_PREFIX))
+    .map((key) => ({
+      slug: key.slice(ROOM_ACCESS_TOKEN_PREFIX.length),
+      token: window.localStorage.getItem(key) || "",
+    }))
+    .filter((item) => item.slug && item.token)
+    .slice(0, 100);
 }
 
 export function listPostEditTokens() {

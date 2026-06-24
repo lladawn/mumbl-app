@@ -1,10 +1,13 @@
 import { badRequest, ok, serverError } from "../../../../../src/server/http";
 import { assertExpectedAuthenticatedOwner, resolveRequestOwner } from "../../../../../src/server/auth";
+import { getServerEnv } from "../../../../../src/server/env";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
 import { cleanString } from "../../../../../src/server/validation";
 
 export async function POST(request, { params }) {
   try {
+    if (!getServerEnv().patternGraphEnabled) return badRequest("pattern graph is disabled");
+
     const { patternId: rawPatternId } = await params;
     const patternId = cleanString(rawPatternId, 64);
     const body = await request.json();

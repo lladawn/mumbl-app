@@ -24,7 +24,7 @@ The user should not need to understand embeddings, milestones, or model routing.
 - Source dump IDs may be stored privately for cleanup and evidence linking, but public or room surfaces must not expose them.
 - Slack notifications may say that a private insight exists and link back to Mumbl. They must not include private insight text.
 - Confirming or dismissing a pattern affects only that logged-in user's row.
-- Supermemory columns are kept inert for data safety. New code should not read or write `supermemory_*`.
+- The old Supermemory columns and `memory_entries` table have been removed. Private patterns use Supabase pgvector-backed `dump_signals` instead.
 
 ## Data Flow
 

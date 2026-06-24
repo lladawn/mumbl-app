@@ -1,32 +1,36 @@
+import { decryptContentFields } from "./encryption";
+
 export function serializeDump(dump) {
+  const readableDump = decryptContentFields("dumps", dump, ["content", "ai_reflection", "source_meta"]);
   return {
-    id: dump.id,
-    content: dump.content,
-    visibility: dump.visibility,
-    teamRoomId: dump.team_room_id || "",
-    aiReflection: dump.ai_reflection || "",
-    source: dump.source || "web",
-    sourceMeta: dump.source_meta || {},
-    publishedAt: dump.published_at ? new Date(dump.published_at).getTime() : null,
-    createdAt: new Date(dump.created_at).getTime(),
-    updatedAt: new Date(dump.updated_at).getTime(),
+    id: readableDump.id,
+    content: readableDump.content,
+    visibility: readableDump.visibility,
+    teamRoomId: readableDump.team_room_id || "",
+    aiReflection: readableDump.ai_reflection || "",
+    source: readableDump.source || "web",
+    sourceMeta: readableDump.source_meta || {},
+    publishedAt: readableDump.published_at ? new Date(readableDump.published_at).getTime() : null,
+    createdAt: new Date(readableDump.created_at).getTime(),
+    updatedAt: new Date(readableDump.updated_at).getTime(),
   };
 }
 
 export function serializeFieldNote(note) {
+  const readableNote = decryptContentFields("field_notes", note, ["title", "content"]);
   return {
-    id: note.id,
-    title: note.title,
-    content: note.content,
-    sourceDumpIds: note.source_dump_ids || [],
-    teamRoomId: note.team_room_id || "",
-    isPublished: note.is_published || false,
-    publishedPostId: note.published_post_id || "",
-    isPublic: note.is_public || false,
-    publicProfileId: note.public_profile_id || "",
-    createdAt: new Date(note.created_at).getTime(),
-    publishedAt: note.published_at ? new Date(note.published_at).getTime() : null,
-    publicPublishedAt: note.public_published_at ? new Date(note.public_published_at).getTime() : null,
+    id: readableNote.id,
+    title: readableNote.title,
+    content: readableNote.content,
+    sourceDumpIds: readableNote.source_dump_ids || [],
+    teamRoomId: readableNote.team_room_id || "",
+    isPublished: readableNote.is_published || false,
+    publishedPostId: readableNote.published_post_id || "",
+    isPublic: readableNote.is_public || false,
+    publicProfileId: readableNote.public_profile_id || "",
+    createdAt: new Date(readableNote.created_at).getTime(),
+    publishedAt: readableNote.published_at ? new Date(readableNote.published_at).getTime() : null,
+    publicPublishedAt: readableNote.public_published_at ? new Date(readableNote.public_published_at).getTime() : null,
   };
 }
 

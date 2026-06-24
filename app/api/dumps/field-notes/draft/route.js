@@ -3,6 +3,7 @@ import { draftFieldNote } from "../../../../../src/server/fieldNotes";
 import { applyOwnerFilter, assertExpectedAuthenticatedOwner, ownerInsertFields, resolveRequestOwner } from "../../../../../src/server/auth";
 import { enforceRateLimit } from "../../../../../src/server/rateLimit";
 import { serializeFieldNote } from "../../../../../src/server/dumps";
+import { decryptContentRows, encryptContentFields } from "../../../../../src/server/encryption";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
 import { cleanString } from "../../../../../src/server/validation";
 
@@ -28,7 +29,8 @@ export async function POST(request) {
     if (dumpsError) throw dumpsError;
     if (!dumps?.length) return badRequest("no matching private dumps found");
 
-    const orderedDumps = [...dumpIds].reverse().map((id) => dumps.find((dump) => dump.id === id)).filter(Boolean);
+    const readableDumps = decryptContentRows("dumps", dumps || [], ["content", "ai_reflection", "source_meta"]);
+    const orderedDumps = [...dumpIds].reverse().map((id) => readableDumps.find((dump) => dump.id === id)).filter(Boolean);
     const draft = await draftFieldNote({ dumps: orderedDumps });
 
     const { data: fieldNote, error: noteError } = await supabase
@@ -36,8 +38,10 @@ export async function POST(request) {
       .insert({
         ...ownerInsertFields(owner),
         source_dump_ids: draft.sourceDumpIds,
-        title: draft.title || "field note",
-        content: draft.content,
+        encrypted_payload: encryptContentFields("field_notes", {
+          title: draft.title || "field note",
+          content: draft.content,
+        }),
       })
       .select("*")
       .single();

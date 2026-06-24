@@ -1,5 +1,6 @@
 import { badRequest, ok, serverError } from "../../../src/server/http";
 import { assertExpectedAuthenticatedOwner, resolveRequestOwner } from "../../../src/server/auth";
+import { decryptContentRows, withoutEncryptedPayloadRows } from "../../../src/server/encryption";
 import { getServerEnv } from "../../../src/server/env";
 import { getSupabaseAdmin } from "../../../src/server/supabase";
 import { cleanString } from "../../../src/server/validation";
@@ -12,15 +13,18 @@ export async function GET(request) {
     const includeDismissed = url.searchParams.get("includeDismissed") === "true";
     if (!sessionToken) return badRequest("session token is required");
 
+    const env = getServerEnv();
+    if (!env.patternGraphEnabled) return ok({ patterns: [], testToolsEnabled: false, disabled: true });
+
     const supabase = getSupabaseAdmin();
     const owner = await resolveRequestOwner({ request, sessionToken });
     assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner);
-    const testToolsEnabled = getServerEnv().patternGraphTestToolsEnabled;
+    const testToolsEnabled = env.patternGraphTestToolsEnabled;
     if (!owner.userId) return ok({ patterns: [], testToolsEnabled });
 
     let query = supabase
       .from("patterns")
-      .select("id, summary, question, period_start, period_end, user_confirmed, user_dismissed, delivered_slack, delivered_at, triggered_at_count, created_at")
+      .select("id, encrypted_payload, period_start, period_end, user_confirmed, user_dismissed, delivered_slack, delivered_at, triggered_at_count, created_at")
       .eq("user_id", owner.userId)
       .order("created_at", { ascending: false })
       .limit(20);
@@ -30,7 +34,10 @@ export async function GET(request) {
     const { data, error } = await query;
     if (isMissingTableError(error)) return serverError(missingPatternMigrationError());
     if (error) throw error;
-    return ok({ patterns: data || [], testToolsEnabled });
+    return ok({
+      patterns: withoutEncryptedPayloadRows(decryptContentRows("patterns", data || [], ["summary", "question"])),
+      testToolsEnabled,
+    });
   } catch (error) {
     return serverError(error);
   }

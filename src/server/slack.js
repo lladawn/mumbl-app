@@ -3,8 +3,10 @@ import { after } from "next/server";
 import { assertSlackEnv, getServerEnv } from "./env";
 import { processSavedPrivateDump } from "./dumpPatterns";
 import { draftFieldNote } from "./fieldNotes";
+import { decryptContentFields, decryptContentRows, encryptContentFields } from "./encryption";
 import { createToken, hashToken } from "./hash";
 import { enforceRateLimit } from "./rateLimit";
+import { roomInvitePath } from "./roomAccess";
 import { getSupabaseAdmin } from "./supabase";
 import { cleanString, slugify } from "./validation";
 
@@ -168,7 +170,7 @@ export async function consumeTeamReadsSetup({ setupId, setupToken }) {
   const now = new Date().toISOString();
   const { data: setup, error } = await supabase
     .from("slack_team_read_setups")
-    .select("*, spaces(id, slug, name)")
+    .select("*, spaces(id, slug, encrypted_payload)")
     .eq("id", setupId)
     .eq("setup_token_hash", hashToken(setupToken))
     .is("consumed_at", null)
@@ -178,7 +180,10 @@ export async function consumeTeamReadsSetup({ setupId, setupToken }) {
 
   const { error: updateError } = await supabase.from("slack_team_read_setups").update({ consumed_at: now }).eq("id", setup.id);
   if (updateError) throw updateError;
-  return setup;
+  return {
+    ...setup,
+    spaces: setup.spaces ? decryptContentFields("spaces", setup.spaces, ["name", "description", "public_name"]) : setup.spaces,
+  };
 }
 
 export async function createSlackSpaceChannel({ oauthResult, setup }) {
@@ -228,6 +233,7 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
   const supabase = getSupabaseAdmin();
   const connection = await findSlackConnectionForAutoPin({ teamId, slackUserId });
   const creatorToken = createToken();
+  const accessToken = createToken();
   const cleanName = cleanString(name, 80).toLowerCase();
   const baseSlug = slugify(cleanName) || "team-mumbl";
   let slug = baseSlug;
@@ -238,18 +244,23 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
       .from("spaces")
       .insert({
         slug,
-        name: cleanName,
         vibe: "chill",
         creator_token_hash: hashToken(creatorToken),
+        read_token_hash: hashToken(accessToken),
+        encrypted_payload: encryptContentFields("spaces", {
+          name: cleanName,
+          description: null,
+          public_name: null,
+        }),
         ...(connection?.mumbl_user_id ? { creator_user_id: connection.mumbl_user_id } : {}),
       })
       .select("*")
       .single();
 
-    if (!error) {
-      insertedSpace = data;
-      break;
-    }
+      if (!error) {
+        insertedSpace = decryptContentFields("spaces", data, ["name", "description", "public_name"]);
+        break;
+      }
 
     if (error.code !== "23505") throw error;
     slug = `${baseSlug}-${attempt + 2}`;
@@ -266,15 +277,16 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
     await pinSlackSpace({ connection, spaceId: insertedSpace.id });
   }
 
-  const handoff = await createCreatorHandoff({ spaceId: insertedSpace.id, creatorToken });
+  const handoff = await createCreatorHandoff({ spaceId: insertedSpace.id, creatorToken, accessToken });
   const teamReadsSetup = await createTeamReadsSetup({ spaceId: insertedSpace.id });
   return {
     space: insertedSpace,
     creatorToken,
+    accessToken,
     creatorLinked: Boolean(connection?.mumbl_user_id),
     pinned: Boolean(connection),
     openUrl: slackSpaceHandoffUrl(handoff),
-    roomUrl: `${getServerEnv().appUrl}/r/${insertedSpace.slug}/reads`,
+    roomUrl: `${getServerEnv().appUrl}${roomInvitePath(insertedSpace.slug, accessToken)}`,
     teamReadsUrl: slackTeamReadsInstallUrl(teamReadsSetup),
   };
 }
@@ -289,9 +301,10 @@ export async function createSlackStartedSpaceModalView({ teamId, slackUserId, na
   return slackRoomCreatedModalView(result);
 }
 
-export async function createCreatorHandoff({ spaceId, creatorToken }) {
+export async function createCreatorHandoff({ spaceId, creatorToken, accessToken = "" }) {
   const handoffToken = createToken();
   const encrypted = encryptSlackSecret(creatorToken);
+  const encryptedAccess = accessToken ? encryptSlackSecret(accessToken) : null;
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("slack_space_handoffs")
@@ -301,6 +314,13 @@ export async function createCreatorHandoff({ spaceId, creatorToken }) {
       creator_token_ciphertext: encrypted.ciphertext,
       creator_token_iv: encrypted.iv,
       creator_token_tag: encrypted.tag,
+      ...(encryptedAccess
+        ? {
+            access_token_ciphertext: encryptedAccess.ciphertext,
+            access_token_iv: encryptedAccess.iv,
+            access_token_tag: encryptedAccess.tag,
+          }
+        : {}),
       handoff_token_hash: hashToken(handoffToken),
     })
     .select("id")
@@ -315,7 +335,7 @@ export async function consumeCreatorHandoff({ handoffId, handoffToken, mumblUser
   const now = new Date().toISOString();
   const { data: handoff, error } = await supabase
     .from("slack_space_handoffs")
-    .select("*, spaces(slug, name)")
+    .select("*, spaces(slug, encrypted_payload)")
     .eq("id", handoffId)
     .eq("handoff_token_hash", hashToken(handoffToken))
     .is("consumed_at", null)
@@ -328,6 +348,14 @@ export async function consumeCreatorHandoff({ handoffId, handoffToken, mumblUser
     iv: handoff.creator_token_iv,
     tag: handoff.creator_token_tag,
   });
+  const accessToken =
+    handoff.access_token_ciphertext && handoff.access_token_iv && handoff.access_token_tag
+      ? decryptSlackSecret({
+          ciphertext: handoff.access_token_ciphertext,
+          iv: handoff.access_token_iv,
+          tag: handoff.access_token_tag,
+        })
+      : "";
   const { error: updateError } = await supabase.from("slack_space_handoffs").update({ consumed_at: now }).eq("id", handoff.id);
   if (updateError) throw updateError;
 
@@ -341,10 +369,12 @@ export async function consumeCreatorHandoff({ handoffId, handoffToken, mumblUser
     if (claimError) throw claimError;
   }
 
+  const readableSpace = decryptContentFields("spaces", handoff.spaces, ["name", "description", "public_name"]);
   return {
-    slug: handoff.spaces.slug,
-    name: handoff.spaces.name,
+    slug: readableSpace.slug,
+    name: readableSpace.name,
     creatorToken,
+    accessToken,
     creatorLinked: Boolean(cleanedMumblUserId),
   };
 }
@@ -736,10 +766,13 @@ export async function saveSlackDump({ connection, content, sourceMeta = {} }) {
     .insert({
       user_id: connection.mumbl_user_id,
       session_token_hash: connection.slack_session_token_hash,
-      content: cleanedContent,
       visibility: "private",
       source: "slack",
-      source_meta: sourceMeta,
+      encrypted_payload: encryptContentFields("dumps", {
+        content: cleanedContent,
+        ai_reflection: null,
+        source_meta: sourceMeta,
+      }),
     })
     .select("id, created_at")
     .single();
@@ -772,8 +805,10 @@ export async function createPendingSlackDump({ teamId, slackUserId, content, sou
     .insert({
       slack_team_id: teamId,
       slack_user_id: slackUserId,
-      content: cleanString(content, 4000),
-      source_meta: sourceMeta,
+      encrypted_payload: encryptContentFields("slack_pending_dumps", {
+        content: cleanString(content, 4000),
+        source_meta: sourceMeta,
+      }),
     })
     .select("id")
     .single();
@@ -798,7 +833,8 @@ export async function consumePendingSlackDump({ pendingId, mumblUserId }) {
     slackUserId: pending.slack_user_id,
     mumblUserId,
   });
-  const dump = await saveSlackDump({ connection, content: pending.content, sourceMeta: pending.source_meta || {} });
+  const readablePending = decryptContentFields("slack_pending_dumps", pending, ["content", "source_meta"]);
+  const dump = await saveSlackDump({ connection, content: readablePending.content, sourceMeta: readablePending.source_meta || {} });
   const { error: updateError } = await supabase.from("slack_pending_dumps").update({ consumed_at: now }).eq("id", pending.id);
   if (updateError) throw updateError;
   return { connection, dump };
@@ -808,39 +844,42 @@ export async function recentSlackPrivateDumps(connection) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("dumps")
-    .select("id, content, created_at")
+    .select("id, encrypted_payload, created_at")
     .eq("user_id", connection.mumbl_user_id)
     .eq("visibility", "private")
     .order("created_at", { ascending: false })
     .limit(MAX_SLACK_DRAFT_DUMPS);
   if (error) throw error;
-  return data || [];
+  return decryptContentRows("dumps", data || [], ["content", "ai_reflection", "source_meta"]);
 }
 
 export async function recentSlackFieldNoteDrafts(connection) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("field_notes")
-    .select("id, title, created_at")
+    .select("id, encrypted_payload, created_at")
     .eq("user_id", connection.mumbl_user_id)
     .eq("is_published", false)
     .order("created_at", { ascending: false })
     .limit(10);
   if (error) throw error;
-  return data || [];
+  return decryptContentRows("field_notes", data || [], ["title", "content"]).map((fieldNote) => ({
+    ...fieldNote,
+    spaces: fieldNote.spaces ? decryptContentFields("spaces", fieldNote.spaces, ["name", "description", "public_name"]) : fieldNote.spaces,
+  }));
 }
 
 export async function recentSlackPublishedFieldNotes(connection) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("field_notes")
-    .select("id, title, published_at, spaces:team_room_id(id,slug,name)")
+    .select("id, encrypted_payload, published_at, spaces:team_room_id(id,slug,encrypted_payload)")
     .eq("user_id", connection.mumbl_user_id)
     .eq("is_published", true)
     .order("published_at", { ascending: false })
     .limit(10);
   if (error) throw error;
-  return data || [];
+  return decryptContentRows("field_notes", data || [], ["title", "content"]);
 }
 
 export async function getSlackFieldNoteDraft({ teamId, slackUserId, fieldNoteId }) {
@@ -848,13 +887,13 @@ export async function getSlackFieldNoteDraft({ teamId, slackUserId, fieldNoteId 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("field_notes")
-    .select("id, title, content, created_at, source_dump_ids")
+    .select("id, encrypted_payload, created_at, source_dump_ids")
     .eq("user_id", connection.mumbl_user_id)
     .eq("is_published", false)
     .eq("id", cleanString(fieldNoteId, 64))
     .single();
   if (error) throw error;
-  return data;
+  return decryptContentFields("field_notes", data, ["title", "content"]);
 }
 
 export async function updateSlackFieldNoteDraft({ teamId, slackUserId, fieldNoteId, title, content }) {
@@ -867,15 +906,20 @@ export async function updateSlackFieldNoteDraft({ teamId, slackUserId, fieldNote
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("field_notes")
-    .update({ title: cleanedTitle, content: cleanedContent })
+    .update({
+      encrypted_payload: encryptContentFields("field_notes", {
+        title: cleanedTitle,
+        content: cleanedContent,
+      }),
+    })
     .eq("user_id", connection.mumbl_user_id)
     .eq("is_published", false)
     .eq("id", cleanString(fieldNoteId, 64))
-    .select("id, title, content")
+    .select("id, encrypted_payload")
     .single();
   if (error) throw error;
   return {
-    fieldNote: data,
+    fieldNote: decryptContentFields("field_notes", data, ["title", "content"]),
     url: `${getServerEnv().appUrl}/dump?fieldNote=${encodeURIComponent(data.id)}`,
   };
 }
@@ -959,7 +1003,7 @@ export async function pinSlackSpaceForChannelMember({ teamId, slackUserId, chann
   const supabase = getSupabaseAdmin();
   const { data: channel, error } = await supabase
     .from("slack_space_channels")
-    .select("space_id, slack_team_id, slack_channel_id, spaces(id,slug,name)")
+    .select("space_id, slack_team_id, slack_channel_id, spaces(id,slug,encrypted_payload)")
     .eq("slack_team_id", cleanedTeamId)
     .eq("slack_channel_id", cleanedChannelId)
     .maybeSingle();
@@ -973,7 +1017,10 @@ export async function pinSlackSpaceForChannelMember({ teamId, slackUserId, chann
   if (!connection) return { pinned: false, reason: "mumbl_account_not_connected" };
 
   await pinSlackSpace({ connection, spaceId: channel.space_id });
-  return { pinned: true, space: channel.spaces };
+  return {
+    pinned: true,
+    space: channel.spaces ? decryptContentFields("spaces", channel.spaces, ["name", "description", "public_name"]) : channel.spaces,
+  };
 }
 
 export async function unpinSlackPinnedSpace({ teamId, slackUserId, pinId }) {
@@ -989,11 +1036,14 @@ export async function unpinSlackPinnedSpace({ teamId, slackUserId, pinId }) {
     .eq("id", cleanedPinId)
     .eq("slack_team_id", cleanedTeamId)
     .eq("slack_user_id", cleanedSlackUserId)
-    .select("id,space_id,spaces(id,slug,name)")
+    .select("id,space_id,spaces(id,slug,encrypted_payload)")
     .single();
   if (error?.code === "PGRST116") throw new Error("that pinned space is already gone.");
   if (error) throw error;
-  return data;
+  return {
+    ...data,
+    spaces: data.spaces ? decryptContentFields("spaces", data.spaces, ["name", "description", "public_name"]) : data.spaces,
+  };
 }
 
 export async function removeSlackUserFromPinnedSpaceChannel({ teamId, slackUserId, spaceId }) {
@@ -1043,14 +1093,19 @@ export async function slackUnpinPinnedSpaceConfirmView({ teamId, slackUserId, pi
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("slack_pinned_spaces")
-    .select("id,spaces(id,slug,name)")
+    .select("id,spaces(id,slug,encrypted_payload)")
     .eq("id", cleanString(pinId, 64))
     .eq("slack_team_id", cleanString(teamId, 80))
     .eq("slack_user_id", cleanString(slackUserId, 80))
     .single();
   if (error?.code === "PGRST116") throw new Error("that pinned space is already gone.");
   if (error) throw error;
-  return slackUnpinPinnedSpaceConfirmModal({ pin: data });
+  return slackUnpinPinnedSpaceConfirmModal({
+    pin: {
+      ...data,
+      spaces: data.spaces ? decryptContentFields("spaces", data.spaces, ["name", "description", "public_name"]) : data.spaces,
+    },
+  });
 }
 
 export async function slackPublishOptionsView({ teamId, slackUserId, fieldNoteId }) {
@@ -1085,18 +1140,20 @@ export async function publishSlackFieldNoteDraft({ teamId, slackUserId, fieldNot
   const [{ data: fieldNote, error: noteError }, pinnedSpace] = await Promise.all([
     supabase
       .from("field_notes")
-      .select("*, spaces:team_room_id(id,slug,name)")
+      .select("*, spaces:team_room_id(id,slug,encrypted_payload)")
       .eq("user_id", connection.mumbl_user_id)
       .eq("id", cleanString(fieldNoteId, 64))
       .single(),
     getPinnedSpace({ connection, spaceId }),
   ]);
   if (noteError) throw noteError;
+  const readableFieldNote = decryptContentFields("field_notes", fieldNote, ["title", "content"]);
+  const readableSpace = decryptContentFields("spaces", pinnedSpace.spaces, ["name", "description", "public_name"]);
 
-  if (fieldNote.is_published) {
-    const space = fieldNote.spaces || pinnedSpace.spaces;
+  if (readableFieldNote.is_published) {
+    const space = decryptContentFields("spaces", readableFieldNote.spaces || pinnedSpace.spaces, ["name", "description", "public_name"]);
     return {
-      fieldNote: { id: fieldNote.id, title: fieldNote.title },
+      fieldNote: { id: readableFieldNote.id, title: readableFieldNote.title },
       space,
       url: `${getServerEnv().appUrl}/r/${space.slug}/reads`,
     };
@@ -1104,17 +1161,19 @@ export async function publishSlackFieldNoteDraft({ teamId, slackUserId, fieldNot
 
   await enforceRateLimit({ supabase, action: "post", sessionToken });
 
-  const space = pinnedSpace.spaces;
+  const space = readableSpace;
   const authorName = isAnonymous ? null : cleanString(displayName, 48) || "someone brave";
   const { data: post, error: postError } = await supabase
     .from("posts")
     .insert({
       space_id: space.id,
       type: "field_note",
-      field_note_title: fieldNote.title,
-      content: fieldNote.content,
       is_anonymous: isAnonymous,
-      display_name: authorName,
+      encrypted_payload: encryptContentFields("posts", {
+        field_note_title: readableFieldNote.title,
+        content: readableFieldNote.content,
+        display_name: authorName,
+      }),
     })
     .select()
     .single();
@@ -1128,8 +1187,8 @@ export async function publishSlackFieldNoteDraft({ teamId, slackUserId, fieldNot
       published_post_id: post.id,
       published_at: new Date().toISOString(),
     })
-    .eq("id", fieldNote.id)
-    .select("id,title")
+    .eq("id", readableFieldNote.id)
+    .select("id,encrypted_payload")
     .single();
   if (updateError) throw updateError;
 
@@ -1143,13 +1202,13 @@ export async function publishSlackFieldNoteDraft({ teamId, slackUserId, fieldNot
   ]);
 
   try {
-    await postTeamReadToSlack({ space, post });
+    await postTeamReadToSlack({ space, post: decryptContentFields("posts", post, ["content", "display_name", "field_note_title"]) });
   } catch (slackError) {
     await recordSlackTeamReadFailure({ spaceId: space.id, error: slackError });
   }
 
   return {
-    fieldNote: updatedNote,
+    fieldNote: decryptContentFields("field_notes", updatedNote, ["title", "content"]),
     space,
     url: `${getServerEnv().appUrl}/r/${space.slug}/reads`,
   };
@@ -1159,10 +1218,10 @@ async function findSpaceForSlackPin(slug) {
   const cleanedSlug = cleanString(slug, 64);
   if (!cleanedSlug) throw new Error("space slug is required.");
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.from("spaces").select("id,slug,name").eq("slug", cleanedSlug).single();
+  const { data, error } = await supabase.from("spaces").select("id,slug,encrypted_payload").eq("slug", cleanedSlug).single();
   if (error?.code === "PGRST116") throw new Error("couldn't find that Mumbl space.");
   if (error) throw error;
-  return data;
+  return decryptContentFields("spaces", data, ["name", "description", "public_name"]);
 }
 
 async function pinSlackSpace({ connection, spaceId }) {
@@ -1183,7 +1242,7 @@ async function listSlackPinnedSpaces(connection) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("slack_pinned_spaces")
-    .select("id,space_id,last_used_at,created_at,spaces(id,slug,name)")
+    .select("id,space_id,last_used_at,created_at,spaces(id,slug,encrypted_payload)")
     .eq("slack_team_id", connection.slack_team_id)
     .eq("slack_user_id", connection.slack_user_id)
     .order("last_used_at", { ascending: false, nullsFirst: false })
@@ -1204,6 +1263,7 @@ async function listSlackPinnedSpaces(connection) {
   const channelsBySpaceId = new Map((channels || []).map((channel) => [channel.space_id, channel]));
   return pins.map((pin) => ({
     ...pin,
+    spaces: pin.spaces ? decryptContentFields("spaces", pin.spaces, ["name", "description", "public_name"]) : pin.spaces,
     slackTeamReads: channelsBySpaceId.get(pin.space_id) || null,
   }));
 }
@@ -1212,14 +1272,17 @@ async function getPinnedSpace({ connection, spaceId }) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("slack_pinned_spaces")
-    .select("id,space_id,spaces(id,slug,name)")
+    .select("id,space_id,spaces(id,slug,encrypted_payload)")
     .eq("slack_team_id", connection.slack_team_id)
     .eq("slack_user_id", connection.slack_user_id)
     .eq("space_id", cleanString(spaceId, 64))
     .single();
   if (error?.code === "PGRST116") throw new Error("pin that Mumbl space before publishing from Slack.");
   if (error) throw error;
-  return data;
+  return {
+    ...data,
+    spaces: data.spaces ? decryptContentFields("spaces", data.spaces, ["name", "description", "public_name"]) : data.spaces,
+  };
 }
 
 async function inviteSlackUserToSpaceChannel({ teamId, slackUserId, spaceId }) {
@@ -1275,7 +1338,8 @@ export async function createSlackFieldNoteDraft({ teamId, slackUserId, dumpIds }
   if (dumpsError) throw dumpsError;
   if (!dumps?.length) throw new Error("no matching private dumps found.");
 
-  const orderedDumps = [...cleanedDumpIds].reverse().map((id) => dumps.find((dump) => dump.id === id)).filter(Boolean);
+  const readableDumps = decryptContentRows("dumps", dumps || [], ["content", "ai_reflection", "source_meta"]);
+  const orderedDumps = [...cleanedDumpIds].reverse().map((id) => readableDumps.find((dump) => dump.id === id)).filter(Boolean);
   const draft = await draftFieldNote({ dumps: orderedDumps });
 
   const { data: fieldNote, error: noteError } = await supabase
@@ -1284,15 +1348,17 @@ export async function createSlackFieldNoteDraft({ teamId, slackUserId, dumpIds }
       user_id: connection.mumbl_user_id,
       session_token_hash: connection.slack_session_token_hash,
       source_dump_ids: draft.sourceDumpIds,
-      title: draft.title || "field note",
-      content: draft.content,
+      encrypted_payload: encryptContentFields("field_notes", {
+        title: draft.title || "field note",
+        content: draft.content,
+      }),
     })
-    .select("id, title, content")
+    .select("id, encrypted_payload")
     .single();
   if (noteError) throw noteError;
 
   return {
-    fieldNote,
+    fieldNote: decryptContentFields("field_notes", fieldNote, ["title", "content"]),
     visibilityReminder: draft.visibilityReminder,
     url: `${getServerEnv().appUrl}/dump?fieldNote=${encodeURIComponent(fieldNote.id)}`,
   };

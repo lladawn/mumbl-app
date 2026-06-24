@@ -1,4 +1,5 @@
 import { getServerEnv } from "./env";
+import { decryptContentFields, decryptContentRows, encryptContentFields, withoutEncryptedPayload } from "./encryption";
 import { cleanString } from "./validation";
 
 const INSIGHT_SCHEMA = {
@@ -13,6 +14,7 @@ const INSIGHT_SCHEMA = {
 export async function checkInsightMilestone(supabase, userId) {
   const cleanedUserId = cleanString(userId, 64);
   if (!cleanedUserId) return;
+  if (!getServerEnv().patternGraphEnabled) return;
 
   const { data, error } = await supabase.rpc("increment_user_dump_count", { p_user_id: cleanedUserId });
   if (error) throw error;
@@ -38,6 +40,7 @@ export async function checkInsightMilestone(supabase, userId) {
 }
 
 export async function generateAndDeliverInsight(supabase, userId, dumpCount) {
+  if (!getServerEnv().patternGraphEnabled) return null;
   const dumps = await fetchRecentDumpsWithSignals(supabase, userId);
   if (dumps.length < 5) return null;
 
@@ -47,18 +50,20 @@ export async function generateAndDeliverInsight(supabase, userId, dumpCount) {
     .insert({
       user_id: userId,
       dump_ids: dumps.map((dump) => dump.id),
-      summary: insight.summary,
-      question: insight.question,
+      encrypted_payload: encryptContentFields("patterns", {
+        summary: insight.summary,
+        question: insight.question,
+      }),
       period_start: dumps[dumps.length - 1]?.created_at || null,
       period_end: dumps[0]?.created_at || null,
       triggered_at_count: dumpCount,
     })
-    .select("id, summary, question")
+    .select("id, encrypted_payload")
     .single();
   if (error) throw error;
 
   await notifyInsightViaSlack(supabase, userId, pattern.id);
-  return pattern;
+  return withoutEncryptedPayload(decryptContentFields("patterns", pattern, ["summary", "question"]));
 }
 
 export async function notifyInsightViaSlack(supabase, userId, patternId) {
@@ -102,6 +107,7 @@ async function fetchRecentDumpsWithSignals(supabase, userId, limit = 15) {
       `
       id,
       content,
+      encrypted_payload,
       created_at,
       dump_signals (
         energy,
@@ -117,7 +123,7 @@ async function fetchRecentDumpsWithSignals(supabase, userId, limit = 15) {
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return data || [];
+  return decryptContentRows("dumps", data || [], ["content", "ai_reflection", "source_meta"]);
 }
 
 async function generateInsight(dumps) {

@@ -1,4 +1,5 @@
 import { cleanString } from "./validation";
+import { decryptContentRows } from "./encryption";
 
 const SEARCH_PROBES = [
   {
@@ -28,8 +29,10 @@ const SEARCH_PROBES = [
 ];
 
 export async function buildPatternGraph({ supabase, userId, dumps, patterns = [], signals = [], embedContent }) {
+  const readableDumps = decryptContentRows("dumps", dumps, ["content", "ai_reflection", "source_meta"]);
+  const readablePatterns = decryptContentRows("patterns", patterns, ["summary", "question"]);
   const signalByDumpId = new Map(signals.map((signal) => [signal.dump_id, signal]));
-  const nodes = dumps.map((dump) => ({
+  const nodes = readableDumps.map((dump) => ({
     id: dump.id,
     kind: "dump",
     label: firstLine(dump.content),
@@ -57,9 +60,9 @@ export async function buildPatternGraph({ supabase, userId, dumps, patterns = []
     ),
     source: semanticGroups.length ? "pattern_graph" : "local",
     syncedCount: signals.filter((signal) => signal.extraction_status === "done").length,
-    summary: makeSummary({ groups, dumps, signals }),
-    insights: makeInsights({ signals, dumps }),
-    patterns: makePatternCards({ patterns, groups }),
+    summary: makeSummary({ groups, dumps: readableDumps, signals }),
+    insights: makeInsights({ signals, dumps: readableDumps }),
+    patterns: makePatternCards({ patterns: readablePatterns, groups }),
   };
 }
 

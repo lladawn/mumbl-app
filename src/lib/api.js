@@ -4,10 +4,13 @@ import {
   forgetRecentSlug,
   getCreatorToken,
   getPostEditToken,
+  getRoomAccessToken,
   loadSession,
   rememberRecentSlug,
   saveCreatorToken,
   savePostEditToken,
+  saveRoomAccessToken,
+  clearRoomAccessToken,
 } from "./storage";
 import { authRequestContext } from "./auth";
 
@@ -24,6 +27,8 @@ export async function fetchSpace(slug, { limit, before, type } = {}) {
   const sessionToken = loadSession();
   const auth = await authRequestContext();
   const params = new URLSearchParams({ sessionToken });
+  const accessToken = roomAccessTokenForSlug(slug);
+  if (accessToken) params.set("key", accessToken);
   if (limit) params.set("limit", String(limit));
   if (before) params.set("before", before);
   if (type) params.set("type", type);
@@ -33,8 +38,21 @@ export async function fetchSpace(slug, { limit, before, type } = {}) {
     cache: "no-store",
   });
   const data = await parseJson(response);
+  if (data.space?.slug && accessToken) saveRoomAccessToken(data.space.slug, accessToken);
   rememberRecentSlug(slug);
   return data.space;
+}
+
+export async function fetchSavedRooms() {
+  const sessionToken = loadSession();
+  const auth = await authRequestContext();
+  const params = new URLSearchParams({ sessionToken });
+  if (auth.expectsAuthenticatedOwner) params.set("expectsAuthenticatedOwner", "true");
+  const response = await fetch(`/api/spaces?${params.toString()}`, {
+    headers: auth.headers,
+    cache: "no-store",
+  });
+  return parseJson(response);
 }
 
 export async function createRemoteSpace({ name, vibe }) {
@@ -46,6 +64,7 @@ export async function createRemoteSpace({ name, vibe }) {
   });
   const data = await parseJson(response);
   saveCreatorToken(data.slug, data.creatorToken);
+  saveRoomAccessToken(data.slug, data.accessToken);
   rememberRecentSlug(data.slug);
   return data;
 }
@@ -62,6 +81,7 @@ export async function createRemotePost({ slug, type, content, isAnonymous, displ
       displayName,
       promptId,
       sessionToken: loadSession(),
+      accessToken: roomAccessTokenForSlug(slug),
     }),
   });
   const data = await parseJson(response);
@@ -187,7 +207,16 @@ export async function publishFieldNote({ fieldNoteId, slug, title, content, isAn
   const response = await fetch(`/api/dumps/field-notes/${fieldNoteId}/publish`, {
     method: "POST",
     headers: { "content-type": "application/json", ...auth.headers },
-    body: JSON.stringify({ slug, title, content, isAnonymous, displayName, sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
+    body: JSON.stringify({
+      slug,
+      title,
+      content,
+      isAnonymous,
+      displayName,
+      sessionToken: loadSession(),
+      accessToken: roomAccessTokenForSlug(slug),
+      expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner,
+    }),
   });
   const data = await parseJson(response);
   rememberRecentSlug(slug);
@@ -250,6 +279,7 @@ export async function deleteRemoteSpace({ slug }) {
   });
   const data = await parseJson(response);
   clearCreatorToken(slug);
+  clearRoomAccessToken(slug);
   forgetRecentSlug(slug);
   return data;
 }
@@ -451,6 +481,17 @@ function privateSessionParams(sessionToken, auth) {
   const params = new URLSearchParams({ sessionToken });
   if (auth.expectsAuthenticatedOwner) params.set("expectsAuthenticatedOwner", "true");
   return params;
+}
+
+export function roomAccessTokenForSlug(slug) {
+  if (!slug || typeof window === "undefined") return "";
+  const params = new URLSearchParams(window.location.search);
+  const urlToken = params.get("key") || params.get("accessToken") || "";
+  if (urlToken) {
+    saveRoomAccessToken(slug, urlToken);
+    return urlToken;
+  }
+  return getRoomAccessToken(slug);
 }
 
 async function parseJson(response) {

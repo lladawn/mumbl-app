@@ -1,4 +1,5 @@
 import { checkInsightMilestone } from "./insights";
+import { getServerEnv } from "./env";
 import { processDump } from "./signals";
 import { cleanString } from "./validation";
 
@@ -6,6 +7,7 @@ export async function processSavedPrivateDump({ supabase, dumpId, userId, conten
   const cleanedDumpId = cleanString(dumpId, 64);
   const cleanedUserId = cleanString(userId, 64);
   if (!cleanedDumpId || !cleanedUserId) return;
+  if (!getServerEnv().patternGraphEnabled) return;
 
   try {
     await processDump(supabase, cleanedDumpId, cleanedUserId, content);
@@ -26,6 +28,7 @@ export async function cleanupPatternGraphAfterDumpDelete({ supabase, userId, dum
   const cleanedUserId = cleanString(userId, 64);
   const cleanedDumpIds = Array.isArray(dumpIds) ? dumpIds.map((id) => cleanString(id, 64)).filter(Boolean) : [];
   if (!cleanedUserId || !cleanedDumpIds.length) return null;
+  if (!getServerEnv().patternGraphEnabled) return null;
 
   try {
     const { data, error } = await supabase.rpc("cleanup_pattern_graph_after_dump_delete", {

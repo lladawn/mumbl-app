@@ -1,6 +1,7 @@
 import { badRequest, notFound, ok, serverError } from "../../../../../src/server/http";
 import { applyOwnerFilter, assertExpectedAuthenticatedOwner, resolveRequestOwner } from "../../../../../src/server/auth";
 import { serializeFieldNote } from "../../../../../src/server/dumps";
+import { encryptContentFields } from "../../../../../src/server/encryption";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
 import { cleanString } from "../../../../../src/server/validation";
 
@@ -28,7 +29,9 @@ export async function PATCH(request, { params }) {
     if (noteError?.code === "PGRST116") return notFound("field note not found");
     if (noteError) throw noteError;
 
-    const updates = { title, content };
+    const updates = {
+      encrypted_payload: encryptContentFields("field_notes", { title, content }),
+    };
     const { data: updatedNote, error: updateError } = await supabase
       .from("field_notes")
       .update(updates)
@@ -38,9 +41,23 @@ export async function PATCH(request, { params }) {
     if (updateError) throw updateError;
 
     if (fieldNote.is_published && fieldNote.published_post_id) {
+      const { data: publishedPost, error: publishedPostError } = await supabase
+        .from("posts")
+        .select("id,encrypted_payload")
+        .eq("id", fieldNote.published_post_id)
+        .single();
+      if (publishedPostError) throw publishedPostError;
       const { error: postError } = await supabase
         .from("posts")
-        .update({ field_note_title: title, content })
+        .update({
+          encrypted_payload: {
+            ...(publishedPost.encrypted_payload || {}),
+            ...encryptContentFields("posts", {
+              field_note_title: title,
+              content,
+            }),
+          },
+        })
         .eq("id", fieldNote.published_post_id);
       if (postError) throw postError;
     }
