@@ -20,7 +20,7 @@ import {
   updateFieldNote,
 } from "../lib/api";
 import { AUTH_CHANGED_EVENT, linkCurrentDumpSession } from "../lib/auth";
-import { getRecentSlug, getRoomAccessToken } from "../lib/storage";
+import { getRecentSlug, getRoomAccessToken, saveRoomAccessToken } from "../lib/storage";
 import { EditIcon, TrashIcon } from "./ActionIcons";
 import Toast from "./Toast";
 
@@ -46,6 +46,7 @@ export default function DumpPageClient({ mode = "home" }) {
   const [expandedId, setExpandedId] = useState("");
   const [recentSlug, setRecentSlug] = useState("");
   const [shareSlug, setShareSlug] = useState("");
+  const [manualInvite, setManualInvite] = useState("");
   const [savedRooms, setSavedRooms] = useState([]);
   const [publishAnonymous, setPublishAnonymous] = useState(true);
   const [displayName, setDisplayName] = useState("");
@@ -247,9 +248,15 @@ export default function DumpPageClient({ mode = "home" }) {
   }
 
   async function handlePublishFieldNote(fieldNote, edits) {
-    const slug = (shareSlug || recentSlug).trim();
+    const manualRoom = parseManualRoomInvite(manualInvite);
+    if (manualInvite.trim() && (!manualRoom.slug || !manualRoom.accessToken)) {
+      setToast("paste the full invite link, including ?key=...");
+      return;
+    }
+    if (manualRoom.slug && manualRoom.accessToken) saveRoomAccessToken(manualRoom.slug, manualRoom.accessToken);
+    const slug = (manualRoom.slug || shareSlug || recentSlug).trim();
     if (!slug || publishingNoteId) {
-      setToast("paste a room slug first.");
+      setToast("choose a saved room or paste the full invite link.");
       return;
     }
 
@@ -266,6 +273,7 @@ export default function DumpPageClient({ mode = "home" }) {
       setFieldNotes((current) => current.map((item) => (item.id === fieldNote.id ? result.fieldNote : item)));
       setRecentSlug(slug);
       setShareSlug("");
+      setManualInvite("");
       setDisplayName("");
       setToast("published to team reads.");
     } catch (error) {
@@ -623,7 +631,9 @@ export default function DumpPageClient({ mode = "home" }) {
             recentSlug={recentSlug}
             savedRooms={savedRooms}
             shareSlug={shareSlug}
-          setShareSlug={setShareSlug}
+            setShareSlug={setShareSlug}
+            manualInvite={manualInvite}
+            setManualInvite={setManualInvite}
           publishAnonymous={publishAnonymous}
           setPublishAnonymous={setPublishAnonymous}
           displayName={displayName}
@@ -695,6 +705,29 @@ export default function DumpPageClient({ mode = "home" }) {
 function roomLinkFor(slug) {
   const accessToken = getRoomAccessToken(slug);
   return `/r/${slug}/reads${accessToken ? `?key=${encodeURIComponent(accessToken)}` : ""}`;
+}
+
+function parseManualRoomInvite(value) {
+  const raw = (value || "").trim();
+  if (!raw) return { slug: "", accessToken: "" };
+
+  try {
+    const url = new URL(raw, "https://mumbl.local");
+    const parts = url.pathname.split("/").filter(Boolean);
+    const roomIndex = parts.indexOf("r");
+    const slug = roomIndex >= 0 ? parts[roomIndex + 1] || "" : parts[0] || "";
+    return {
+      slug: decodeURIComponent(slug),
+      accessToken: url.searchParams.get("key") || url.searchParams.get("accessToken") || "",
+    };
+  } catch {
+    const [slugPart, query = ""] = raw.split("?");
+    const params = new URLSearchParams(query);
+    return {
+      slug: slugPart.replace(/^\/?r\//, "").replace(/\/reads$/, ""),
+      accessToken: params.get("key") || params.get("accessToken") || "",
+    };
+  }
 }
 
 function appendSpeechTranscript(current, transcript) {
@@ -844,6 +877,8 @@ function FieldNoteDrafts({
   savedRooms,
   shareSlug,
   setShareSlug,
+  manualInvite,
+  setManualInvite,
   publishAnonymous,
   setPublishAnonymous,
   displayName,
@@ -869,6 +904,8 @@ function FieldNoteDrafts({
           savedRooms={savedRooms}
           shareSlug={shareSlug}
           setShareSlug={setShareSlug}
+          manualInvite={manualInvite}
+          setManualInvite={setManualInvite}
           publishAnonymous={publishAnonymous}
           setPublishAnonymous={setPublishAnonymous}
           displayName={displayName}
@@ -890,6 +927,8 @@ function FieldNoteDraft({
   savedRooms,
   shareSlug,
   setShareSlug,
+  manualInvite,
+  setManualInvite,
   publishAnonymous,
   setPublishAnonymous,
   displayName,
@@ -970,22 +1009,22 @@ function FieldNoteDraft({
             </label>
           ) : (
             <label>
-              room slug
+              invite link
               <input
-                value={shareSlug}
-                onChange={(event) => setShareSlug(event.target.value)}
-                placeholder={recentSlug || "backend-team"}
+                value={manualInvite}
+                onChange={(event) => setManualInvite(event.target.value)}
+                placeholder="/r/backend-team/reads?key=..."
                 disabled={isMutating}
               />
             </label>
           )}
           {savedRooms.length > 0 && (
             <label>
-              other room slug
+              other invite link
               <input
-                value={shareSlug}
-                onChange={(event) => setShareSlug(event.target.value)}
-                placeholder="paste slug if it is not saved yet"
+                value={manualInvite}
+                onChange={(event) => setManualInvite(event.target.value)}
+                placeholder="paste /r/team/reads?key=..."
                 disabled={isMutating}
               />
             </label>
