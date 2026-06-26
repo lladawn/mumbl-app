@@ -6,6 +6,8 @@ Mumbl is a private, anonymous-first space for engineering teams to think out lou
 
 → **Try it:** [mumbl.wtf](https://mumbl.wtf) · demo room at [/r/it-works-on-my-machine/reads](https://mumbl.wtf/r/it-works-on-my-machine/reads)
 
+![Mumbl product preview: private dump to field note to team read](https://mumbl.wtf/opengraph-image)
+
 ## How it works
 
 ```
@@ -20,7 +22,7 @@ private dump  →  field note draft  →  team read
 
 Rooms are private by default and need an invite link to join. Creators set the room up once; team members join via the invite link. No accounts required to post — login is optional and only used to keep your drafts and history across devices.
 
-## Run It
+## Run It Locally
 
 ```bash
 npm install
@@ -33,11 +35,13 @@ Then open:
 http://127.0.0.1:3000/
 ```
 
+Most product routes need the Supabase and app secrets from `.env.example`. Without them, backend API routes intentionally return setup `503` responses.
+
 ## Project Shape
 
 - `app/` contains Next.js routes: landing, create, explore, room pages, and API handlers.
 - `src/components/` contains reusable UI components.
-- `src/components/space/` contains room-specific team reads, hidden legacy feed, share, and heartbeat pieces.
+- `src/components/space/` contains room-specific team reads, legacy feed/wins compatibility, share, and heartbeat pieces.
 - `src/hooks/` contains client-side state hooks.
 - `src/lib/` contains product constants, API helpers, storage helpers for session/creator tokens, and heartbeat logic.
 - `docs/mumbl-product-context.md` and `docs/mumbl-extension-01.md` are the product source of truth. The extension wins on conflicts.
@@ -46,7 +50,7 @@ http://127.0.0.1:3000/
 ## What Exists
 
 - Landing screen with Mumbl's core voice
-- Create-space flow with vibe picker
+- Create-space flow with vibe picker and first-post nudge
 - Real routes for `/create` and `/r/:slug/:tab`
 - Optional creator-managed room note after creation
 - Reads-first room view for published field notes, with legacy feed/wins routes kept for compatibility
@@ -89,7 +93,7 @@ The current generator is deterministic/local and reads only published team-read 
 
 Logged-in private dumps are processed asynchronously for private pattern features. OpenAI extracts signals and embeddings into Supabase pgvector-backed `dump_signals`; Anthropic generates milestone insights into `patterns`. Anonymous/session-only dumps are excluded. Pattern APIs are owner-scoped and must not expose source dump content.
 
-Users can review insights at `/patterns` and explore the working map at `/dump/map`. Local and staging can enable `MUMBL_ENABLE_PATTERN_TEST_TOOLS=true` for manual QA controls; production should keep it disabled. See [docs/pattern-graph.md](/Users/dawn/Code/mumbl-app/docs/pattern-graph.md).
+Users can review insights at `/patterns` and explore the working map at `/dump/map`. Local and staging can enable `MUMBL_ENABLE_PATTERN_TEST_TOOLS=true` for manual QA controls; production should keep it disabled. See [docs/pattern-graph.md](docs/pattern-graph.md).
 
 ## Backend Setup
 
@@ -147,8 +151,8 @@ Use `main` for production and `dev` for shared staging / preview work.
 - `dev` -> Vercel Preview -> staging Supabase
 - local `.env.local` -> local or staging Supabase, never production
 
-Analytics is environment-gated. Local development is off by default. See [docs/environments.md](/Users/dawn/Code/mumbl-app/docs/environments.md).
-Release flow and safety checks live in [docs/release-checklist.md](/Users/dawn/Code/mumbl-app/docs/release-checklist.md).
+Analytics is environment-gated. Local development is off by default. See [docs/environments.md](docs/environments.md).
+Release flow and safety checks live in [docs/release-checklist.md](docs/release-checklist.md).
 
 ## CI
 
@@ -156,9 +160,9 @@ GitHub Actions runs `npm ci` and `npm run build` on pushes and pull requests to 
 
 ## Scaling
 
-Prompt rotation, heartbeat job queueing, rate limits, and pooler notes are documented in [docs/scaling.md](/Users/dawn/Code/mumbl-app/docs/scaling.md).
-Free-tier tradeoffs and future upgrade paths are documented in [docs/free-tier-compromises.md](/Users/dawn/Code/mumbl-app/docs/free-tier-compromises.md).
-Private pattern graph behavior, pgvector checks, and staging QA steps are documented in [docs/pattern-graph.md](/Users/dawn/Code/mumbl-app/docs/pattern-graph.md).
+Prompt rotation, heartbeat job queueing, rate limits, and pooler notes are documented in [docs/scaling.md](docs/scaling.md).
+Free-tier tradeoffs and future upgrade paths are documented in [docs/free-tier-compromises.md](docs/free-tier-compromises.md).
+Private pattern graph behavior, pgvector checks, and staging QA steps are documented in [docs/pattern-graph.md](docs/pattern-graph.md).
 
 ## Current Stack
 
@@ -170,7 +174,6 @@ Private pattern graph behavior, pgvector checks, and staging QA steps are docume
 ## Domain
 
 Canonical product domain: `https://mumbl.wtf`. Use `NEXT_PUBLIC_APP_URL=https://mumbl.wtf` in production once the domain is pointed at Vercel.
-
 
 ## Heartbeat testing
 
