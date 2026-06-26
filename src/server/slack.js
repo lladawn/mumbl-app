@@ -597,6 +597,20 @@ export async function openSlackRoomModal({ teamId, triggerId, initialName = "" }
   });
 }
 
+export async function openSlackPinRoomModal({ teamId, triggerId }) {
+  const installation = await getSlackInstallation(teamId);
+  const token = decryptSlackToken({
+    ciphertext: installation.bot_access_token_ciphertext,
+    iv: installation.bot_access_token_iv,
+    tag: installation.bot_access_token_tag,
+  });
+
+  return slackApi("views.open", token, {
+    trigger_id: triggerId,
+    view: slackPinRoomModal(),
+  });
+}
+
 export async function openSlackDumpModal({ teamId, triggerId }) {
   const installation = await getSlackInstallation(teamId);
   const token = decryptSlackToken({
@@ -989,6 +1003,7 @@ export async function pinSlackSpaceBySlug({ teamId, slackUserId, slug }) {
   return { space, channelJoin };
 }
 
+
 export async function pinSlackSpaceForMumblUser({ mumblUserId, spaceId }) {
   const supabase = getSupabaseAdmin();
   const { data: connection, error } = await supabase
@@ -1271,13 +1286,36 @@ export async function publishSlackFieldNoteDraft({ teamId, slackUserId, fieldNot
   };
 }
 
-async function findSpaceForSlackPin(slug) {
-  const cleanedSlug = cleanString(slug, 64);
-  if (!cleanedSlug) throw new Error("space slug is required.");
+async function findSpaceForSlackPin(slugOrUrl) {
+  const raw = cleanString(slugOrUrl, 2000) || "";
+  // accept full invite URLs like https://mumbl.wtf/r/slug/reads?key=...
+  const urlMatch = raw.match(/\/r\/([^/?#]+)/);
+  const cleanedSlug = cleanString(urlMatch ? urlMatch[1] : raw, 64);
+  if (!cleanedSlug) throw new Error("paste the room invite link to pin a private room.");
+
+  // extract key= param if present
+  let accessKey = null;
+  try {
+    const keyMatch = raw.match(/[?&]key=([^&]+)/);
+    if (keyMatch) accessKey = decodeURIComponent(keyMatch[1]);
+  } catch {
+    // ignore malformed URL encoding
+  }
+
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.from("spaces").select("id,slug,encrypted_payload").eq("slug", cleanedSlug).single();
+  const { data, error } = await supabase
+    .from("spaces")
+    .select("id,slug,read_token_hash,encrypted_payload")
+    .eq("slug", cleanedSlug)
+    .single();
   if (error?.code === "PGRST116") throw new Error("couldn't find that Mumbl space.");
   if (error) throw error;
+
+  if (data.read_token_hash) {
+    if (!accessKey) throw new Error("this is a private room — paste the full invite link (with the key).");
+    if (hashToken(accessKey) !== data.read_token_hash) throw new Error("invite link doesn't match that room.");
+  }
+
   return decryptContentFields("spaces", data, ["name", "description", "public_name"]);
 }
 
@@ -1476,7 +1514,7 @@ export function slackHelpPayload() {
   return blockResponse({
     text: "use /mumbl to save a private thought or create a room.",
     blocks: [
-      section("*mumbl in Slack*\n`/mumbl the thing I want to keep` saves a private dump.\n`/mumbl room platform team` creates a Mumbl room from Slack.\n`/mumbl pin platform-team` adds a room to your Slack publish list."),
+      section("*mumbl in Slack*\n`/mumbl the thing I want to keep` saves a private dump.\n`/mumbl room platform team` creates a Mumbl room from Slack.\n`/mumbl pin <invite-link>` pins a room to your Slack publish list."),
       context("Private dumps stay private. Team reads only post to Slack if you enable them."),
     ],
   });
@@ -1508,7 +1546,7 @@ export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl,
       context(
         pinned
           ? `Pinned for publishing. Invite link: <${roomUrl}|${roomUrl}>`
-          : `Use /mumbl pin ${space.slug} after connecting Mumbl. Invite link: <${roomUrl}|${roomUrl}>`,
+          : `Pin this room in Mumbl App Home, or run \`/mumbl pin\` with the invite link: <${roomUrl}|${roomUrl}>`,
       ),
     ],
   });
@@ -1931,18 +1969,18 @@ async function slackAppHomeBlocks({ teamId, slackUserId }) {
     section(
       pinnedSpaces.length
         ? `*pinned teamspaces*\n${pinnedList}`
-        : connection
-          ? "*pinned teamspaces*\nNo pinned spaces yet. Create a team room here, or use `/mumbl pin space-slug`."
-          : "*pinned teamspaces*\nConnect by saving a private dump, then pin a Mumbl space for team reads.",
+        : "*join your team's room*\nPaste a room invite link to pin it, or create a new team room.",
     ),
     actions(
       pinnedSpaces.length
         ? [
-            { text: "manage pinned spaces", actionId: "manage_pinned_spaces", style: "primary" },
+            { text: "pin a room", actionId: "pin_room_modal", style: "primary" },
+            { text: "manage pinned spaces", actionId: "manage_pinned_spaces" },
             { text: "start a team room", actionId: "start_room_modal" },
           ]
         : [
-            { text: "start a team room", actionId: "start_room_modal", style: "primary" },
+            { text: "pin a room", actionId: "pin_room_modal", style: "primary" },
+            { text: "start a team room", actionId: "start_room_modal" },
             { text: "create on mumbl", url: `${appUrl}/create` },
           ],
     ),
@@ -2167,7 +2205,7 @@ function slackNoPinnedSpacesModal() {
     title: { type: "plain_text", text: "team space needed" },
     close: { type: "plain_text", text: "done" },
     blocks: [
-      section("*choose where this team read should live.*\nCreate a Mumbl team space from Slack, or pin an existing room with `/mumbl pin space-slug`."),
+      section("*choose where this team read should live.*\nCreate a Mumbl team space from Slack, or pin an existing room using the room invite link."),
       actions([
         { text: "create team space", actionId: "start_room_modal", style: "primary" },
         { text: "open mumbl", url: `${appUrl}/create` },
@@ -2186,17 +2224,19 @@ function slackPinnedSpacesEmptyModal({ connected }) {
     blocks: [
       section(
         connected
-          ? "*no pinned teamspaces yet.*\nCreate one from Slack, or pin an existing room with `/mumbl pin space-slug`."
-          : "*connect mumbl first.*\nSave a private dump from Slack once, then pin a teamspace for publishing.",
+          ? "*no pinned teamspaces yet.*\nPin a room your team already has, or create a new one."
+          : "*join your team's room.*\nPaste the room invite link to pin it. If your Slack email isn't on Mumbl yet, save a private dump once to connect.",
       ),
       actions(
         connected
           ? [
-              { text: "start a team room", actionId: "start_room_modal", style: "primary" },
+              { text: "pin a room", actionId: "pin_room_modal", style: "primary" },
+              { text: "start a team room", actionId: "start_room_modal" },
               { text: "create on mumbl", url: `${appUrl}/create` },
             ]
           : [
-              { text: "new private dump", actionId: "new_private_dump", style: "primary" },
+              { text: "pin a room", actionId: "pin_room_modal", style: "primary" },
+              { text: "new private dump", actionId: "new_private_dump" },
               { text: "open mumbl", url: `${appUrl}/dump` },
             ],
       ),
@@ -2235,11 +2275,39 @@ async function slackPinnedSpacesModal({ pinnedSpaces }) {
     );
   }
 
+  blocks.push(
+    divider(),
+    actions([{ text: "pin a room", actionId: "pin_room_modal", style: "primary" }]),
+  );
+
   return {
     type: "modal",
     title: { type: "plain_text", text: "pinned spaces" },
     close: { type: "plain_text", text: "done" },
     blocks,
+  };
+}
+
+export function slackPinRoomModal() {
+  return {
+    type: "modal",
+    callback_id: "pin_room",
+    title: { type: "plain_text", text: "pin a room" },
+    submit: { type: "plain_text", text: "pin" },
+    close: { type: "plain_text", text: "cancel" },
+    blocks: [
+      section("*pin a Mumbl room to your Slack.*\nPaste the room slug or invite link from your team."),
+      {
+        type: "input",
+        block_id: "pin_room_slug",
+        label: { type: "plain_text", text: "room slug or invite link" },
+        element: {
+          type: "plain_text_input",
+          action_id: "value",
+          placeholder: { type: "plain_text", text: "e.g. platform-team or https://mumbl.wtf/r/platform-team/reads?key=..." },
+        },
+      },
+    ],
   };
 }
 

@@ -37,11 +37,14 @@ import {
   slackPublishedReadsView,
   slackPublishOptionsView,
   slackPublishPreviewView,
+  slackPinRoomModal,
   slackRoomModalView,
   slackShareRoomInviteModalView,
   slackUnpinPinnedSpaceConfirmView,
   openSlackDumpModal,
+  openSlackPinRoomModal,
   openSlackRoomModal,
+  pinSlackSpaceBySlug,
   publishSlackAppHome,
   removeSlackUserFromPinnedSpaceChannel,
   updateSlackView,
@@ -64,17 +67,27 @@ export async function POST(request) {
           const teamId = slackTeamId(payload);
           const viewId = slackModalViewId(payload);
           const triggerId = cleanString(payload.trigger_id, 200);
-          if (triggerId) {
-            await openSlackRoomModal({
-              teamId,
-              triggerId,
-            });
-          } else if (viewId) {
+          if (viewId) {
             await updateSlackView({
               teamId,
               viewId,
               view: slackRoomModalView(),
             });
+          } else if (triggerId) {
+            await openSlackRoomModal({
+              teamId,
+              triggerId,
+            });
+          }
+        }
+        if (actionId === "pin_room_modal") {
+          const teamId = slackTeamId(payload);
+          const viewId = slackModalViewId(payload);
+          const triggerId = cleanString(payload.trigger_id, 200);
+          if (viewId) {
+            await updateSlackView({ teamId, viewId, view: slackPinRoomModal() });
+          } else if (triggerId) {
+            await openSlackPinRoomModal({ teamId, triggerId });
           }
         }
         if (actionId === "new_private_dump") {
@@ -360,6 +373,34 @@ export async function POST(request) {
         }
       });
       return ok({ response_action: "update", view: slackFieldNotePublishingModalView() });
+    }
+
+    if (payload.type === "view_submission" && payload.view?.callback_id === "pin_room") {
+      const teamId = slackTeamId(payload);
+      const slackUserId = cleanString(payload.user?.id, 80);
+      const slugOrUrl = cleanString(payload.view?.state?.values?.pin_room_slug?.value?.value, 2000);
+      if (!slugOrUrl) {
+        return ok({
+          response_action: "errors",
+          errors: { pin_room_slug: "paste the room slug or invite link." },
+        });
+      }
+      try {
+        await pinSlackSpaceBySlug({ teamId, slackUserId, slug: slugOrUrl });
+        after(async () => {
+          try {
+            await publishSlackAppHome({ teamId, slackUserId });
+          } catch (error) {
+            console.error("Slack App Home refresh after pin failed", { message: error.message, slackError: error.slack?.error });
+          }
+        });
+        return ok({ response_action: "update", view: await slackPinnedSpacesView({ teamId, slackUserId }) });
+      } catch (error) {
+        return ok({
+          response_action: "errors",
+          errors: { pin_room_slug: error.message || "couldn't pin that room." },
+        });
+      }
     }
 
     if (payload.type === "view_submission" && payload.view?.callback_id === "unpin_pinned_space_confirm") {
