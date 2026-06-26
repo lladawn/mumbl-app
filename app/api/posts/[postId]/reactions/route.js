@@ -23,13 +23,14 @@ export async function POST(request, { params }) {
 
     const sessionTokenHash = hashToken(reactionIdentity);
 
-    const { data: existing, error: existingError } = await supabase
-      .from("reactions")
-      .select("id")
-      .eq("post_id", postId)
-      .eq("label", label)
-      .eq("session_token_hash", sessionTokenHash)
-      .maybeSingle();
+    let existingQuery = supabase.from("reactions").select("id").eq("post_id", postId).eq("label", label);
+    if (owner.userId && owner.sessionToken) {
+      // also check the pre-migration session-token hash in case link-session hasn't run yet
+      existingQuery = existingQuery.in("session_token_hash", [sessionTokenHash, hashToken(owner.sessionToken)]);
+    } else {
+      existingQuery = existingQuery.eq("session_token_hash", sessionTokenHash);
+    }
+    const { data: existing, error: existingError } = await existingQuery.maybeSingle();
     if (existingError) throw existingError;
 
     if (existing) {

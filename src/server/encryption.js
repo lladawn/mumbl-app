@@ -86,17 +86,21 @@ function encryptContentValue(value, aad) {
 
 function decryptContentValue(payload, aad) {
   if (!payload || typeof payload !== "object") return null;
-  const decipher = createDecipheriv(ALGORITHM, contentKey(), Buffer.from(payload.iv, "base64url"));
-  decipher.setAAD(Buffer.from(aad, "utf8"));
-  decipher.setAuthTag(Buffer.from(payload.tag, "base64url"));
-  const plaintext = Buffer.concat([
-    decipher.update(Buffer.from(payload.ciphertext, "base64url")),
-    decipher.final(),
-  ]).toString("utf8");
+  try {
+    const decipher = createDecipheriv(ALGORITHM, contentKey(), Buffer.from(payload.iv, "base64url"));
+    decipher.setAAD(Buffer.from(aad, "utf8"));
+    decipher.setAuthTag(Buffer.from(payload.tag, "base64url"));
+    const plaintext = Buffer.concat([
+      decipher.update(Buffer.from(payload.ciphertext, "base64url")),
+      decipher.final(),
+    ]).toString("utf8");
 
-  if (payload.isNull) return null;
-  if (payload.encoding === "json") return JSON.parse(plaintext);
-  return plaintext;
+    if (payload.isNull) return null;
+    if (payload.encoding === "json") return JSON.parse(plaintext);
+    return plaintext;
+  } catch {
+    return null;
+  }
 }
 
 function sideQuestKey() {

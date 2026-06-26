@@ -7,6 +7,7 @@ import {
   storeSlackInstallation,
   verifySlackState,
 } from "../../../../../../src/server/slack";
+import { roomInvitePath } from "../../../../../../src/server/roomAccess";
 import { getServerEnv } from "../../../../../../src/server/env";
 
 export async function GET(request) {
@@ -25,7 +26,11 @@ export async function GET(request) {
     await storeSlackInstallation(oauthResult);
     await createSlackSpaceChannel({ oauthResult, setup });
 
-    return NextResponse.redirect(`${getServerEnv().appUrl}/r/${setup.spaces.slug}/reads?slack=team-reads-ready`);
+    const { appUrl } = getServerEnv();
+    const redirectPath = setup.roomAccessToken
+      ? `${roomInvitePath(setup.spaces.slug, setup.roomAccessToken)}&slack=team-reads-ready`
+      : `/r/${setup.spaces.slug}/reads?slack=team-reads-ready`;
+    return NextResponse.redirect(`${appUrl}${redirectPath}`);
   } catch (error) {
     return serverError(error);
   }

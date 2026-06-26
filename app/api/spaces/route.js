@@ -9,7 +9,7 @@ import { cleanString, isValidVibe, slugify } from "../../../src/server/validatio
 export async function GET(request) {
   try {
     const url = new URL(request.url);
-    const sessionToken = cleanString(url.searchParams.get("sessionToken"), 256);
+    const sessionToken = cleanString(request.headers.get("x-session-token"), 256);
     const owner = await resolveRequestOwner({ request, sessionToken });
     if (!owner.userId) return ok({ savedRooms: [] });
 
@@ -69,7 +69,7 @@ export async function POST(request) {
           vibe,
           creator_token_hash: hashToken(creatorToken),
           read_token_hash: hashToken(accessToken),
-          encrypted_payload: encryptContentFields("spaces", { name, description: null, public_name: null }),
+          encrypted_payload: encryptContentFields("spaces", { name, description: null, public_name: null, access_token: accessToken }),
           ...(owner.userId ? { creator_user_id: owner.userId } : {}),
         })
         .select()

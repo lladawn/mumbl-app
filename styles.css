@@ -44,7 +44,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -2056,6 +2057,10 @@ h1 {
   box-shadow: 4px 4px 0 var(--ink);
   max-width: 100%;
   min-width: 0;
+  max-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .panel,
@@ -2094,7 +2099,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 1px solid var(--ink);
   border-radius: var(--radius);
@@ -2116,8 +2122,20 @@ textarea {
   line-height: 1.45;
 }
 
+select {
+  min-height: 48px;
+  padding: 0 38px 0 14px;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6l4 4 4-4' stroke='%23161412' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   box-shadow: 0 0 0 3px var(--blue);
 }
 
@@ -2906,6 +2924,77 @@ textarea:focus {
 
 .modal {
   width: min(520px, 100%);
+}
+
+.join-saved-rooms {
+  margin-top: 20px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+
+.join-saved-rooms-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: lowercase;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.join-saved-rooms-empty {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.88rem;
+}
+
+.join-saved-rooms-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  overflow-y: auto;
+  max-height: 220px;
+  scrollbar-width: thin;
+}
+
+.join-saved-room-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fffefa;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.join-saved-room-item:hover {
+  border-color: var(--ink);
+  background: var(--paper);
+}
+
+.join-saved-room-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.join-saved-room-slug {
+  font-size: 0.78rem;
+  color: var(--faint);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .join-open-room {
@@ -5239,7 +5328,8 @@ textarea:focus {
 
 button:disabled,
 input:disabled,
-textarea:disabled {
+textarea:disabled,
+select:disabled {
   cursor: wait;
   opacity: 0.68;
 }

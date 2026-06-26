@@ -11,6 +11,7 @@ import {
   getSlackFieldNoteDraft,
   getSlackUserEmail,
   openSlackLoadingModal,
+  openSlackShareRoomInviteModal,
   parseVerifiedSlackForm,
   publishSlackFieldNoteDraft,
   postSlackResponse,
@@ -37,6 +38,7 @@ import {
   slackPublishOptionsView,
   slackPublishPreviewView,
   slackRoomModalView,
+  slackShareRoomInviteModalView,
   slackUnpinPinnedSpaceConfirmView,
   openSlackDumpModal,
   openSlackRoomModal,
@@ -148,6 +150,23 @@ export async function POST(request) {
             buildView: ({ teamId, slackUserId }) => slackPublishOptionsView({ teamId, slackUserId, fieldNoteId }),
             logLabel: "Slack publish options update failed",
           });
+        }
+        if (actionId === "share_room_invite") {
+          const teamId = slackTeamId(payload);
+          const viewId = slackModalViewId(payload);
+          const triggerId = cleanString(payload.trigger_id, 200);
+          const buttonValue = parseViewMetadata(cleanString(payload.actions?.[0]?.value, 2000));
+          const roomUrl = cleanString(buttonValue.roomUrl, 2000);
+          const spaceName = cleanString(buttonValue.spaceName, 120);
+          if (viewId) {
+            await updateSlackView({
+              teamId,
+              viewId,
+              view: slackShareRoomInviteModalView({ roomUrl, spaceName }),
+            });
+          } else if (triggerId) {
+            await openSlackShareRoomInviteModal({ teamId, triggerId, roomUrl, spaceName });
+          }
         }
       } catch (error) {
         console.error("Slack action failed", {
@@ -398,6 +417,10 @@ export async function POST(request) {
           errors: { room_name: error.message || "couldn't create that room yet." },
         });
       }
+    }
+
+    if (payload.type === "view_submission" && payload.view?.callback_id === "share_room_invite") {
+      return ok({ response_action: "clear" });
     }
 
     if (payload.type !== "message_action" || payload.callback_id !== "save_to_mumbl") {

@@ -45,8 +45,7 @@ export default function DumpPageClient({ mode = "home" }) {
   const [isSaving, setIsSaving] = useState(false);
   const [expandedId, setExpandedId] = useState("");
   const [recentSlug, setRecentSlug] = useState("");
-  const [shareSlug, setShareSlug] = useState("");
-  const [manualInvite, setManualInvite] = useState("");
+
   const [savedRooms, setSavedRooms] = useState([]);
   const [publishAnonymous, setPublishAnonymous] = useState(true);
   const [displayName, setDisplayName] = useState("");
@@ -247,9 +246,9 @@ export default function DumpPageClient({ mode = "home" }) {
     setConfirmBulkDelete(false);
   }
 
-  async function handlePublishFieldNote(fieldNote, edits) {
+  async function handlePublishFieldNote(fieldNote, edits, manualInvite = "", shareSlug = "") {
     const manualRoom = parseManualRoomInvite(manualInvite);
-    if (manualInvite.trim() && (!manualRoom.slug || !manualRoom.accessToken)) {
+    if (manualInvite.trim() && !shareSlug && (!manualRoom.slug || !manualRoom.accessToken)) {
       setToast("paste the full invite link, including ?key=...");
       return;
     }
@@ -272,8 +271,6 @@ export default function DumpPageClient({ mode = "home" }) {
       });
       setFieldNotes((current) => current.map((item) => (item.id === fieldNote.id ? result.fieldNote : item)));
       setRecentSlug(slug);
-      setShareSlug("");
-      setManualInvite("");
       setDisplayName("");
       setToast("published to team reads.");
     } catch (error) {
@@ -630,10 +627,6 @@ export default function DumpPageClient({ mode = "home" }) {
             fieldNotes={fieldNotes}
             recentSlug={recentSlug}
             savedRooms={savedRooms}
-            shareSlug={shareSlug}
-            setShareSlug={setShareSlug}
-            manualInvite={manualInvite}
-            setManualInvite={setManualInvite}
           publishAnonymous={publishAnonymous}
           setPublishAnonymous={setPublishAnonymous}
           displayName={displayName}
@@ -875,10 +868,6 @@ function FieldNoteDrafts({
   fieldNotes,
   recentSlug,
   savedRooms,
-  shareSlug,
-  setShareSlug,
-  manualInvite,
-  setManualInvite,
   publishAnonymous,
   setPublishAnonymous,
   displayName,
@@ -902,10 +891,6 @@ function FieldNoteDrafts({
           key={fieldNote.id}
           recentSlug={recentSlug}
           savedRooms={savedRooms}
-          shareSlug={shareSlug}
-          setShareSlug={setShareSlug}
-          manualInvite={manualInvite}
-          setManualInvite={setManualInvite}
           publishAnonymous={publishAnonymous}
           setPublishAnonymous={setPublishAnonymous}
           displayName={displayName}
@@ -925,10 +910,6 @@ function FieldNoteDraft({
   fieldNote,
   recentSlug,
   savedRooms,
-  shareSlug,
-  setShareSlug,
-  manualInvite,
-  setManualInvite,
   publishAnonymous,
   setPublishAnonymous,
   displayName,
@@ -943,6 +924,9 @@ function FieldNoteDraft({
   const [noteContent, setNoteContent] = useState(fieldNote.content);
   const [isEditing, setIsEditing] = useState(!fieldNote.isPublished);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [shareSlug, setShareSlug] = useState("");
+  const [manualInvite, setManualInvite] = useState("");
+  const [showManualInput, setShowManualInput] = useState(false);
   const isPublished = fieldNote.isPublished;
   const isMutating = mutatingNoteId === fieldNote.id || publishingNoteId === fieldNote.id;
 
@@ -950,6 +934,10 @@ function FieldNoteDraft({
     setTitle(fieldNote.title);
     setNoteContent(fieldNote.content);
   }, [fieldNote.title, fieldNote.content]);
+
+  useEffect(() => {
+    if (fieldNote.isPublished) setIsEditing(false);
+  }, [fieldNote.isPublished]);
 
   async function saveEdits() {
     const trimmedTitle = title.trim();
@@ -998,16 +986,31 @@ function FieldNoteDraft({
           {savedRooms.length ? (
             <label>
               publish to
-              <select value={shareSlug} onChange={(event) => setShareSlug(event.target.value)} disabled={isMutating}>
+              <select
+                value={showManualInput ? "__manual__" : shareSlug}
+                onChange={(event) => {
+                  if (event.target.value === "__manual__") {
+                    setShowManualInput(true);
+                    setShareSlug("");
+                  } else {
+                    setShowManualInput(false);
+                    setManualInvite("");
+                    setShareSlug(event.target.value);
+                  }
+                }}
+                disabled={isMutating}
+              >
                 <option value="">{recentSlug ? `recent: ${recentSlug}` : "choose a saved room"}</option>
                 {savedRooms.map((room) => (
                   <option value={room.slug} key={room.id || room.slug}>
                     {room.name || room.slug}
                   </option>
                 ))}
+                <option value="__manual__">+ add by invite link</option>
               </select>
             </label>
-          ) : (
+          ) : null}
+          {(!savedRooms.length || showManualInput) && (
             <label>
               invite link
               <input
@@ -1015,17 +1018,7 @@ function FieldNoteDraft({
                 onChange={(event) => setManualInvite(event.target.value)}
                 placeholder="/r/backend-team/reads?key=..."
                 disabled={isMutating}
-              />
-            </label>
-          )}
-          {savedRooms.length > 0 && (
-            <label>
-              other invite link
-              <input
-                value={manualInvite}
-                onChange={(event) => setManualInvite(event.target.value)}
-                placeholder="paste /r/team/reads?key=..."
-                disabled={isMutating}
+                autoFocus={showManualInput}
               />
             </label>
           )}
@@ -1076,7 +1069,12 @@ function FieldNoteDraft({
             <button
               className="solid-button button-with-loader"
               type="button"
-              onClick={() => handlePublishFieldNote(fieldNote, { title, content: noteContent })}
+              onClick={async () => {
+                await handlePublishFieldNote(fieldNote, { title, content: noteContent }, manualInvite, shareSlug);
+                setShareSlug("");
+                setManualInvite("");
+                setShowManualInput(false);
+              }}
               disabled={isMutating}
             >
               {publishingNoteId === fieldNote.id && <span className="mini-loader" aria-hidden="true" />}

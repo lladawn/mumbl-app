@@ -34,7 +34,7 @@ export async function POST(request, { params }) {
     const { data: space, error: spaceError } = await supabase.from("spaces").select("id,read_token_hash,is_public,creator_user_id").eq("slug", slug).single();
     if (spaceError?.code === "PGRST116") return notFound("space not found");
     if (spaceError) throw spaceError;
-    assertRoomAccess({ space, accessToken, owner });
+    await assertRoomAccess({ supabase, space, accessToken, owner });
     await saveRoomAccessForUser({ supabase, owner, space, accessToken });
 
     const editToken = createToken();

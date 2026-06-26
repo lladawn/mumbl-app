@@ -8,7 +8,7 @@ import { isValidHandle, normalizeHandle, serializePublicProfile } from "../../..
 export async function GET(request) {
   try {
     const url = new URL(request.url);
-    const sessionToken = cleanString(url.searchParams.get("sessionToken"), 256);
+    const sessionToken = cleanString(request.headers.get("x-session-token"), 256);
     const expectsAuthenticatedOwner = url.searchParams.get("expectsAuthenticatedOwner") === "true";
     if (!sessionToken) return badRequest("session token is required");
 

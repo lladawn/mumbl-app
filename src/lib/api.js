@@ -26,7 +26,7 @@ export async function joinWaitlist({ email }) {
 export async function fetchSpace(slug, { limit, before, type } = {}) {
   const sessionToken = loadSession();
   const auth = await authRequestContext();
-  const params = new URLSearchParams({ sessionToken });
+  const params = new URLSearchParams();
   const accessToken = roomAccessTokenForSlug(slug);
   if (accessToken) params.set("key", accessToken);
   if (limit) params.set("limit", String(limit));
@@ -34,7 +34,7 @@ export async function fetchSpace(slug, { limit, before, type } = {}) {
   if (type) params.set("type", type);
 
   const response = await fetch(`/api/spaces/${slug}?${params.toString()}`, {
-    headers: auth.headers,
+    headers: { ...auth.headers, "x-session-token": sessionToken },
     cache: "no-store",
   });
   const data = await parseJson(response);
@@ -43,13 +43,25 @@ export async function fetchSpace(slug, { limit, before, type } = {}) {
   return data.space;
 }
 
+export async function fetchSavedRoomAccessToken(slug) {
+  const auth = await authRequestContext();
+  if (!auth.expectsAuthenticatedOwner) return null;
+  const sessionToken = loadSession();
+  const response = await fetch(`/api/spaces/${slug}/access-token`, {
+    headers: { ...auth.headers, "x-session-token": sessionToken },
+    cache: "no-store",
+  });
+  const data = await parseJson(response);
+  return data.accessToken || null;
+}
+
 export async function fetchSavedRooms() {
   const sessionToken = loadSession();
   const auth = await authRequestContext();
-  const params = new URLSearchParams({ sessionToken });
+  const params = new URLSearchParams();
   if (auth.expectsAuthenticatedOwner) params.set("expectsAuthenticatedOwner", "true");
   const response = await fetch(`/api/spaces?${params.toString()}`, {
-    headers: auth.headers,
+    headers: { ...auth.headers, "x-session-token": sessionToken },
     cache: "no-store",
   });
   return parseJson(response);
@@ -92,9 +104,9 @@ export async function createRemotePost({ slug, type, content, isAnonymous, displ
 export async function fetchDumps() {
   const sessionToken = loadSession();
   const auth = await authRequestContext();
-  const params = privateSessionParams(sessionToken, auth);
+  const params = privateSessionParams(auth);
   const response = await fetch(`/api/dumps?${params.toString()}`, {
-    headers: auth.headers,
+    headers: { ...auth.headers, "x-session-token": sessionToken },
     cache: "no-store",
   });
   return parseJson(response);
@@ -103,9 +115,9 @@ export async function fetchDumps() {
 export async function fetchDumpMap() {
   const sessionToken = loadSession();
   const auth = await authRequestContext();
-  const params = privateSessionParams(sessionToken, auth);
+  const params = privateSessionParams(auth);
   const response = await fetch(`/api/dumps/map?${params.toString()}`, {
-    headers: auth.headers,
+    headers: { ...auth.headers, "x-session-token": sessionToken },
     cache: "no-store",
   });
   return parseJson(response);
@@ -114,10 +126,10 @@ export async function fetchDumpMap() {
 export async function fetchPatterns({ includeDismissed = false } = {}) {
   const sessionToken = loadSession();
   const auth = await authRequestContext();
-  const params = privateSessionParams(sessionToken, auth);
+  const params = privateSessionParams(auth);
   if (includeDismissed) params.set("includeDismissed", "true");
   const response = await fetch(`/api/patterns?${params.toString()}`, {
-    headers: auth.headers,
+    headers: { ...auth.headers, "x-session-token": sessionToken },
     cache: "no-store",
   });
   return parseJson(response);
@@ -361,7 +373,8 @@ export async function toggleRemoteReaction({ postId, label }) {
 
 export async function fetchSideQuests(slug) {
   const sessionToken = loadSession();
-  const response = await fetch(`/api/spaces/${slug}/side-quests?sessionToken=${encodeURIComponent(sessionToken)}`, {
+  const response = await fetch(`/api/spaces/${slug}/side-quests`, {
+    headers: { "x-session-token": sessionToken },
     cache: "no-store",
   });
   return parseJson(response);
@@ -414,7 +427,8 @@ export async function cancelSideQuest({ slug, cardId }) {
 
 export async function fetchSideQuestRoom(roomId) {
   const sessionToken = loadSession();
-  const response = await fetch(`/api/side-quest-rooms/${roomId}?sessionToken=${encodeURIComponent(sessionToken)}`, {
+  const response = await fetch(`/api/side-quest-rooms/${roomId}`, {
+    headers: { "x-session-token": sessionToken },
     cache: "no-store",
   });
   return parseJson(response);
@@ -448,10 +462,11 @@ export async function reportSideQuestRoom(roomId) {
 }
 
 export async function fetchPublicProfileForSession() {
+  const sessionToken = loadSession();
   const auth = await authRequestContext();
-  const params = privateSessionParams(loadSession(), auth);
+  const params = privateSessionParams(auth);
   const response = await fetch(`/api/public-profiles?${params.toString()}`, {
-    headers: auth.headers,
+    headers: { ...auth.headers, "x-session-token": sessionToken },
     cache: "no-store",
   });
   return parseJson(response);
@@ -477,8 +492,8 @@ export async function setFieldNotePublic({ fieldNoteId, isPublic, handle }) {
   return parseJson(response);
 }
 
-function privateSessionParams(sessionToken, auth) {
-  const params = new URLSearchParams({ sessionToken });
+function privateSessionParams(auth) {
+  const params = new URLSearchParams();
   if (auth.expectsAuthenticatedOwner) params.set("expectsAuthenticatedOwner", "true");
   return params;
 }

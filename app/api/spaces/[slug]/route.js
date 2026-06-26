@@ -20,8 +20,8 @@ export async function GET(request, { params }) {
     if (!slug) return badRequest("space slug is required");
 
     const url = new URL(request.url);
-    const sessionToken = url.searchParams.get("sessionToken");
-    const owner = await resolveRequestOwner({ request, sessionToken: cleanString(sessionToken, 256) });
+    const sessionToken = cleanString(request.headers.get("x-session-token"), 256);
+    const owner = await resolveRequestOwner({ request, sessionToken });
     const sessionTokenHash = sessionToken ? hashToken(sessionToken) : null;
     const reactionIdentityHash = owner.userId ? hashToken(`auth-reaction:${owner.userId}`) : sessionTokenHash;
     const postLimit = parsePostLimit(url.searchParams.get("limit"));
@@ -37,7 +37,7 @@ export async function GET(request, { params }) {
       spaceError = null;
     }
     if (spaceError) throw spaceError;
-    assertRoomAccess({ space, accessToken, owner });
+    await assertRoomAccess({ supabase, space, accessToken, owner });
     await saveRoomAccessForUser({ supabase, owner, space, accessToken });
 
     let postsQuery = supabase

@@ -1,9 +1,0 @@
-alter table spaces add column if not exists encrypted_payload jsonb not null default '{}'::jsonb;
-alter table posts add column if not exists encrypted_payload jsonb not null default '{}'::jsonb;
-alter table heartbeats add column if not exists encrypted_payload jsonb not null default '{}'::jsonb;
-alter table dumps add column if not exists encrypted_payload jsonb not null default '{}'::jsonb;
-alter table field_notes add column if not exists encrypted_payload jsonb not null default '{}'::jsonb;
-alter table dump_insights add column if not exists encrypted_payload jsonb not null default '{}'::jsonb;
-alter table public_profiles add column if not exists encrypted_payload jsonb not null default '{}'::jsonb;
-alter table slack_pending_dumps add column if not exists encrypted_payload jsonb not null default '{}'::jsonb;
-alter table patterns add column if not exists encrypted_payload jsonb not null default '{}'::jsonb;

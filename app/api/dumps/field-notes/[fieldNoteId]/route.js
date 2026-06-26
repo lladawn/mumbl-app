@@ -1,7 +1,7 @@
 import { badRequest, notFound, ok, serverError } from "../../../../../src/server/http";
 import { applyOwnerFilter, assertExpectedAuthenticatedOwner, resolveRequestOwner } from "../../../../../src/server/auth";
 import { serializeFieldNote } from "../../../../../src/server/dumps";
-import { encryptContentFields } from "../../../../../src/server/encryption";
+import { decryptContentFields, encryptContentFields } from "../../../../../src/server/encryption";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
 import { cleanString } from "../../../../../src/server/validation";
 
@@ -43,20 +43,19 @@ export async function PATCH(request, { params }) {
     if (fieldNote.is_published && fieldNote.published_post_id) {
       const { data: publishedPost, error: publishedPostError } = await supabase
         .from("posts")
-        .select("id,encrypted_payload")
+        .select("id,encrypted_payload,is_anonymous")
         .eq("id", fieldNote.published_post_id)
         .single();
       if (publishedPostError) throw publishedPostError;
+      const decrypted = decryptContentFields("posts", publishedPost, ["display_name"]);
       const { error: postError } = await supabase
         .from("posts")
         .update({
-          encrypted_payload: {
-            ...(publishedPost.encrypted_payload || {}),
-            ...encryptContentFields("posts", {
-              field_note_title: title,
-              content,
-            }),
-          },
+          encrypted_payload: encryptContentFields("posts", {
+            field_note_title: title,
+            content,
+            display_name: decrypted.display_name ?? null,
+          }),
         })
         .eq("id", fieldNote.published_post_id);
       if (postError) throw postError;

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { publicDemoRoom } from "../lib/constants";
 
-export default function JoinModal({ recentSlug, navigate, close }) {
+export default function JoinModal({ recentSlug, savedRooms, navigate, close }) {
   const [joinValue, setJoinValue] = useState("");
 
   function handleSubmit(event) {
@@ -12,6 +12,9 @@ export default function JoinModal({ recentSlug, navigate, close }) {
     if (slug) navigate(`/r/${slug}`);
     close();
   }
+
+  const rooms = savedRooms || [];
+  const loadingRooms = savedRooms === null;
 
   return (
     <div className="modal-backdrop" onClick={close}>
@@ -30,20 +33,33 @@ export default function JoinModal({ recentSlug, navigate, close }) {
             <button className="ghost-button" type="button" onClick={close}>
               cancel
             </button>
-            {recentSlug && (
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => {
-                  navigate(`/r/${recentSlug}`);
-                  close();
-                }}
-              >
-                open {recentSlug}
-              </button>
-            )}
           </div>
         </form>
+
+        {(loadingRooms || rooms.length > 0) && (
+          <div className="join-saved-rooms">
+            <span className="join-saved-rooms-label">your rooms</span>
+            {loadingRooms ? (
+              <p className="join-saved-rooms-empty">loading…</p>
+            ) : (
+              <ul className="join-saved-rooms-list">
+                {rooms.map((room) => (
+                  <li key={room.id}>
+                    <button
+                      className="join-saved-room-item"
+                      type="button"
+                      onClick={() => { navigate(`/r/${room.slug}/reads`); close(); }}
+                    >
+                      <span className="join-saved-room-name">{room.name}</span>
+                      <span className="join-saved-room-slug">{room.slug}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         <div className="join-open-room">
           <span>no invite yet?</span>
           <strong>{publicDemoRoom.slug}</strong>

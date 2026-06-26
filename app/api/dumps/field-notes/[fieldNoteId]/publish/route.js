@@ -40,7 +40,7 @@ export async function POST(request, { params }) {
     if (spaceError?.code === "PGRST116") return notFound("space not found");
     if (noteError) throw noteError;
     if (spaceError) throw spaceError;
-    assertRoomAccess({ space, accessToken, owner });
+    await assertRoomAccess({ supabase, space, accessToken, owner });
     await saveRoomAccessForUser({ supabase, owner, space, accessToken });
     if (fieldNote.is_published) return badRequest("field note is already published");
     const readableSpace = decryptContentFields("spaces", space, ["name", "description", "public_name"]);
@@ -73,7 +73,10 @@ export async function POST(request, { params }) {
       .eq("id", fieldNote.id)
       .select("*")
       .single();
-    if (updateError) throw updateError;
+    if (updateError) {
+      await supabase.from("posts").delete().eq("id", post.id);
+      throw updateError;
+    }
 
     if (isAnonymous) {
       await supabase.from("anon_audit").insert({
