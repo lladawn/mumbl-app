@@ -338,6 +338,7 @@ create table saved_room_access (
   user_id uuid not null references auth.users(id) on delete cascade,
   space_id uuid not null references spaces(id) on delete cascade,
   read_token_hash text not null,
+  encrypted_payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   last_opened_at timestamptz,
   unique (user_id, space_id)
