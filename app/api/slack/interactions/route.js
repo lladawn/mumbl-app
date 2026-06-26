@@ -386,7 +386,7 @@ export async function POST(request) {
         });
       }
       try {
-        await pinSlackSpaceBySlug({ teamId, slackUserId, slug: slugOrUrl });
+        const result = await pinSlackSpaceBySlug({ teamId, slackUserId, slug: slugOrUrl });
         after(async () => {
           try {
             await publishSlackAppHome({ teamId, slackUserId });
@@ -394,7 +394,14 @@ export async function POST(request) {
             console.error("Slack App Home refresh after pin failed", { message: error.message, slackError: error.slack?.error });
           }
         });
-        return ok({ response_action: "update", view: await slackPinnedSpacesView({ teamId, slackUserId }) });
+        return ok({
+          response_action: "update",
+          view: await slackPinnedSpacesView({
+            teamId,
+            slackUserId,
+            notice: slackPinNotice(result),
+          }),
+        });
       } catch (error) {
         return ok({
           response_action: "errors",
@@ -502,6 +509,13 @@ function slackTeamId(payload) {
 
 function slackModalViewId(payload) {
   return payload.view?.type === "modal" ? cleanString(payload.view?.id, 120) : "";
+}
+
+function slackPinNotice({ space, channelJoin, alreadyPinned }) {
+  const channelText = channelJoin?.joined
+    ? ` You're also in the ${channelJoin.channelName ? `#${channelJoin.channelName}` : "Slack reads"} channel.`
+    : "";
+  return `${space?.name || "That room"} ${alreadyPinned ? "was already pinned" : "is pinned"} for team reads.${channelText}`;
 }
 
 async function showLoadingThenReplace({ payload, title, message, buildView, logLabel }) {

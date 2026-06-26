@@ -96,11 +96,11 @@ async function startRoomFromSlack({ teamId, slackUserId, name }) {
 }
 
 async function pinSpaceFromSlack({ teamId, slackUserId, slug }) {
-  const { space, channelJoin } = await pinSlackSpaceBySlug({ teamId, slackUserId, slug });
+  const { space, channelJoin, alreadyPinned } = await pinSlackSpaceBySlug({ teamId, slackUserId, slug });
   const channelText = channelJoin?.joined
     ? ` You're also in the ${channelJoin.channelName ? `#${channelJoin.channelName}` : "Slack reads"} channel.`
     : "";
-  return ephemeralText(`${space.name} is pinned for team reads.${channelText}`);
+  return ephemeralText(`${space.name} ${alreadyPinned ? "was already pinned" : "is pinned"} for team reads.${channelText}`);
 }
 
 async function saveOrConnect({ teamId, slackUserId, content, sourceMeta }) {

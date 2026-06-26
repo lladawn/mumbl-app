@@ -704,11 +704,11 @@ export async function slackPublishedReadsView({ teamId, slackUserId }) {
   }
 }
 
-export async function slackPinnedSpacesView({ teamId, slackUserId }) {
+export async function slackPinnedSpacesView({ teamId, slackUserId, notice = "" }) {
   const connection = await findSlackConnection({ teamId, slackUserId });
   if (!connection) return slackPinnedSpacesEmptyModal({ connected: false });
   const pinnedSpaces = await listSlackPinnedSpaces(connection);
-  return pinnedSpaces.length ? await slackPinnedSpacesModal({ pinnedSpaces }) : slackPinnedSpacesEmptyModal({ connected: true });
+  return pinnedSpaces.length ? await slackPinnedSpacesModal({ pinnedSpaces, notice }) : slackPinnedSpacesEmptyModal({ connected: true });
 }
 
 export async function openSlackFieldNoteReviewModal({ teamId, slackUserId, triggerId }) {
@@ -998,9 +998,9 @@ export async function updateSlackFieldNoteDraft({ teamId, slackUserId, fieldNote
 export async function pinSlackSpaceBySlug({ teamId, slackUserId, slug }) {
   const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
   const space = await findSpaceForSlackPin(slug);
-  await pinSlackSpace({ connection, spaceId: space.id });
+  const pin = await pinSlackSpace({ connection, spaceId: space.id });
   const channelJoin = await inviteSlackUserToSpaceChannel({ teamId, slackUserId, spaceId: space.id });
-  return { space, channelJoin };
+  return { space, channelJoin, alreadyPinned: pin.alreadyPinned };
 }
 
 
@@ -1321,6 +1321,15 @@ async function findSpaceForSlackPin(slugOrUrl) {
 
 async function pinSlackSpace({ connection, spaceId }) {
   const supabase = getSupabaseAdmin();
+  const { data: existingPins, error: existingError } = await supabase
+    .from("slack_pinned_spaces")
+    .select("id")
+    .eq("slack_team_id", connection.slack_team_id)
+    .eq("slack_user_id", connection.slack_user_id)
+    .eq("space_id", spaceId)
+    .limit(1);
+  if (existingError) throw existingError;
+
   const { error } = await supabase.from("slack_pinned_spaces").upsert(
     {
       mumbl_user_id: connection.mumbl_user_id,
@@ -1331,6 +1340,7 @@ async function pinSlackSpace({ connection, spaceId }) {
     { onConflict: "slack_team_id,slack_user_id,space_id" },
   );
   if (error) throw error;
+  return { alreadyPinned: Boolean(existingPins?.length) };
 }
 
 async function listSlackPinnedSpaces(connection) {
@@ -1342,9 +1352,9 @@ async function listSlackPinnedSpaces(connection) {
     .eq("slack_user_id", connection.slack_user_id)
     .order("last_used_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(25);
   if (error) throw error;
-  const pins = data || [];
+  const pins = dedupePinsBySpace(data || []);
   const spaceIds = pins.map((pin) => pin.space_id).filter(Boolean);
   if (!spaceIds.length) return pins;
 
@@ -1366,6 +1376,18 @@ async function listSlackPinnedSpaces(connection) {
       slackTeamReads: channelsBySpaceId.get(pin.space_id) || null,
     };
   });
+}
+
+function dedupePinsBySpace(pins) {
+  const seen = new Set();
+  const uniquePins = [];
+  for (const pin of pins) {
+    const key = pin.space_id || pin.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniquePins.push(pin);
+  }
+  return uniquePins;
 }
 
 async function getPinnedSpace({ connection, spaceId }) {
@@ -1974,8 +1996,7 @@ async function slackAppHomeBlocks({ teamId, slackUserId }) {
     actions(
       pinnedSpaces.length
         ? [
-            { text: "pin a room", actionId: "pin_room_modal", style: "primary" },
-            { text: "manage pinned spaces", actionId: "manage_pinned_spaces" },
+            { text: "manage teamspaces", actionId: "manage_pinned_spaces", style: "primary" },
             { text: "start a team room", actionId: "start_room_modal" },
           ]
         : [
@@ -2207,7 +2228,8 @@ function slackNoPinnedSpacesModal() {
     blocks: [
       section("*choose where this team read should live.*\nCreate a Mumbl team space from Slack, or pin an existing room using the room invite link."),
       actions([
-        { text: "create team space", actionId: "start_room_modal", style: "primary" },
+        { text: "pin a room", actionId: "pin_room_modal", style: "primary" },
+        { text: "create team space", actionId: "start_room_modal" },
         { text: "open mumbl", url: `${appUrl}/create` },
       ]),
       context("After a space is pinned, come back to this draft and publish it to team reads."),
@@ -2244,10 +2266,14 @@ function slackPinnedSpacesEmptyModal({ connected }) {
   };
 }
 
-async function slackPinnedSpacesModal({ pinnedSpaces }) {
+async function slackPinnedSpacesModal({ pinnedSpaces, notice = "" }) {
   const blocks = [
     section("*your pinned teamspaces*\nThese are personal Slack publish destinations. Unpinning only removes your shortcut."),
   ];
+
+  if (notice) {
+    blocks.push(context(escapeSlackText(notice)));
+  }
 
   for (const pin of pinnedSpaces.slice(0, 10)) {
     const space = pin.spaces || {};
@@ -2263,10 +2289,6 @@ async function slackPinnedSpacesModal({ pinnedSpaces }) {
       { text: "open team reads", url: openReadsUrl },
       { text: "publish a draft", actionId: "review_field_note_drafts" },
     ];
-    if (!channel?.slack_channel_id) {
-      const setup = await createTeamReadsSetup({ spaceId: space.id });
-      rowActions.push({ text: "create team reads channel", url: slackTeamReadsInstallUrl(setup), style: "primary" });
-    }
     rowActions.push({ text: "unpin", actionId: "unpin_pinned_space_start", value: pin.id, style: "danger" });
 
     blocks.push(
@@ -2277,7 +2299,7 @@ async function slackPinnedSpacesModal({ pinnedSpaces }) {
 
   blocks.push(
     divider(),
-    actions([{ text: "pin a room", actionId: "pin_room_modal", style: "primary" }]),
+    actions([{ text: "pin another room", actionId: "pin_room_modal", style: "primary" }]),
   );
 
   return {
