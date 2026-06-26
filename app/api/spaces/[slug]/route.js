@@ -1,5 +1,5 @@
 import { badRequest, notFound, ok, serverError } from "../../../../src/server/http";
-import { resolveRequestOwner } from "../../../../src/server/auth";
+import { applyOwnerFilter, resolveRequestOwner } from "../../../../src/server/auth";
 import { claimCreatorAccess, resolveCreatorAccess } from "../../../../src/server/creatorAccess";
 import { encryptContentFields } from "../../../../src/server/encryption";
 import { hashToken } from "../../../../src/server/hash";
@@ -78,6 +78,7 @@ export async function GET(request, { params }) {
       activeReactionsResult,
       accountEditablePostsResult,
       localEditablePostsResult,
+      ownedFieldNotePostsResult,
       heartbeatsResult,
       todayReactionsResult,
       slackTeamReadsResult,
@@ -94,6 +95,12 @@ export async function GET(request, { params }) {
       postIds.length
         ? supabase.from("post_edit_tokens").select("post_id").in("post_id", postIds).is("owner_user_id", null)
         : Promise.resolve({ data: [], error: null }),
+      postIds.length && (owner.userId || owner.sessionTokenHash)
+        ? applyOwnerFilter(
+            supabase.from("field_notes").select("published_post_id").in("published_post_id", postIds),
+            owner,
+          )
+        : Promise.resolve({ data: [], error: null }),
       supabase.from("heartbeats").select("*").eq("space_id", space.id).order("week_of", { ascending: false }),
       todayPostIdsPromise.then(({ data, error }) => {
         if (error) return { data: [], error };
@@ -109,6 +116,7 @@ export async function GET(request, { params }) {
     if (activeReactionsResult.error) throw activeReactionsResult.error;
     if (accountEditablePostsResult.error && !isMissingPostEditTokensTable(accountEditablePostsResult.error)) throw accountEditablePostsResult.error;
     if (localEditablePostsResult.error && !isMissingPostEditTokensTable(localEditablePostsResult.error)) throw localEditablePostsResult.error;
+    if (ownedFieldNotePostsResult.error) throw ownedFieldNotePostsResult.error;
     if (heartbeatsResult.error) throw heartbeatsResult.error;
     if (todayReactionsResult.error) throw todayReactionsResult.error;
     if (slackTeamReadsResult.error && !isMissingSlackTeamReadsTable(slackTeamReadsResult.error)) throw slackTeamReadsResult.error;
@@ -124,7 +132,10 @@ export async function GET(request, { params }) {
           roomVibe: getTopReactionLabels(todayReactionsResult.data),
           slackTeamReads: slackTeamReadsResult.error ? null : slackTeamReadsResult.data,
           canManage: Boolean(owner.userId && space.creator_user_id === owner.userId),
-          accountEditablePostIds: new Set((accountEditablePostsResult.error ? [] : accountEditablePostsResult.data || []).map((row) => row.post_id)),
+          accountEditablePostIds: new Set([
+            ...(accountEditablePostsResult.error ? [] : accountEditablePostsResult.data || []).map((row) => row.post_id),
+            ...(ownedFieldNotePostsResult.data || []).map((row) => row.published_post_id),
+          ]),
           localEditablePostIds: new Set((localEditablePostsResult.error ? [] : localEditablePostsResult.data || []).map((row) => row.post_id)),
           postsPage: {
             limit: postLimit,

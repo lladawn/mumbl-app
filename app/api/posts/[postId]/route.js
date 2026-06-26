@@ -56,14 +56,22 @@ export async function DELETE(request, { params }) {
     const supabase = getSupabaseAdmin();
     const post = await getPostForMutation(supabase, postId);
     const owner = await resolveRequestOwner({ request, sessionToken });
-    const canDeleteAsAuthor = await hasPostEditAccess({ supabase, postId: post.id, editToken, owner });
-    const canDeleteAsCreator = await canCreatorDeletePost({ request, body, post });
+    const canDeleteAsAuthor = await hasPostDeleteAccess({ supabase, post, editToken, owner });
+    const canDeleteAsCreator = post.type !== "field_note" && await canCreatorDeletePost({ request, body, post });
     if (!canDeleteAsAuthor && !canDeleteAsCreator) return badRequest("post edit token or creator access is required");
 
     if (post.type === "field_note") {
       const { error: unlinkError } = await supabase
         .from("field_notes")
-        .update({ team_room_id: null, published_post_id: null })
+        .update({
+          team_room_id: null,
+          is_published: false,
+          published_post_id: null,
+          published_at: null,
+          is_public: false,
+          public_profile_id: null,
+          public_published_at: null,
+        })
         .eq("published_post_id", post.id);
       if (unlinkError) throw unlinkError;
     }
@@ -104,6 +112,25 @@ async function hasPostEditAccess({ supabase, postId, editToken, owner }) {
   if (editToken && (await hasPostEditToken(supabase, postId, editToken, owner))) return true;
   if (!owner.userId) return false;
   return hasPostEditOwner(supabase, postId, owner.userId);
+}
+
+async function hasPostDeleteAccess({ supabase, post, editToken, owner }) {
+  if (await hasPostEditAccess({ supabase, postId: post.id, editToken, owner })) return true;
+  if (post.type !== "field_note") return false;
+  return hasPublishedFieldNoteOwner(supabase, post.id, owner);
+}
+
+async function hasPublishedFieldNoteOwner(supabase, postId, owner) {
+  if (!owner.userId && !owner.sessionTokenHash) return false;
+  let query = supabase
+    .from("field_notes")
+    .select("id")
+    .eq("published_post_id", postId)
+    .limit(1);
+  query = owner.userId ? query.eq("user_id", owner.userId) : query.eq("session_token_hash", owner.sessionTokenHash);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return Boolean(data?.id);
 }
 
 async function hasPostEditToken(supabase, postId, editToken, owner) {

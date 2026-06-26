@@ -330,7 +330,7 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
     creatorLinked: Boolean(connection?.mumbl_user_id),
     pinned: Boolean(connection),
     openUrl: slackSpaceHandoffUrl(handoff),
-    roomUrl: `${getServerEnv().appUrl}${roomInvitePath(insertedSpace.slug, accessToken)}`,
+    roomUrl: slackRoomReadsUrl(insertedSpace, accessToken),
     teamReadsUrl: slackTeamReadsInstallUrl(teamReadsSetup),
   };
 }
@@ -950,7 +950,12 @@ export async function recentSlackPublishedFieldNotes(connection) {
     .order("published_at", { ascending: false })
     .limit(10);
   if (error) throw error;
-  return decryptContentRows("field_notes", data || [], ["title", "content"]);
+  return decryptContentRows("field_notes", data || [], ["title", "content"]).map((fieldNote) => ({
+    ...fieldNote,
+    spaces: fieldNote.spaces
+      ? decryptContentFields("spaces", fieldNote.spaces, ["name", "description", "public_name", "access_token"])
+      : fieldNote.spaces,
+  }));
 }
 
 export async function getSlackFieldNoteDraft({ teamId, slackUserId, fieldNoteId }) {
@@ -1220,14 +1225,14 @@ export async function publishSlackFieldNoteDraft({ teamId, slackUserId, fieldNot
   ]);
   if (noteError) throw noteError;
   const readableFieldNote = decryptContentFields("field_notes", fieldNote, ["title", "content"]);
-  const readableSpace = decryptContentFields("spaces", pinnedSpace.spaces, ["name", "description", "public_name"]);
+  const readableSpace = decryptContentFields("spaces", pinnedSpace.spaces, ["name", "description", "public_name", "access_token"]);
 
   if (readableFieldNote.is_published) {
-    const space = decryptContentFields("spaces", readableFieldNote.spaces || pinnedSpace.spaces, ["name", "description", "public_name"]);
+    const space = decryptContentFields("spaces", readableFieldNote.spaces || pinnedSpace.spaces, ["name", "description", "public_name", "access_token"]);
     return {
       fieldNote: { id: readableFieldNote.id, title: readableFieldNote.title },
       space,
-      url: `${getServerEnv().appUrl}/r/${space.slug}/reads`,
+      url: slackRoomReadsUrl(space),
     };
   }
 
@@ -1282,7 +1287,7 @@ export async function publishSlackFieldNoteDraft({ teamId, slackUserId, fieldNot
   return {
     fieldNote: decryptContentFields("field_notes", updatedNote, ["title", "content"]),
     space,
-    url: `${getServerEnv().appUrl}/r/${space.slug}/reads`,
+    url: slackRoomReadsUrl(space),
   };
 }
 
@@ -1317,6 +1322,14 @@ async function findSpaceForSlackPin(slugOrUrl) {
   }
 
   return decryptContentFields("spaces", data, ["name", "description", "public_name"]);
+}
+
+function slackRoomReadsUrl(space, accessToken = "") {
+  const { appUrl } = getServerEnv();
+  const slug = cleanString(space?.slug, 80);
+  if (!slug) return appUrl;
+  const token = cleanString(accessToken || space?.access_token, 256);
+  return `${appUrl}${roomInvitePath(slug, token)}`;
 }
 
 async function pinSlackSpace({ connection, spaceId }) {
@@ -1403,7 +1416,7 @@ async function getPinnedSpace({ connection, spaceId }) {
   if (error) throw error;
   return {
     ...data,
-    spaces: data.spaces ? decryptContentFields("spaces", data.spaces, ["name", "description", "public_name"]) : data.spaces,
+    spaces: data.spaces ? decryptContentFields("spaces", data.spaces, ["name", "description", "public_name", "access_token"]) : data.spaces,
   };
 }
 
@@ -1889,10 +1902,7 @@ async function inviteUserToSlackChannel({ token, channelId, slackUserId }) {
 
 async function postSlackChannelIntro({ token, channel, space, roomAccessToken = "" }) {
   try {
-    const { appUrl } = getServerEnv();
-    const roomUrl = roomAccessToken
-      ? `${appUrl}${roomInvitePath(space.slug, roomAccessToken)}`
-      : `${appUrl}/r/${space.slug}/reads`;
+    const roomUrl = slackRoomReadsUrl(space, roomAccessToken);
     await slackApi("chat.postMessage", token, {
       channel: channel.slack_channel_id,
       text: `mumbl team reads for ${space.name}`,
@@ -1940,10 +1950,7 @@ function teamReadMessage({ space, post, channel, roomAccessToken = "" }) {
   const author = post.is_anonymous ? "anonymous team read" : cleanString(post.display_name, 48) || "someone brave";
   const title = cleanString(post.field_note_title, 120) || "team read";
   const preview = cleanString(post.content, 900);
-  const { appUrl } = getServerEnv();
-  const url = roomAccessToken
-    ? `${appUrl}${roomInvitePath(space.slug, roomAccessToken)}`
-    : `${appUrl}/r/${space.slug}/reads`;
+  const url = slackRoomReadsUrl(space, roomAccessToken);
   return {
     channel: channel.slack_channel_id,
     text: `${author}: ${title}`,
@@ -2191,7 +2198,7 @@ function slackPublishedReadsModal({ fieldNotes }) {
     const destination = space.name ? `in ${escapeSlackText(space.name)}` : "published";
     blocks.push(
       section(`*${escapeSlackText(fieldNote.title || "team read")}*\n${destination}`),
-      actions([{ text: "open read", url: space.slug ? `${appUrl}/r/${space.slug}/reads` : `${appUrl}/dump?fieldNote=${encodeURIComponent(fieldNote.id)}` }]),
+      actions([{ text: "open read", url: space.slug ? slackRoomReadsUrl(space) : `${appUrl}/dump?fieldNote=${encodeURIComponent(fieldNote.id)}` }]),
     );
   });
 
@@ -2281,10 +2288,7 @@ async function slackPinnedSpacesModal({ pinnedSpaces, notice = "" }) {
     const channelText = channel?.slack_channel_name
       ? `slack reads channel: #${channel.slack_channel_name}${channel.posting_enabled ? "" : " (posting paused)"}`
       : "no slack reads channel yet.";
-    const { appUrl } = getServerEnv();
-    const openReadsUrl = space.access_token
-      ? `${appUrl}${roomInvitePath(space.slug, space.access_token)}`
-      : `${appUrl}/r/${space.slug}/reads`;
+    const openReadsUrl = slackRoomReadsUrl(space);
     const rowActions = [
       { text: "open team reads", url: openReadsUrl },
       { text: "publish a draft", actionId: "review_field_note_drafts" },
