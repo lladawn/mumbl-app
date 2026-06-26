@@ -41,6 +41,12 @@ const promises = [
   "no wellness theater",
 ];
 
+const memoryLines = [
+  "Slack saves messages. Docs save decisions. Tickets save tasks.",
+  "Mumbl saves the thinking in between: the wrong turns, the quiet concern, the lesson behind a weird week.",
+  "The useful parts can become team reads. The rest can stay private.",
+];
+
 export default function MissionPage() {
   return (
     <section className="mission-view">
@@ -80,6 +86,12 @@ export default function MissionPage() {
             perform the saying.
           </p>
         </div>
+      </div>
+
+      <div className="mission-memory" aria-label="what mumbl saves">
+        {memoryLines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
       </div>
 
       <div className="mission-beliefs" aria-label="mumbl beliefs">

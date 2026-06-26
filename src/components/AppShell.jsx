@@ -27,6 +27,7 @@ export default function AppShell({ children }) {
   }, [savedRooms]);
   const dumpActive = pathname?.startsWith("/dump") || pathname?.startsWith("/patterns");
   const missionActive = pathname?.startsWith("/mission");
+  const isHome = pathname === "/";
 
   return (
     <div className="shell">
@@ -41,18 +42,34 @@ export default function AppShell({ children }) {
           <Link className={`topbar-link ${missionActive ? "active" : ""}`} href="/mission" aria-current={missionActive ? "page" : undefined}>
             mission
           </Link>
-          <Link className={`topbar-link ${dumpActive ? "active" : ""}`} href="/dump" aria-current={dumpActive ? "page" : undefined}>
-            dump
-          </Link>
-          <button className="topbar-link" type="button" onClick={openJoin}>
-            join<span className="topbar-label-extra"> a space</span>
-          </button>
+          {isHome ? (
+            <a className="topbar-link" href="#team-reads">
+              examples
+            </a>
+          ) : (
+            <>
+              <Link className={`topbar-link ${dumpActive ? "active" : ""}`} href="/dump" aria-current={dumpActive ? "page" : undefined}>
+                dump
+              </Link>
+              <button className="topbar-link" type="button" onClick={openJoin}>
+                join<span className="topbar-label-extra"> a space</span>
+              </button>
+            </>
+          )}
         </nav>
         <div className="topbar-actions">
-          <AccountControl />
-          <Link className="topbar-create button-link" href="/create">
-            create<span className="topbar-label-extra"> space</span>
-          </Link>
+          {isHome ? (
+            <a className="topbar-create button-link" href="/api/slack/install" target="_blank" rel="noreferrer">
+              add to slack
+            </a>
+          ) : (
+            <>
+              <AccountControl />
+              <Link className="topbar-create button-link" href="/create">
+                create<span className="topbar-label-extra"> space</span>
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
