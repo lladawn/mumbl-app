@@ -1,8 +1,24 @@
 # mumbl
 
-Say the thing you've been mumbling all week.
+**Say the thing you've been mumbling all week.**
 
-Mumbl is an anonymous-first team room for engineers to share the thoughts that usually stay in side chats, heads, or dead Slack channels. The app uses Next.js App Router with modular React components and Supabase-backed API routes for spaces, posts, reactions, and heartbeats.
+Mumbl is a private, anonymous-first space for engineering teams to think out loud together. Save a thought from Slack or the browser, shape it into a field note when it's ready, and publish it as a team read for the room. No Slack channel history. No member tracking. No manager dashboards. Just the signal that matters.
+
+→ **Try it:** [mumbl.wtf](https://mumbl.wtf) · demo room at [/r/it-works-on-my-machine/reads](https://mumbl.wtf/r/it-works-on-my-machine/reads)
+
+## How it works
+
+```
+private dump  →  field note draft  →  team read
+```
+
+1. **Dump privately.** Write a thought from Slack (`/mumbl the thing`) or the browser. It stays in your private dump — never visible to the team, never searchable.
+
+2. **Shape it into a field note.** When something is worth saying out loud, turn one or several dumps into a field note draft. Edit it until it's right.
+
+3. **Publish as a team read.** One tap sends it to the room as a team read. Anonymous or named — your choice every time. The team reacts, the room stays alive, the heartbeat reflects what was shared.
+
+Rooms are private by default and need an invite link to join. Creators set the room up once; team members join via the invite link. No accounts required to post — login is optional and only used to keep your drafts and history across devices.
 
 ## Run It
 
