@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createDump,
   deleteDump,
@@ -11,14 +11,16 @@ import {
   fetchDumpMap,
   fetchDumps,
   fetchPublicProfileForSession,
+  fetchSavedRooms,
   publishFieldNote,
   savePublicProfile,
   setFieldNotePublic,
+  testGeneratePatternInsight,
   updateDump,
   updateFieldNote,
 } from "../lib/api";
 import { AUTH_CHANGED_EVENT, linkCurrentDumpSession } from "../lib/auth";
-import { getDumpMemoryOptIn, getRecentSlug, setDumpMemoryOptIn } from "../lib/storage";
+import { getRecentSlug, getRoomAccessToken, saveRoomAccessToken } from "../lib/storage";
 import { EditIcon, TrashIcon } from "./ActionIcons";
 import Toast from "./Toast";
 
@@ -31,6 +33,7 @@ const placeholders = [
 ];
 
 const MAX_DUMP_CHARS = 4000;
+const patternGraphUiEnabled = process.env.NEXT_PUBLIC_ENABLE_PATTERN_GRAPH === "true";
 
 export default function DumpPageClient({ mode = "home" }) {
   const [dumps, setDumps] = useState([]);
@@ -42,7 +45,8 @@ export default function DumpPageClient({ mode = "home" }) {
   const [isSaving, setIsSaving] = useState(false);
   const [expandedId, setExpandedId] = useState("");
   const [recentSlug, setRecentSlug] = useState("");
-  const [shareSlug, setShareSlug] = useState("");
+
+  const [savedRooms, setSavedRooms] = useState([]);
   const [publishAnonymous, setPublishAnonymous] = useState(true);
   const [displayName, setDisplayName] = useState("");
   const [publicProfile, setPublicProfile] = useState(null);
@@ -112,6 +116,7 @@ export default function DumpPageClient({ mode = "home" }) {
       if (event.detail?.status === "anonymous") {
         setDumps([]);
         setFieldNotes([]);
+        setSavedRooms([]);
         setPublicProfile(null);
         setPublicProfileStatus("loading");
       }
@@ -147,6 +152,12 @@ export default function DumpPageClient({ mode = "home" }) {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  function handleDumpKeyDown(event) {
+    if (event.key !== "Enter" || !event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
   }
 
   async function handleUpdateDump(dump, nextContent, nextWantsReflection) {
@@ -235,10 +246,16 @@ export default function DumpPageClient({ mode = "home" }) {
     setConfirmBulkDelete(false);
   }
 
-  async function handlePublishFieldNote(fieldNote, edits) {
-    const slug = (shareSlug || recentSlug).trim();
+  async function handlePublishFieldNote(fieldNote, edits, manualInvite = "", shareSlug = "") {
+    const manualRoom = parseManualRoomInvite(manualInvite);
+    if (manualInvite.trim() && !shareSlug && (!manualRoom.slug || !manualRoom.accessToken)) {
+      setToast("paste the full invite link, including ?key=...");
+      return;
+    }
+    if (manualRoom.slug && manualRoom.accessToken) saveRoomAccessToken(manualRoom.slug, manualRoom.accessToken);
+    const slug = (manualRoom.slug || shareSlug || recentSlug).trim();
     if (!slug || publishingNoteId) {
-      setToast("paste a room slug first.");
+      setToast("choose a saved room or paste the full invite link.");
       return;
     }
 
@@ -254,7 +271,6 @@ export default function DumpPageClient({ mode = "home" }) {
       });
       setFieldNotes((current) => current.map((item) => (item.id === fieldNote.id ? result.fieldNote : item)));
       setRecentSlug(slug);
-      setShareSlug("");
       setDisplayName("");
       setToast("published to team reads.");
     } catch (error) {
@@ -461,14 +477,21 @@ export default function DumpPageClient({ mode = "home" }) {
           <p>Write the messy thing. Keep it private. Turn only the useful thread into a field note later.</p>
         </div>
         <div className="dump-nav">
-          <Link className="ghost-button button-link" href="/dump/map">
-            see the map
-          </Link>
+          {patternGraphUiEnabled && (
+            <>
+              <Link className="ghost-button button-link" href="/dump/map">
+                see the map
+              </Link>
+              <Link className="ghost-button button-link" href="/patterns">
+                patterns
+              </Link>
+            </>
+          )}
           <button className="ghost-button" type="button" onClick={() => setPublicModalOpen(true)}>
             go public
           </button>
           {recentSlug && (
-            <Link className="ghost-button button-link" href={`/r/${recentSlug}/reads`}>
+            <Link className="ghost-button button-link" href={roomLinkFor(recentSlug)}>
               team reads
             </Link>
           )}
@@ -480,6 +503,7 @@ export default function DumpPageClient({ mode = "home" }) {
           <textarea
             value={content}
             onChange={(event) => setContent(event.target.value)}
+            onKeyDown={handleDumpKeyDown}
             maxLength={MAX_DUMP_CHARS}
             placeholder={placeholder}
             autoFocus={mode === "new"}
@@ -599,11 +623,10 @@ export default function DumpPageClient({ mode = "home" }) {
           </div>
         </section>
       ) : (
-        <FieldNoteDrafts
-          fieldNotes={fieldNotes}
-          recentSlug={recentSlug}
-          shareSlug={shareSlug}
-          setShareSlug={setShareSlug}
+          <FieldNoteDrafts
+            fieldNotes={fieldNotes}
+            recentSlug={recentSlug}
+            savedRooms={savedRooms}
           publishAnonymous={publishAnonymous}
           setPublishAnonymous={setPublishAnonymous}
           displayName={displayName}
@@ -641,10 +664,11 @@ export default function DumpPageClient({ mode = "home" }) {
   async function loadDumpState(isMounted = () => true) {
     try {
       await repairLoggedInSessionLink();
-      const [result, profileResult] = await Promise.all([fetchDumps(), fetchPublicProfileForSession()]);
+      const [result, profileResult, roomsResult] = await Promise.all([fetchDumps(), fetchPublicProfileForSession(), fetchSavedRooms()]);
       if (!isMounted()) return;
       setDumps(result.dumps || []);
       setFieldNotes(result.fieldNotes || []);
+      setSavedRooms(roomsResult.savedRooms || []);
       const nextProfile = profileResult.profile || null;
       setPublicProfile(nextProfile);
       setPublicProfileStatus(profileResult.migrationRequired ? "migration" : "ready");
@@ -668,6 +692,34 @@ export default function DumpPageClient({ mode = "home" }) {
     } catch {
       // The following fetch will surface auth/migration errors in the normal page flow.
     }
+  }
+}
+
+function roomLinkFor(slug) {
+  const accessToken = getRoomAccessToken(slug);
+  return `/r/${slug}/reads${accessToken ? `?key=${encodeURIComponent(accessToken)}` : ""}`;
+}
+
+function parseManualRoomInvite(value) {
+  const raw = (value || "").trim();
+  if (!raw) return { slug: "", accessToken: "" };
+
+  try {
+    const url = new URL(raw, "https://mumbl.local");
+    const parts = url.pathname.split("/").filter(Boolean);
+    const roomIndex = parts.indexOf("r");
+    const slug = roomIndex >= 0 ? parts[roomIndex + 1] || "" : parts[0] || "";
+    return {
+      slug: decodeURIComponent(slug),
+      accessToken: url.searchParams.get("key") || url.searchParams.get("accessToken") || "",
+    };
+  } catch {
+    const [slugPart, query = ""] = raw.split("?");
+    const params = new URLSearchParams(query);
+    return {
+      slug: slugPart.replace(/^\/?r\//, "").replace(/\/reads$/, ""),
+      accessToken: params.get("key") || params.get("accessToken") || "",
+    };
   }
 }
 
@@ -815,8 +867,7 @@ function DumpCard({ dump, expanded, setExpandedId, selected, toggleSelected, upd
 function FieldNoteDrafts({
   fieldNotes,
   recentSlug,
-  shareSlug,
-  setShareSlug,
+  savedRooms,
   publishAnonymous,
   setPublishAnonymous,
   displayName,
@@ -839,8 +890,7 @@ function FieldNoteDrafts({
           fieldNote={fieldNote}
           key={fieldNote.id}
           recentSlug={recentSlug}
-          shareSlug={shareSlug}
-          setShareSlug={setShareSlug}
+          savedRooms={savedRooms}
           publishAnonymous={publishAnonymous}
           setPublishAnonymous={setPublishAnonymous}
           displayName={displayName}
@@ -859,8 +909,7 @@ function FieldNoteDrafts({
 function FieldNoteDraft({
   fieldNote,
   recentSlug,
-  shareSlug,
-  setShareSlug,
+  savedRooms,
   publishAnonymous,
   setPublishAnonymous,
   displayName,
@@ -875,6 +924,9 @@ function FieldNoteDraft({
   const [noteContent, setNoteContent] = useState(fieldNote.content);
   const [isEditing, setIsEditing] = useState(!fieldNote.isPublished);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [shareSlug, setShareSlug] = useState("");
+  const [manualInvite, setManualInvite] = useState("");
+  const [showManualInput, setShowManualInput] = useState(false);
   const isPublished = fieldNote.isPublished;
   const isMutating = mutatingNoteId === fieldNote.id || publishingNoteId === fieldNote.id;
 
@@ -882,6 +934,10 @@ function FieldNoteDraft({
     setTitle(fieldNote.title);
     setNoteContent(fieldNote.content);
   }, [fieldNote.title, fieldNote.content]);
+
+  useEffect(() => {
+    if (fieldNote.isPublished) setIsEditing(false);
+  }, [fieldNote.isPublished]);
 
   async function saveEdits() {
     const trimmedTitle = title.trim();
@@ -927,15 +983,45 @@ function FieldNoteDraft({
       )}
       {!isPublished && (
         <div className="dump-share-fields">
-          <label>
-            room slug
-            <input
-              value={shareSlug}
-              onChange={(event) => setShareSlug(event.target.value)}
-              placeholder={recentSlug || "backend-team"}
-              disabled={isMutating}
-            />
-          </label>
+          {savedRooms.length ? (
+            <label>
+              publish to
+              <select
+                value={showManualInput ? "__manual__" : shareSlug}
+                onChange={(event) => {
+                  if (event.target.value === "__manual__") {
+                    setShowManualInput(true);
+                    setShareSlug("");
+                  } else {
+                    setShowManualInput(false);
+                    setManualInvite("");
+                    setShareSlug(event.target.value);
+                  }
+                }}
+                disabled={isMutating}
+              >
+                <option value="">{recentSlug ? `recent: ${recentSlug}` : "choose a saved room"}</option>
+                {savedRooms.map((room) => (
+                  <option value={room.slug} key={room.id || room.slug}>
+                    {room.name || room.slug}
+                  </option>
+                ))}
+                <option value="__manual__">+ add by invite link</option>
+              </select>
+            </label>
+          ) : null}
+          {(!savedRooms.length || showManualInput) && (
+            <label>
+              invite link
+              <input
+                value={manualInvite}
+                onChange={(event) => setManualInvite(event.target.value)}
+                placeholder="/r/backend-team/reads?key=..."
+                disabled={isMutating}
+                autoFocus={showManualInput}
+              />
+            </label>
+          )}
           <label className={`display-name-row ${publishAnonymous ? "hidden" : ""}`}>
             display handle
             <input
@@ -983,7 +1069,12 @@ function FieldNoteDraft({
             <button
               className="solid-button button-with-loader"
               type="button"
-              onClick={() => handlePublishFieldNote(fieldNote, { title, content: noteContent })}
+              onClick={async () => {
+                await handlePublishFieldNote(fieldNote, { title, content: noteContent }, manualInvite, shareSlug);
+                setShareSlug("");
+                setManualInvite("");
+                setShowManualInput(false);
+              }}
               disabled={isMutating}
             >
               {publishingNoteId === fieldNote.id && <span className="mini-loader" aria-hidden="true" />}
@@ -1120,39 +1211,56 @@ function GoPublicModal({
 }
 
 function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
-  const [graphState, setGraphState] = useState({ status: "loading", graph: null, supermemory: null });
+  const [graphState, setGraphState] = useState({ status: "loading", graph: null, memory: null });
   const [selectedPatternId, setSelectedPatternId] = useState("");
-  const [includePrivateDumps, setIncludePrivateDumps] = useState(false);
+  const [testToolsEnabled, setTestToolsEnabled] = useState(false);
+  const [isTestingInsight, setIsTestingInsight] = useState(false);
 
-  useEffect(() => {
-    setIncludePrivateDumps(getDumpMemoryOptIn());
-  }, []);
+  const loadGraph = useCallback(
+    async ({ quiet = false } = {}) => {
+      if (!quiet) {
+        setGraphState((current) => ({ ...current, status: "loading" }));
+      }
+      const result = await fetchDumpMap();
+      setGraphState({ status: "ready", graph: result.graph, memory: result.memory });
+      setTestToolsEnabled(result.testToolsEnabled === true);
+      return result;
+    },
+    [],
+  );
 
   useEffect(() => {
     let mounted = true;
-    async function loadGraph() {
+    async function loadMountedGraph() {
       try {
-        const result = await fetchDumpMap({ includePrivateDumps });
+        const result = await fetchDumpMap();
         if (!mounted) return;
-        setGraphState({ status: "ready", graph: result.graph, supermemory: result.supermemory });
+        setGraphState({ status: "ready", graph: result.graph, memory: result.memory });
+        setTestToolsEnabled(result.testToolsEnabled === true);
       } catch (error) {
         if (!mounted) return;
-        setGraphState({ status: "error", graph: null, supermemory: null });
+        setGraphState({ status: "error", graph: null, memory: null });
         setToast(error.message || "couldn't build the graph yet.");
       }
     }
-    loadGraph();
+    loadMountedGraph();
     return () => {
       mounted = false;
     };
-  }, [includePrivateDumps, setToast]);
+  }, [setToast]);
 
-  function handlePrivateDumpMemoryToggle(event) {
-    const isEnabled = event.target.checked;
-    setDumpMemoryOptIn(isEnabled);
-    setIncludePrivateDumps(isEnabled);
-    setGraphState((current) => ({ ...current, status: "loading" }));
-    setToast(isEnabled ? "private dumps can now shape only your memory graph." : "memory graph is back to field notes only.");
+  async function handleTestGenerateInsight() {
+    if (isTestingInsight) return;
+    setIsTestingInsight(true);
+    try {
+      const result = await testGeneratePatternInsight();
+      await loadGraph({ quiet: true });
+      setToast(result.pattern ? "test insight generated. map refreshed." : result.message || "no insight generated yet.");
+    } catch (error) {
+      setToast(error.message || "couldn't generate a test insight.");
+    } finally {
+      setIsTestingInsight(false);
+    }
   }
 
   const graph = graphState.graph || {
@@ -1163,9 +1271,9 @@ function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
     patterns: [],
     insights: [],
   };
-  const evidenceNodes = graph.nodes.filter((node) => node.kind === (includePrivateDumps ? "dump" : "field_note"));
+  const evidenceNodes = graph.nodes.filter((node) => node.kind === "dump");
   const themes = graph.nodes.filter((node) => node.kind === "theme");
-  const sourceName = includePrivateDumps ? "opted-in dumps" : "field notes";
+  const sourceName = "private dumps";
   const patterns = graph.patterns?.length
     ? graph.patterns
     : [
@@ -1185,7 +1293,7 @@ function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
   const patternEvidence = evidenceNodes.filter((node) => selectedPattern?.evidenceIds?.includes(node.id)).slice(0, 4);
   const summary = graph.summary || {
     headline: themes[0] ? `${themes[0].label} keeps coming back` : "No strong pattern yet",
-    detail: graphState.supermemory?.source === "supermemory" ? `Reading your ${sourceName} for repeat work patterns.` : map.summary,
+    detail: graphState.memory?.source === "pattern_graph" ? `Reading your ${sourceName} for repeat work patterns.` : map.summary,
     nextStep: dumps.length > 2 ? "Turn one useful thread into a field note when it is ready for the team." : "Add more raw material before trusting the read.",
   };
   const insights = graph.insights?.length
@@ -1194,20 +1302,20 @@ function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
         {
           label: "source",
           value: sourceName,
-          detail: includePrivateDumps ? "Private dumps are opted in for this browser." : "Private dumps stay out by default.",
+          detail: "Logged-in private dumps shape this map. Nothing gets posted.",
           tone: "blue",
         },
       ];
-  const memoryStatus = graphState.supermemory || {};
-  const sourceCount = includePrivateDumps ? dumps.length : fieldNotes.length;
+  const memoryStatus = graphState.memory || {};
+  const sourceCount = dumps.length;
   const isGraphLoading = graphState.status === "loading";
   const statusLabel =
     isGraphLoading ? "checking memory" : memoryStatus.label || (memoryStatus.configured ? "memory ready" : "local only");
   const statusValue =
     isGraphLoading
-      ? "syncing..."
+      ? "checking..."
       : memoryStatus.status === "active"
-        ? `${sourceName} connected`
+        ? "private patterns ready"
         : memoryStatus.status === "unavailable"
           ? "local, lower confidence"
           : memoryStatus.status === "waiting"
@@ -1232,41 +1340,37 @@ function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
           <h1>your working map</h1>
           <p>See what keeps coming up, what it might mean, and which thread is worth turning into a team read.</p>
         </div>
-        <Link className="ghost-button button-link" href="/dump">
-          back to dump
-        </Link>
+        <div className="dump-nav">
+          <Link className="ghost-button button-link" href="/patterns">
+            patterns
+          </Link>
+          <Link className="ghost-button button-link" href="/dump">
+            back to dump
+          </Link>
+        </div>
       </div>
       <div className="dump-map-panel">
         {status === "loading" ? <div className="empty-state">looking for patterns...</div> : null}
         {status !== "loading" && sourceCount < 1 ? (
-          <div className="empty-state">
-            {includePrivateDumps ? "write a dump to start your private map." : "draft a field note to start the working map."}
-          </div>
+          <div className="empty-state">write a logged-in private dump to start your working map.</div>
         ) : null}
         {status !== "loading" && sourceCount >= 1 && (
           <>
             <div className={`dump-graph-status ${memoryStatus.status || "local"}`}>
               <span>{statusLabel}</span>
               <strong>{statusValue}</strong>
+              {testToolsEnabled && (
+                <button className="ghost-button dump-map-test-button" type="button" onClick={handleTestGenerateInsight} disabled={isTestingInsight || isGraphLoading}>
+                  {isTestingInsight ? "generating..." : "regenerate"}
+                </button>
+              )}
               {statusDetail && <p>{statusDetail}</p>}
             </div>
-
-            <label className={`dump-memory-toggle ${includePrivateDumps ? "on" : ""}`}>
-              <input type="checkbox" checked={includePrivateDumps} onChange={handlePrivateDumpMemoryToggle} />
-              <span>
-                <strong>use private dumps for my graph</strong>
-                <small>
-                  {includePrivateDumps
-                    ? "only for your private graph. nothing gets posted."
-                    : "off by default. published/drafted field notes shape this view."}
-                </small>
-              </span>
-            </label>
 
             {isGraphLoading ? (
               <div className="dump-map-loading">
                 <strong>reading your {sourceName}...</strong>
-                <p>The map only uses private dumps if you switch them on.</p>
+                <p>Pattern reads stay private to your logged-in dump.</p>
               </div>
             ) : (
               <>
@@ -1326,7 +1430,7 @@ function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
                       </div>
                     </div>
                     <div className="dump-pattern-evidence">
-                      <small>{includePrivateDumps ? "private evidence" : "field note evidence"}</small>
+                      <small>private evidence</small>
                       {patternEvidence.length ? (
                         patternEvidence.map((dump) => (
                           <div className="dump-pattern-evidence-item" key={dump.id}>
@@ -1335,7 +1439,7 @@ function DumpMap({ dumps, fieldNotes, map, status, toast, setToast }) {
                           </div>
                         ))
                       ) : (
-                        <p>No connected evidence yet. Draft a field note or opt private dumps in for a richer read.</p>
+                        <p>No connected evidence yet. Keep dumping and the graph will get a richer read.</p>
                       )}
                     </div>
                   </article>

@@ -16,7 +16,7 @@ export async function GET(_request, { params }) {
 
     const { data: fieldNotes, error: notesError } = await supabase
       .from("field_notes")
-      .select("id, title, content, created_at, public_published_at")
+      .select("id, encrypted_payload, created_at, public_published_at")
       .eq("public_profile_id", profile.id)
       .eq("is_public", true)
       .eq("is_published", true)

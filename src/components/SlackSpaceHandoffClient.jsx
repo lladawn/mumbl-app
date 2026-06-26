@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { authHeader } from "../lib/auth";
-import { rememberRecentSlug, saveCreatorToken } from "../lib/storage";
+import { rememberRecentSlug, saveCreatorToken, saveRoomAccessToken } from "../lib/storage";
 
 export default function SlackSpaceHandoffClient() {
   const router = useRouter();
@@ -32,9 +32,10 @@ export default function SlackSpaceHandoffClient() {
         if (!mounted) return;
 
         saveCreatorToken(result.slug, result.creatorToken);
+        saveRoomAccessToken(result.slug, result.accessToken);
         rememberRecentSlug(result.slug);
         setStatus(result.creatorLinked ? "creator access linked. opening team reads..." : "creator access saved. opening team reads...");
-        router.replace(`/r/${result.slug}/reads`);
+        router.replace(`/r/${result.slug}/reads${result.accessToken ? `?key=${encodeURIComponent(result.accessToken)}` : ""}`);
       } catch (handoffError) {
         if (!mounted) return;
         setError(handoffError.message || "couldn't open that Slack-created room.");

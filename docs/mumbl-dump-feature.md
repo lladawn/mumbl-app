@@ -93,14 +93,8 @@ auth_provider       enum: 'github' | 'google' | 'email' nullable
 created_at          timestamp
 ```
 
-### dump_insights table (new)
-```
-id                  uuid primary key
-session_id          string
-insight_type        enum: 'theme' | 'pattern' | 'streak' | 'graph_node'
-content             jsonb
-generated_at        timestamp
-```
+### private pattern tables
+Private dump patterns now use Supabase pgvector-backed `dump_signals`, `patterns`, and `user_dump_counts`, owned by authenticated users. The old `dump_insights` table has been removed.
 
 ---
 
@@ -165,7 +159,7 @@ generated_at        timestamp
 ### 2. dump map insights (private, weekly)
 - triggered: background job, weekly, for users with 5+ dumps.
 - generates: top recurring themes, emotional arc of the week, flow vs stuck ratio, notable patterns.
-- stored in `dump_insights` table, rendered in `/dump/map`.
+- stored as private pattern graph rows, rendered in `/dump/map`.
 - never shared externally. never visible to the team or public.
 
 ### 3. heartbeat contribution (optional, future)

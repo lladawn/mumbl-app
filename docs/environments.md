@@ -88,6 +88,23 @@ Use different values per environment:
 - Preview / `dev`: staging Supabase URL, anon key, service role key, staging cron secret
 - Production / `main`: production Supabase URL, anon key, service role key, production cron secret
 
+Content encryption and pattern graph variables are also environment-specific:
+
+- `MUMBL_CONTENT_ENCRYPTION_KEY`
+- `MUMBL_ENABLE_PATTERN_GRAPH`
+- `NEXT_PUBLIC_ENABLE_PATTERN_GRAPH`
+- `OPENAI_API_KEY`
+- `OPENAI_SIGNAL_MODEL`
+- `ANTHROPIC_API_KEY`
+- `ANTHROPIC_INSIGHT_MODEL`
+- `MUMBL_PATTERN_GRAPH_FIRST_INSIGHT_AT`
+- `MUMBL_PATTERN_GRAPH_INSIGHT_INTERVAL`
+- `MUMBL_ENABLE_PATTERN_TEST_TOOLS`
+
+`MUMBL_CONTENT_ENCRYPTION_KEY` is server-only and lane-specific. A row encrypted in one lane cannot be decrypted in another lane unless the key is intentionally shared, so production, staging, and local data should use separate keys.
+
+Use `MUMBL_ENABLE_PATTERN_GRAPH=true` only in environments where the private pattern graph should run, and pair it with `NEXT_PUBLIC_ENABLE_PATTERN_GRAPH=true` only when the UI should link to the feature. Production can safely ship the code with both flags false or unset, which hides pattern links and disables pattern APIs, async processing, insight generation, and Slack pattern pointers. Use lower pattern thresholds and `MUMBL_ENABLE_PATTERN_TEST_TOOLS=true` only in local or staging. Production should keep test tools disabled and use the intended cadence unless product explicitly changes it.
+
 Supabase Auth needs environment-specific redirect URLs in the Supabase dashboard. Add each lane's callback URL, such as `http://127.0.0.1:3000/auth/callback`, the Vercel Preview callback URL, and `https://mumbl.wtf/auth/callback`.
 
 For Google login, enable the Google provider in Supabase Auth for each Supabase project and use environment-specific Google OAuth client credentials. The Google OAuth client must allow the Supabase callback URL shown in that project's Google provider settings.
@@ -99,6 +116,8 @@ Analytics should be opt-in per environment:
 - production: enabled
 
 See `docs/analytics.md` for the tracked event boundary, Umami setup, and the privacy rules that keep analytics aggregate rather than person-level.
+
+Slack token encryption keys are lane-specific. If local ngrok and staging intentionally share one staging Supabase project, either use the same `MUMBL_SLACK_TOKEN_ENCRYPTION_KEY` in both or reinstall Slack through the environment that will send notifications. Otherwise a row encrypted by one lane cannot be decrypted by the other.
 
 ## Important rule
 

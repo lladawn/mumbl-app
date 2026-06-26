@@ -1,8 +1,8 @@
 export const SESSION_KEY = "mumbl:session";
 export const RECENT_SPACE_KEY = "mumbl:recent-space";
 export const CREATOR_TOKEN_PREFIX = "mumbl:creator-token:";
+export const ROOM_ACCESS_TOKEN_PREFIX = "mumbl:room-access-token:";
 export const POST_EDIT_TOKEN_PREFIX = "mumbl:post-edit-token:";
-export const DUMP_MEMORY_OPT_IN_KEY = "mumbl:dump-memory-opt-in";
 
 export function loadSession() {
   const existing = window.localStorage.getItem(SESSION_KEY);
@@ -28,15 +28,6 @@ export function forgetRecentSlug(slug) {
   }
 }
 
-export function getDumpMemoryOptIn() {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(DUMP_MEMORY_OPT_IN_KEY) === "true";
-}
-
-export function setDumpMemoryOptIn(isEnabled) {
-  window.localStorage.setItem(DUMP_MEMORY_OPT_IN_KEY, isEnabled ? "true" : "false");
-}
-
 export function saveCreatorToken(slug, token) {
   window.localStorage.setItem(`${CREATOR_TOKEN_PREFIX}${slug}`, token);
 }
@@ -47,6 +38,20 @@ export function getCreatorToken(slug) {
 
 export function clearCreatorToken(slug) {
   window.localStorage.removeItem(`${CREATOR_TOKEN_PREFIX}${slug}`);
+}
+
+export function saveRoomAccessToken(slug, token) {
+  if (!slug || !token) return;
+  window.localStorage.setItem(`${ROOM_ACCESS_TOKEN_PREFIX}${slug}`, token);
+}
+
+export function getRoomAccessToken(slug) {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(`${ROOM_ACCESS_TOKEN_PREFIX}${slug}`) || "";
+}
+
+export function clearRoomAccessToken(slug) {
+  window.localStorage.removeItem(`${ROOM_ACCESS_TOKEN_PREFIX}${slug}`);
 }
 
 export function savePostEditToken(postId, token) {
@@ -71,6 +76,18 @@ export function listCreatorTokens() {
       token: window.localStorage.getItem(key) || "",
     }))
     .filter((item) => item.slug && item.token);
+}
+
+export function listRoomAccessTokens() {
+  if (typeof window === "undefined") return [];
+  return Object.keys(window.localStorage)
+    .filter((key) => key.startsWith(ROOM_ACCESS_TOKEN_PREFIX))
+    .map((key) => ({
+      slug: key.slice(ROOM_ACCESS_TOKEN_PREFIX.length),
+      token: window.localStorage.getItem(key) || "",
+    }))
+    .filter((item) => item.slug && item.token)
+    .slice(0, 100);
 }
 
 export function listPostEditTokens() {

@@ -35,7 +35,7 @@ export async function POST(request) {
 
     if (!teamId || !slackUserId) return ok(ephemeralText("couldn't tell which Slack workspace this came from."));
     if (!text || text.toLowerCase() === "help") return ok(slackHelpPayload());
-    if (pinSlug !== null && !pinSlug) return ok(ephemeralText("try `/mumbl pin your-space-slug`."));
+    if (pinSlug !== null && !pinSlug) return ok(ephemeralText("try `/mumbl pin` followed by the room invite link."));
     if (roomName !== null && !roomName) {
       after(async () => {
         try {
@@ -87,7 +87,7 @@ function parsePinCommand(text) {
   const trimmed = cleanString(text, 4000);
   const lower = trimmed.toLowerCase();
   if (lower === "pin") return "";
-  if (lower.startsWith("pin ")) return cleanString(trimmed.slice(4), 64);
+  if (lower.startsWith("pin ")) return cleanString(trimmed.slice(4), 2000);
   return null;
 }
 
@@ -96,11 +96,11 @@ async function startRoomFromSlack({ teamId, slackUserId, name }) {
 }
 
 async function pinSpaceFromSlack({ teamId, slackUserId, slug }) {
-  const { space, channelJoin } = await pinSlackSpaceBySlug({ teamId, slackUserId, slug });
+  const { space, channelJoin, alreadyPinned } = await pinSlackSpaceBySlug({ teamId, slackUserId, slug });
   const channelText = channelJoin?.joined
     ? ` You're also in the ${channelJoin.channelName ? `#${channelJoin.channelName}` : "Slack reads"} channel.`
     : "";
-  return ephemeralText(`${space.name} is pinned for team reads.${channelText}`);
+  return ephemeralText(`${space.name} ${alreadyPinned ? "was already pinned" : "is pinned"} for team reads.${channelText}`);
 }
 
 async function saveOrConnect({ teamId, slackUserId, content, sourceMeta }) {

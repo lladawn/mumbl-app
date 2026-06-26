@@ -27,7 +27,8 @@ export default function PostCard({
   const [isMutating, setIsMutating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const canEdit = canAuthorEdit && authorEditableTypes.has(post.type) && Boolean(updatePost);
-  const canDelete = (canAuthorEdit || canManage) && Boolean(deletePost);
+  const canDeleteAsCreator = canManage && post.type !== "field_note";
+  const canDelete = (canAuthorEdit || canDeleteAsCreator) && Boolean(deletePost);
 
   useEffect(() => {
     setEditContent(post.content);
@@ -143,8 +144,8 @@ export default function PostCard({
                     type="button"
                     onClick={handleDelete}
                     disabled={isMutating}
-                    aria-label={canManage && !canAuthorEdit ? "delete post as creator" : "delete post"}
-                    title={canManage && !canAuthorEdit ? "delete post as creator" : "delete post"}
+                    aria-label={canDeleteAsCreator && !canAuthorEdit ? "delete post as creator" : "delete post"}
+                    title={canDeleteAsCreator && !canAuthorEdit ? "delete post as creator" : "delete post"}
                   >
                     {confirmDelete ? "delete forever" : <TrashIcon />}
                   </button>

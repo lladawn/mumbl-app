@@ -1,9 +1,11 @@
 import { badRequest, notFound, ok, serverError } from "../../../../src/server/http";
-import { resolveRequestOwner } from "../../../../src/server/auth";
+import { applyOwnerFilter, resolveRequestOwner } from "../../../../src/server/auth";
 import { claimCreatorAccess, resolveCreatorAccess } from "../../../../src/server/creatorAccess";
+import { encryptContentFields } from "../../../../src/server/encryption";
 import { hashToken } from "../../../../src/server/hash";
 import { getOrCreateKnownPublicRoom } from "../../../../src/server/demoRoom";
 import { getTopReactionLabels, startOfTodayIso } from "../../../../src/server/roomVibe";
+import { assertRoomAccess, cleanRoomAccessToken, saveRoomAccessForUser } from "../../../../src/server/roomAccess";
 import { serializeSpace, summariseReactions } from "../../../../src/server/serializers";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 import { cleanString } from "../../../../src/server/validation";
@@ -18,13 +20,14 @@ export async function GET(request, { params }) {
     if (!slug) return badRequest("space slug is required");
 
     const url = new URL(request.url);
-    const sessionToken = url.searchParams.get("sessionToken");
-    const owner = await resolveRequestOwner({ request, sessionToken: cleanString(sessionToken, 256) });
+    const sessionToken = cleanString(request.headers.get("x-session-token"), 256);
+    const owner = await resolveRequestOwner({ request, sessionToken });
     const sessionTokenHash = sessionToken ? hashToken(sessionToken) : null;
     const reactionIdentityHash = owner.userId ? hashToken(`auth-reaction:${owner.userId}`) : sessionTokenHash;
     const postLimit = parsePostLimit(url.searchParams.get("limit"));
     const postCursor = parsePostCursor(url.searchParams.get("before"));
     const postType = parsePostType(url.searchParams.get("type"));
+    const accessToken = cleanRoomAccessToken(url.searchParams.get("key") || url.searchParams.get("accessToken"));
     const supabase = getSupabaseAdmin();
 
     let { data: space, error: spaceError } = await supabase.from("spaces").select("*").eq("slug", slug).single();
@@ -34,6 +37,8 @@ export async function GET(request, { params }) {
       spaceError = null;
     }
     if (spaceError) throw spaceError;
+    await assertRoomAccess({ supabase, space, accessToken, owner });
+    await saveRoomAccessForUser({ supabase, owner, space, accessToken });
 
     let postsQuery = supabase
       .from("posts")
@@ -73,6 +78,7 @@ export async function GET(request, { params }) {
       activeReactionsResult,
       accountEditablePostsResult,
       localEditablePostsResult,
+      ownedFieldNotePostsResult,
       heartbeatsResult,
       todayReactionsResult,
       slackTeamReadsResult,
@@ -89,6 +95,12 @@ export async function GET(request, { params }) {
       postIds.length
         ? supabase.from("post_edit_tokens").select("post_id").in("post_id", postIds).is("owner_user_id", null)
         : Promise.resolve({ data: [], error: null }),
+      postIds.length && (owner.userId || owner.sessionTokenHash)
+        ? applyOwnerFilter(
+            supabase.from("field_notes").select("published_post_id").in("published_post_id", postIds),
+            owner,
+          )
+        : Promise.resolve({ data: [], error: null }),
       supabase.from("heartbeats").select("*").eq("space_id", space.id).order("week_of", { ascending: false }),
       todayPostIdsPromise.then(({ data, error }) => {
         if (error) return { data: [], error };
@@ -104,6 +116,7 @@ export async function GET(request, { params }) {
     if (activeReactionsResult.error) throw activeReactionsResult.error;
     if (accountEditablePostsResult.error && !isMissingPostEditTokensTable(accountEditablePostsResult.error)) throw accountEditablePostsResult.error;
     if (localEditablePostsResult.error && !isMissingPostEditTokensTable(localEditablePostsResult.error)) throw localEditablePostsResult.error;
+    if (ownedFieldNotePostsResult.error) throw ownedFieldNotePostsResult.error;
     if (heartbeatsResult.error) throw heartbeatsResult.error;
     if (todayReactionsResult.error) throw todayReactionsResult.error;
     if (slackTeamReadsResult.error && !isMissingSlackTeamReadsTable(slackTeamReadsResult.error)) throw slackTeamReadsResult.error;
@@ -119,7 +132,10 @@ export async function GET(request, { params }) {
           roomVibe: getTopReactionLabels(todayReactionsResult.data),
           slackTeamReads: slackTeamReadsResult.error ? null : slackTeamReadsResult.data,
           canManage: Boolean(owner.userId && space.creator_user_id === owner.userId),
-          accountEditablePostIds: new Set((accountEditablePostsResult.error ? [] : accountEditablePostsResult.data || []).map((row) => row.post_id)),
+          accountEditablePostIds: new Set([
+            ...(accountEditablePostsResult.error ? [] : accountEditablePostsResult.data || []).map((row) => row.post_id),
+            ...(ownedFieldNotePostsResult.data || []).map((row) => row.published_post_id),
+          ]),
           localEditablePostIds: new Set((localEditablePostsResult.error ? [] : localEditablePostsResult.data || []).map((row) => row.post_id)),
           postsPage: {
             limit: postLimit,
@@ -180,11 +196,10 @@ export async function PATCH(request, { params }) {
     if (Object.hasOwn(body, "isPublic")) {
       const isPublic = body.isPublic === true;
       updates.is_public = isPublic;
-      updates.public_name = isPublic ? cleanString(body.publicName, 80) || null : null;
     }
 
     if (Object.hasOwn(body, "description")) {
-      updates.description = cleanString(body.description, 180) || null;
+      updates.description_changed = true;
     }
 
     if (!slug) return badRequest("space slug is required");
@@ -193,7 +208,7 @@ export async function PATCH(request, { params }) {
     const supabase = getSupabaseAdmin();
     const { data: space, error: spaceError } = await supabase
       .from("spaces")
-      .select("id,creator_token_hash,creator_user_id")
+      .select("id,creator_token_hash,creator_user_id,encrypted_payload")
       .eq("slug", slug)
       .single();
     if (spaceError?.code === "PGRST116") return notFound("space not found");
@@ -204,6 +219,17 @@ export async function PATCH(request, { params }) {
       return badRequest("creator token did not match");
     }
     if (access.shouldClaim) await claimCreatorAccess({ supabase, spaceId: space.id, userId: access.owner.userId });
+
+    const encryptedFields = {};
+    if (Object.hasOwn(body, "isPublic")) encryptedFields.public_name = body.isPublic === true ? cleanString(body.publicName, 80) || null : null;
+    if (Object.hasOwn(body, "description")) encryptedFields.description = cleanString(body.description, 180) || null;
+    if (Object.keys(encryptedFields).length) {
+      updates.encrypted_payload = {
+        ...(space.encrypted_payload || {}),
+        ...encryptContentFields("spaces", encryptedFields),
+      };
+    }
+    delete updates.description_changed;
 
     const { data: updatedSpace, error: updateError } = await supabase
       .from("spaces")

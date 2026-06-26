@@ -13,6 +13,7 @@
     "db:link:prod": "node scripts/supabase-link.mjs .env.production.local",
     "db:push": "supabase db push",
     "db:status": "supabase migration list --linked",
+    "content-encryption:backfill": "node scripts/content-encryption-backfill.mjs",
     "heartbeat:test": "node scripts/heartbeat-test.mjs",
     "side-quests:smoke": "node scripts/side-quests-smoke.mjs"
   },

@@ -15,9 +15,13 @@ export default function AccountControl() {
     setMounted(true);
 
     async function syncSession() {
-      const session = await getAuthSession();
-      if (!isMounted) return;
-      setAuthState(stateFromSession(session));
+      try {
+        const session = await withTimeout(getAuthSession(), 3500);
+        if (!isMounted) return;
+        setAuthState(stateFromSession(session));
+      } catch {
+        if (isMounted) setAuthState({ status: "anonymous", email: "" });
+      }
     }
 
     let subscription;
@@ -133,6 +137,20 @@ function stateFromSession(session) {
   return session?.user
     ? { status: "authenticated", email: session.user.email || "" }
     : { status: "anonymous", email: "" };
+}
+
+async function withTimeout(promise, timeoutMs) {
+  let timeoutId;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeoutId = window.setTimeout(() => reject(new Error("login check timed out")), timeoutMs);
+      }),
+    ]);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 function AccountModal({ authState, close, loginStatus, loginWithGoogle, logout }) {

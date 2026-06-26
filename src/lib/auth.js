@@ -1,4 +1,4 @@
-import { listCreatorTokens, listPostEditTokens, loadSession } from "./storage";
+import { listCreatorTokens, listPostEditTokens, listRoomAccessTokens, loadSession } from "./storage";
 
 const SUPABASE_AUTH_CLIENT_KEY = "__mumblSupabaseAuthClient";
 const SUPABASE_AUTH_CLIENT_PROMISE_KEY = "__mumblSupabaseAuthClientPromise";
@@ -147,6 +147,7 @@ async function linkCurrentBrowserSession(accessToken) {
     body: JSON.stringify({
       sessionToken: loadSession(),
       creatorTokens: listCreatorTokens(),
+      roomAccessTokens: listRoomAccessTokens(),
       postEditTokens: listPostEditTokens(),
     }),
   });

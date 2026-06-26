@@ -1,4 +1,5 @@
 import { feedbackRoom, publicDemoRoom } from "../lib/constants";
+import { encryptContentFields } from "./encryption";
 import { createToken, hashToken } from "./hash";
 
 const knownPublicRooms = [
@@ -56,12 +57,15 @@ export async function getOrCreateKnownPublicRoom(supabase, slug) {
     .from("spaces")
     .insert({
       slug: room.slug,
-      name: room.name,
       vibe: room.vibe,
       creator_token_hash: hashToken(createToken()),
       first_post_done: true,
       is_public: true,
-      public_name: room.name,
+      encrypted_payload: encryptContentFields("spaces", {
+        name: room.name,
+        description: null,
+        public_name: room.name,
+      }),
     })
     .select("*")
     .single();
@@ -88,9 +92,12 @@ async function seedPublicRoomPosts(supabase, spaceId, starterPosts) {
     starterPosts.map((post) => ({
       space_id: spaceId,
       type: post.type,
-      content: post.content,
       is_anonymous: true,
-      display_name: null,
+      encrypted_payload: encryptContentFields("posts", {
+        content: post.content,
+        display_name: null,
+        field_note_title: null,
+      }),
     })),
   );
 

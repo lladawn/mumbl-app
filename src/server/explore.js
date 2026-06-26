@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "./supabase";
+import { decryptContentRows } from "./encryption";
 
 const THEME_KEYWORDS = [
   ["sprint planning", ["sprint", "planning", "estimate", "estimation", "points"]],
@@ -25,7 +26,7 @@ export async function getExploreSummary() {
 
   const { data: posts, error: postsError } = await supabase
     .from("posts")
-    .select("id,space_id,type,content,is_anonymous,created_at")
+    .select("id,space_id,type,encrypted_payload,is_anonymous,created_at")
     .in("space_id", spaceIds)
     .gte("created_at", `${weekStart}T00:00:00.000Z`);
   if (postsError) throw postsError;
@@ -36,22 +37,23 @@ export async function getExploreSummary() {
     : { data: [], error: null };
   if (reactionsError) throw reactionsError;
 
-  const anonymousPosts = posts.filter((post) => post.is_anonymous).length;
-  const anonPercentage = posts.length ? Number(((anonymousPosts / posts.length) * 100).toFixed(2)) : 0;
-  const topRantTheme = topTheme(posts.filter((post) => post.type === "rant"));
-  const topWinTheme = topTheme(posts.filter((post) => post.type === "win"));
-  const mostActiveDay = mostActiveWeekday(posts);
+  const readablePosts = decryptContentRows("posts", posts || [], ["content", "display_name", "field_note_title"]);
+  const anonymousPosts = readablePosts.filter((post) => post.is_anonymous).length;
+  const anonPercentage = readablePosts.length ? Number(((anonymousPosts / readablePosts.length) * 100).toFixed(2)) : 0;
+  const topRantTheme = topTheme(readablePosts.filter((post) => post.type === "rant"));
+  const topWinTheme = topTheme(readablePosts.filter((post) => post.type === "win"));
+  const mostActiveDay = mostActiveWeekday(readablePosts);
 
   return {
     weekOf: weekStart,
     totalPublicSpaces: spaces.length,
-    totalPosts: posts.length,
+    totalPosts: readablePosts.length,
     totalReactions: reactions.length,
     anonPercentage,
     topRantTheme,
     topWinTheme,
     mostActiveDay,
-    culturePulse: makeCulturePulse({ posts, reactions, topRantTheme, topWinTheme }),
+    culturePulse: makeCulturePulse({ posts: readablePosts, reactions, topRantTheme, topWinTheme }),
   };
 }
 

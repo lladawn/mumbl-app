@@ -1,6 +1,7 @@
 import { badRequest, ok, serverError } from "../../../../src/server/http";
 import { resolveRequestOwner } from "../../../../src/server/auth";
 import { resolveCreatorAccess } from "../../../../src/server/creatorAccess";
+import { decryptContentFields, encryptContentFields, withoutEncryptedPayload } from "../../../../src/server/encryption";
 import { hashToken } from "../../../../src/server/hash";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 import { cleanString } from "../../../../src/server/validation";
@@ -26,13 +27,18 @@ export async function PATCH(request, { params }) {
 
     const { data: updatedPost, error } = await supabase
       .from("posts")
-      .update({ content })
+      .update({
+        encrypted_payload: {
+          ...(post.encrypted_payload || {}),
+          ...encryptContentFields("posts", { content }),
+        },
+      })
       .eq("id", post.id)
       .select("*")
       .single();
     if (error) throw error;
 
-    return ok({ post: updatedPost });
+    return ok({ post: withoutEncryptedPayload(decryptContentFields("posts", updatedPost, ["content", "display_name", "field_note_title"])) });
   } catch (error) {
     return serverError(error);
   }
@@ -50,14 +56,22 @@ export async function DELETE(request, { params }) {
     const supabase = getSupabaseAdmin();
     const post = await getPostForMutation(supabase, postId);
     const owner = await resolveRequestOwner({ request, sessionToken });
-    const canDeleteAsAuthor = await hasPostEditAccess({ supabase, postId: post.id, editToken, owner });
-    const canDeleteAsCreator = await canCreatorDeletePost({ request, body, post });
+    const canDeleteAsAuthor = await hasPostDeleteAccess({ supabase, post, editToken, owner });
+    const canDeleteAsCreator = post.type !== "field_note" && await canCreatorDeletePost({ request, body, post });
     if (!canDeleteAsAuthor && !canDeleteAsCreator) return badRequest("post edit token or creator access is required");
 
     if (post.type === "field_note") {
       const { error: unlinkError } = await supabase
         .from("field_notes")
-        .update({ team_room_id: null, published_post_id: null })
+        .update({
+          team_room_id: null,
+          is_published: false,
+          published_post_id: null,
+          published_at: null,
+          is_public: false,
+          public_profile_id: null,
+          public_published_at: null,
+        })
         .eq("published_post_id", post.id);
       if (unlinkError) throw unlinkError;
     }
@@ -74,7 +88,7 @@ export async function DELETE(request, { params }) {
 async function getPostForMutation(supabase, postId) {
   const { data: post, error } = await supabase
     .from("posts")
-    .select("id,space_id,type,spaces(id,creator_token_hash,creator_user_id)")
+    .select("id,space_id,type,encrypted_payload,spaces(id,creator_token_hash,creator_user_id)")
     .eq("id", postId)
     .single();
   if (error?.code === "PGRST116") {
@@ -98,6 +112,25 @@ async function hasPostEditAccess({ supabase, postId, editToken, owner }) {
   if (editToken && (await hasPostEditToken(supabase, postId, editToken, owner))) return true;
   if (!owner.userId) return false;
   return hasPostEditOwner(supabase, postId, owner.userId);
+}
+
+async function hasPostDeleteAccess({ supabase, post, editToken, owner }) {
+  if (await hasPostEditAccess({ supabase, postId: post.id, editToken, owner })) return true;
+  if (post.type !== "field_note") return false;
+  return hasPublishedFieldNoteOwner(supabase, post.id, owner);
+}
+
+async function hasPublishedFieldNoteOwner(supabase, postId, owner) {
+  if (!owner.userId && !owner.sessionTokenHash) return false;
+  let query = supabase
+    .from("field_notes")
+    .select("id")
+    .eq("published_post_id", postId)
+    .limit(1);
+  query = owner.userId ? query.eq("user_id", owner.userId) : query.eq("session_token_hash", owner.sessionTokenHash);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return Boolean(data?.id);
 }
 
 async function hasPostEditToken(supabase, postId, editToken, owner) {

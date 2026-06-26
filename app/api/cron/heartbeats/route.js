@@ -1,4 +1,5 @@
 import { makeHeartbeat } from "../../../../src/lib/heartbeat";
+import { decryptContentFields, decryptContentRows, encryptContentFields } from "../../../../src/server/encryption";
 import { getServerEnv } from "../../../../src/server/env";
 import { makeHeartbeatCardFields } from "../../../../src/server/heartbeatCard";
 import { badRequest, ok, serverError } from "../../../../src/server/http";
@@ -84,16 +85,18 @@ async function processHeartbeatJobs(supabase, weekOf) {
 async function generateHeartbeatForSpace(supabase, spaceId, weekOf) {
   const { data: space, error: spaceError } = await supabase.from("spaces").select("*").eq("id", spaceId).single();
   if (spaceError) throw spaceError;
+  const readableSpace = decryptContentFields("spaces", space, ["name", "description", "public_name"]);
 
   const { data: posts, error: postsError } = await supabase
     .from("posts")
-    .select("id,type,content")
+    .select("id,type,encrypted_payload")
     .eq("space_id", space.id)
     .eq("type", "field_note")
     .gte("created_at", weekOf + "T00:00:00.000Z");
   if (postsError) throw postsError;
+  const readablePosts = decryptContentRows("posts", posts || [], ["content", "display_name", "field_note_title"]);
 
-  const postIds = posts.map((post) => post.id);
+  const postIds = readablePosts.map((post) => post.id);
   const { data: reactions, error: reactionsError } = postIds.length
     ? await supabase.from("reactions").select("post_id,label").in("post_id", postIds)
     : { data: [], error: null };
@@ -104,40 +107,42 @@ async function generateHeartbeatForSpace(supabase, spaceId, weekOf) {
     return counts;
   }, {});
 
-  const anonymisedPosts = posts.map((post) => ({
+  const anonymisedPosts = readablePosts.map((post) => ({
     type: post.type,
     content: post.content,
     reaction_count: reactionCounts[post.id] || 0,
   }));
 
   const heartbeat = makeHeartbeat({
-    ...space,
-    vibe: space.vibe,
+    ...readableSpace,
+    vibe: readableSpace.vibe,
     posts: anonymisedPosts.map((post) => ({
       type: post.type,
       content: post.content,
       reactions: { total: Array.from({ length: post.reaction_count }) },
     })),
   });
-  const card = makeHeartbeatCardFields({ heartbeat, posts, reactions });
+  const card = makeHeartbeatCardFields({ heartbeat, posts: readablePosts, reactions });
 
   const { error: upsertError } = await supabase.from("heartbeats").upsert(
     {
       space_id: space.id,
       week_of: weekOf,
-      vibe_read: heartbeat.vibeRead,
-      digest: heartbeat.digest,
-      uplift: heartbeat.uplift,
-      vibe_word: card.vibeWord,
-      top_theme: card.topTheme,
       energy_level: card.energyLevel,
-      card_line: card.cardLine,
+      encrypted_payload: encryptContentFields("heartbeats", {
+        vibe_read: heartbeat.vibeRead,
+        digest: heartbeat.digest,
+        uplift: heartbeat.uplift,
+        vibe_word: card.vibeWord,
+        top_theme: card.topTheme,
+        card_line: card.cardLine,
+      }),
     },
     { onConflict: "space_id,week_of" },
   );
   if (upsertError) throw upsertError;
 
-  return { slug: space.slug, posts: anonymisedPosts.length };
+  return { slug: readableSpace.slug, posts: anonymisedPosts.length };
 }
 
 function currentMonday() {

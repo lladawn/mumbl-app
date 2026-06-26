@@ -1,39 +1,50 @@
 import { feedbackRoom, publicDemoRoom } from "../lib/constants";
+import { decryptContentFields, decryptContentRows } from "./encryption";
 
 export function serializeSpace(space, posts = [], heartbeats = [], reactionRows = [], activeReactionRows = [], extras = {}) {
+  const readableSpace = decryptContentFields("spaces", space, ["name", "description", "public_name"]);
+  const readablePosts = decryptContentRows("posts", posts, ["content", "display_name", "field_note_title"]);
+  const readableHeartbeats = decryptContentRows("heartbeats", heartbeats, [
+    "vibe_read",
+    "digest",
+    "uplift",
+    "vibe_word",
+    "top_theme",
+    "card_line",
+  ]);
   const activeReactionKeys = new Set(activeReactionRows.map((row) => `${row.post_id}:${row.label}`));
   const accountEditablePostIds = extras.accountEditablePostIds || new Set();
   const localEditablePostIds = extras.localEditablePostIds || new Set();
-  const knownRoomDescription = getKnownRoomDescription(space.slug);
+  const knownRoomDescription = getKnownRoomDescription(readableSpace.slug);
 
   return {
-    id: space.id,
-    slug: space.slug,
-    name: space.name,
-    description: space.description || knownRoomDescription || "",
-    vibe: space.vibe,
-    firstPostDone: space.first_post_done,
-    isPublic: space.is_public || false,
-    publicName: space.public_name || "",
-    createdAt: new Date(space.created_at).getTime(),
+    id: readableSpace.id,
+    slug: readableSpace.slug,
+    name: readableSpace.name,
+    description: readableSpace.description || knownRoomDescription || "",
+    vibe: readableSpace.vibe,
+    firstPostDone: readableSpace.first_post_done,
+    isPublic: readableSpace.is_public || false,
+    publicName: readableSpace.public_name || "",
+    createdAt: new Date(readableSpace.created_at).getTime(),
     dailyPrompt: extras.dailyPrompt ? serializePrompt(extras.dailyPrompt) : null,
     slackTeamReads: extras.slackTeamReads ? serializeSlackTeamReads(extras.slackTeamReads) : null,
     canManage: extras.canManage === true,
     roomVibe: extras.roomVibe || [],
     postsPage: extras.postsPage || {
-      limit: posts.length,
-      count: posts.length,
+      limit: readablePosts.length,
+      count: readablePosts.length,
       hasMore: false,
       nextCursor: "",
       type: "",
     },
-    posts: posts.map((post) =>
+    posts: readablePosts.map((post) =>
       serializePost(post, reactionRows, activeReactionKeys, {
         canAuthorEdit: accountEditablePostIds.has(post.id),
         localEditTokenAllowed: localEditablePostIds.has(post.id),
       }),
     ),
-    heartbeats: heartbeats.map(serializeHeartbeat),
+    heartbeats: readableHeartbeats.map(serializeHeartbeat),
   };
 }
 

@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og";
+import { decryptContentFields } from "../../../../src/server/encryption";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const alt = "mumbl weekly heartbeat card";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -76,12 +77,12 @@ async function getLatestHeartbeat(slug) {
 
   const { data: heartbeat, error: heartbeatError } = await supabase
     .from("heartbeats")
-    .select("week_of,vibe_read,vibe_word,top_theme,energy_level,card_line")
+    .select("week_of,energy_level,encrypted_payload")
     .eq("space_id", space.id)
     .order("week_of", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (heartbeatError || !heartbeat) return {};
-  return heartbeat;
+  return decryptContentFields("heartbeats", heartbeat, ["vibe_read", "vibe_word", "top_theme", "card_line"]);
 }

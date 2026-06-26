@@ -4,10 +4,13 @@ import {
   forgetRecentSlug,
   getCreatorToken,
   getPostEditToken,
+  getRoomAccessToken,
   loadSession,
   rememberRecentSlug,
   saveCreatorToken,
   savePostEditToken,
+  saveRoomAccessToken,
+  clearRoomAccessToken,
 } from "./storage";
 import { authRequestContext } from "./auth";
 
@@ -23,18 +26,45 @@ export async function joinWaitlist({ email }) {
 export async function fetchSpace(slug, { limit, before, type } = {}) {
   const sessionToken = loadSession();
   const auth = await authRequestContext();
-  const params = new URLSearchParams({ sessionToken });
+  const params = new URLSearchParams();
+  const accessToken = roomAccessTokenForSlug(slug);
+  if (accessToken) params.set("key", accessToken);
   if (limit) params.set("limit", String(limit));
   if (before) params.set("before", before);
   if (type) params.set("type", type);
 
   const response = await fetch(`/api/spaces/${slug}?${params.toString()}`, {
-    headers: auth.headers,
+    headers: { ...auth.headers, "x-session-token": sessionToken },
     cache: "no-store",
   });
   const data = await parseJson(response);
+  if (data.space?.slug && accessToken) saveRoomAccessToken(data.space.slug, accessToken);
   rememberRecentSlug(slug);
   return data.space;
+}
+
+export async function fetchSavedRoomAccessToken(slug) {
+  const auth = await authRequestContext();
+  if (!auth.expectsAuthenticatedOwner) return null;
+  const sessionToken = loadSession();
+  const response = await fetch(`/api/spaces/${slug}/access-token`, {
+    headers: { ...auth.headers, "x-session-token": sessionToken },
+    cache: "no-store",
+  });
+  const data = await parseJson(response);
+  return data.accessToken || null;
+}
+
+export async function fetchSavedRooms() {
+  const sessionToken = loadSession();
+  const auth = await authRequestContext();
+  const params = new URLSearchParams();
+  if (auth.expectsAuthenticatedOwner) params.set("expectsAuthenticatedOwner", "true");
+  const response = await fetch(`/api/spaces?${params.toString()}`, {
+    headers: { ...auth.headers, "x-session-token": sessionToken },
+    cache: "no-store",
+  });
+  return parseJson(response);
 }
 
 export async function createRemoteSpace({ name, vibe }) {
@@ -46,6 +76,7 @@ export async function createRemoteSpace({ name, vibe }) {
   });
   const data = await parseJson(response);
   saveCreatorToken(data.slug, data.creatorToken);
+  saveRoomAccessToken(data.slug, data.accessToken);
   rememberRecentSlug(data.slug);
   return data;
 }
@@ -62,6 +93,7 @@ export async function createRemotePost({ slug, type, content, isAnonymous, displ
       displayName,
       promptId,
       sessionToken: loadSession(),
+      accessToken: roomAccessTokenForSlug(slug),
     }),
   });
   const data = await parseJson(response);
@@ -72,22 +104,53 @@ export async function createRemotePost({ slug, type, content, isAnonymous, displ
 export async function fetchDumps() {
   const sessionToken = loadSession();
   const auth = await authRequestContext();
-  const params = privateSessionParams(sessionToken, auth);
+  const params = privateSessionParams(auth);
   const response = await fetch(`/api/dumps?${params.toString()}`, {
-    headers: auth.headers,
+    headers: { ...auth.headers, "x-session-token": sessionToken },
     cache: "no-store",
   });
   return parseJson(response);
 }
 
-export async function fetchDumpMap({ includePrivateDumps = false } = {}) {
+export async function fetchDumpMap() {
   const sessionToken = loadSession();
   const auth = await authRequestContext();
-  const params = privateSessionParams(sessionToken, auth);
-  if (includePrivateDumps) params.set("includePrivateDumps", "true");
+  const params = privateSessionParams(auth);
   const response = await fetch(`/api/dumps/map?${params.toString()}`, {
-    headers: auth.headers,
+    headers: { ...auth.headers, "x-session-token": sessionToken },
     cache: "no-store",
+  });
+  return parseJson(response);
+}
+
+export async function fetchPatterns({ includeDismissed = false } = {}) {
+  const sessionToken = loadSession();
+  const auth = await authRequestContext();
+  const params = privateSessionParams(auth);
+  if (includeDismissed) params.set("includeDismissed", "true");
+  const response = await fetch(`/api/patterns?${params.toString()}`, {
+    headers: { ...auth.headers, "x-session-token": sessionToken },
+    cache: "no-store",
+  });
+  return parseJson(response);
+}
+
+export async function testGeneratePatternInsight() {
+  const auth = await authRequestContext();
+  const response = await fetch("/api/patterns/test-generate", {
+    method: "POST",
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
+  });
+  return parseJson(response);
+}
+
+export async function sendPatternFeedback({ patternId, confirmed }) {
+  const auth = await authRequestContext();
+  const response = await fetch(`/api/patterns/${patternId}/feedback`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...auth.headers },
+    body: JSON.stringify({ confirmed, sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
   });
   return parseJson(response);
 }
@@ -156,7 +219,16 @@ export async function publishFieldNote({ fieldNoteId, slug, title, content, isAn
   const response = await fetch(`/api/dumps/field-notes/${fieldNoteId}/publish`, {
     method: "POST",
     headers: { "content-type": "application/json", ...auth.headers },
-    body: JSON.stringify({ slug, title, content, isAnonymous, displayName, sessionToken: loadSession(), expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner }),
+    body: JSON.stringify({
+      slug,
+      title,
+      content,
+      isAnonymous,
+      displayName,
+      sessionToken: loadSession(),
+      accessToken: roomAccessTokenForSlug(slug),
+      expectsAuthenticatedOwner: auth.expectsAuthenticatedOwner,
+    }),
   });
   const data = await parseJson(response);
   rememberRecentSlug(slug);
@@ -219,6 +291,7 @@ export async function deleteRemoteSpace({ slug }) {
   });
   const data = await parseJson(response);
   clearCreatorToken(slug);
+  clearRoomAccessToken(slug);
   forgetRecentSlug(slug);
   return data;
 }
@@ -300,7 +373,8 @@ export async function toggleRemoteReaction({ postId, label }) {
 
 export async function fetchSideQuests(slug) {
   const sessionToken = loadSession();
-  const response = await fetch(`/api/spaces/${slug}/side-quests?sessionToken=${encodeURIComponent(sessionToken)}`, {
+  const response = await fetch(`/api/spaces/${slug}/side-quests`, {
+    headers: { "x-session-token": sessionToken },
     cache: "no-store",
   });
   return parseJson(response);
@@ -353,7 +427,8 @@ export async function cancelSideQuest({ slug, cardId }) {
 
 export async function fetchSideQuestRoom(roomId) {
   const sessionToken = loadSession();
-  const response = await fetch(`/api/side-quest-rooms/${roomId}?sessionToken=${encodeURIComponent(sessionToken)}`, {
+  const response = await fetch(`/api/side-quest-rooms/${roomId}`, {
+    headers: { "x-session-token": sessionToken },
     cache: "no-store",
   });
   return parseJson(response);
@@ -387,10 +462,11 @@ export async function reportSideQuestRoom(roomId) {
 }
 
 export async function fetchPublicProfileForSession() {
+  const sessionToken = loadSession();
   const auth = await authRequestContext();
-  const params = privateSessionParams(loadSession(), auth);
+  const params = privateSessionParams(auth);
   const response = await fetch(`/api/public-profiles?${params.toString()}`, {
-    headers: auth.headers,
+    headers: { ...auth.headers, "x-session-token": sessionToken },
     cache: "no-store",
   });
   return parseJson(response);
@@ -416,10 +492,21 @@ export async function setFieldNotePublic({ fieldNoteId, isPublic, handle }) {
   return parseJson(response);
 }
 
-function privateSessionParams(sessionToken, auth) {
-  const params = new URLSearchParams({ sessionToken });
+function privateSessionParams(auth) {
+  const params = new URLSearchParams();
   if (auth.expectsAuthenticatedOwner) params.set("expectsAuthenticatedOwner", "true");
   return params;
+}
+
+export function roomAccessTokenForSlug(slug) {
+  if (!slug || typeof window === "undefined") return "";
+  const params = new URLSearchParams(window.location.search);
+  const urlToken = params.get("key") || params.get("accessToken") || "";
+  if (urlToken) {
+    saveRoomAccessToken(slug, urlToken);
+    return urlToken;
+  }
+  return getRoomAccessToken(slug);
 }
 
 async function parseJson(response) {

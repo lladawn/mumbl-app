@@ -6,7 +6,7 @@ import { cleanString } from "../../../../src/server/validation";
 export async function GET(request, { params }) {
   try {
     const { roomId } = await params;
-    const sessionToken = cleanString(new URL(request.url).searchParams.get("sessionToken"), 256);
+    const sessionToken = cleanString(request.headers.get("x-session-token"), 256);
     if (!roomId) return badRequest("tiny room is required");
     if (!sessionToken) return badRequest("session token is required");
 
