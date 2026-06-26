@@ -1,5 +1,6 @@
 import { badRequest, ok, serverError } from "../../../src/server/http";
 import { applyOwnerFilter, assertExpectedAuthenticatedOwner, ownerInsertFields, ownerMatches, resolveRequestOwner } from "../../../src/server/auth";
+import { encryptContentFields } from "../../../src/server/encryption";
 import { getSupabaseAdmin } from "../../../src/server/supabase";
 import { cleanString } from "../../../src/server/validation";
 import { isValidHandle, normalizeHandle, serializePublicProfile } from "../../../src/server/publicProfiles";
@@ -7,7 +8,7 @@ import { isValidHandle, normalizeHandle, serializePublicProfile } from "../../..
 export async function GET(request) {
   try {
     const url = new URL(request.url);
-    const sessionToken = cleanString(url.searchParams.get("sessionToken"), 256);
+    const sessionToken = cleanString(request.headers.get("x-session-token"), 256);
     const expectsAuthenticatedOwner = url.searchParams.get("expectsAuthenticatedOwner") === "true";
     if (!sessionToken) return badRequest("session token is required");
 
@@ -68,11 +69,25 @@ export async function POST(request) {
     const mutation = existingForSession
       ? supabase
           .from("public_profiles")
-          .update({ handle, display_name: displayName || handle, bio, updated_at: new Date().toISOString() })
+          .update({
+            handle,
+            encrypted_payload: encryptContentFields("public_profiles", {
+              display_name: displayName || handle,
+              bio,
+            }),
+            updated_at: new Date().toISOString(),
+          })
           .eq("id", existingForSession.id)
       : supabase
           .from("public_profiles")
-          .insert({ ...ownerInsertFields(owner), handle, display_name: displayName || handle, bio });
+          .insert({
+            ...ownerInsertFields(owner),
+            handle,
+            encrypted_payload: encryptContentFields("public_profiles", {
+              display_name: displayName || handle,
+              bio,
+            }),
+          });
 
     const { data: profile, error } = await mutation.select("*").single();
     if (error?.code === "23505") return badRequest("that handle is already taken");

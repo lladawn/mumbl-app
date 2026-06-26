@@ -59,7 +59,12 @@ Future improvements:
 Current compromise:
 - Per-entry AI reflection uses a deterministic local reflector in the route handler, not an external AI provider.
 - Team field-note drafting uses OpenAI only when the user clicks draft, sends selected dumps only, caps selection size, and rate-limits drafts per session with `OPENAI_MAX_DAILY_DRAFTS`. Draft length adapts to source signal so tiny dumps stay short and honest, while richer selections can become story-shaped reads without costly padding.
-- The private map is rendered from the user's fetched dump text in the browser, with no weekly insight cron yet.
+- Logged-in private dumps are processed asynchronously for the private pattern graph using OpenAI signal extraction/embeddings and milestone Anthropic insights. Anonymous/session-only dumps stay out of the pattern layer.
+- Production can ship pattern graph code with `MUMBL_ENABLE_PATTERN_GRAPH=false` or unset. In that state pattern APIs, async processing, insight generation, and Slack pattern pointers stay off while other production updates can roll out.
+- User-entered and user-derived text is encrypted into server-side `encrypted_payload` fields before storage. The rollout backfills existing rows, scrubs legacy columns for verification, then drops the legacy plaintext columns once encrypted coverage is confirmed.
+- Pattern insight thresholds default to first insight at 10 logged-in dumps, then every 25. Local/staging can lower `MUMBL_PATTERN_GRAPH_FIRST_INSIGHT_AT` and `MUMBL_PATTERN_GRAPH_INSIGHT_INTERVAL` for testing; production should keep the defaults unless product intentionally changes the cadence.
+- Local/staging can enable `MUMBL_ENABLE_PATTERN_TEST_TOOLS=true` to expose a manual private insight trigger for QA. Production should keep it disabled.
+- Deleting logged-in private dumps also removes generated pattern rows that cite those dumps and reconciles the active private dump count. Low-level dump signals are deleted by cascade.
 - Team reads reuse the existing posts infrastructure, but only for approved `field_note` posts. Raw dumps are blocked from reads.
 
 Why:
@@ -68,7 +73,7 @@ Why:
 
 Future improvements:
 - Add provider-backed reflection behind an opt-in toggle once budget and privacy copy are settled.
-- Generate `dump_insights` weekly for users with enough dumps, using a daily-or-weekly cron posture compatible with the current free-tier lane.
+- Move pattern generation to a durable queue if post-save async work becomes unreliable at higher volume.
 
 ## Slack Beta
 
@@ -77,8 +82,8 @@ Current compromise:
 - The beta supports only explicit user actions: `/mumbl [text]` and the `save_to_mumbl` message shortcut.
 - `/mumbl room [team name]` can create a Mumbl room from Slack with an expiring creator handoff link. `/mumbl start [team name]` remains an alias.
 - App Home can create private dumps, draft a field note from selected recent private dumps, edit recent private drafts, and publish to explicitly pinned Mumbl spaces. Drafting uses the existing field-note OpenAI daily limit. Pinned spaces are user-chosen publish destinations. Slack-created rooms and joins to Mumbl-created team-read channels can auto-pin for connected Mumbl users, but Mumbl does not track general Slack membership or channel history.
-- The Slack app requests `commands`, `users:read`, and `users:read.email` only. It does not request channel history or message history scopes.
-- Team-read posting to Slack is optional per room. When a creator enables it, Mumbl asks for an optional `chat:write`, `groups:write`, and `groups:read` permission upgrade only so it can create one private channel, post published team reads, and receive join events for Mumbl-created private team-read channels.
+- The core Slack app requests `commands`, `users:read`, `users:read.email`, `im:write`, and `chat:write`. Direct-message write access is used for private Mumbl pointers such as pattern insight notifications; the message body must not include private insight text. Mumbl does not request channel history or message history scopes.
+- Team-read posting to Slack is optional per room. When a creator enables it, Mumbl asks for an optional `groups:write` and `groups:read` permission upgrade only so it can create one private channel, post published team reads with the core `chat:write` scope, and receive join events for Mumbl-created private team-read channels.
 - Public Slack team-read channels are deferred. They would require an admin-approved public-channel management scope such as `channels:manage`; if added later, it should only create the reads channel and still avoid history scopes.
 - Slack daily check-in reminders are deferred because a 15-minute scheduler does not fit the free-tier posture.
 

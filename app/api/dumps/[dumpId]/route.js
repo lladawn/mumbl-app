@@ -1,5 +1,7 @@
 import { badRequest, notFound, ok, serverError } from "../../../../src/server/http";
 import { applyOwnerFilter, assertExpectedAuthenticatedOwner, resolveRequestOwner } from "../../../../src/server/auth";
+import { cleanupPatternGraphAfterDumpDelete } from "../../../../src/server/dumpPatterns";
+import { encryptContentFields } from "../../../../src/server/encryption";
 import { makeLocalReflection, serializeDump } from "../../../../src/server/dumps";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 import { cleanString } from "../../../../src/server/validation";
@@ -20,12 +22,24 @@ export async function PATCH(request, { params }) {
     const supabase = getSupabaseAdmin();
     const owner = await resolveRequestOwner({ request, sessionToken });
     assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner);
+    const { data: existingDump, error: existingError } = await applyOwnerFilter(
+      supabase.from("dumps").select("id,encrypted_payload").eq("id", dumpId),
+      owner,
+    ).single();
+    if (existingError?.code === "PGRST116") return notFound("dump not found");
+    if (existingError) throw existingError;
+    const aiReflection = wantsReflection ? makeLocalReflection(content) : null;
     const { data: dump, error } = await applyOwnerFilter(
       supabase
         .from("dumps")
         .update({
-          content,
-          ai_reflection: wantsReflection ? makeLocalReflection(content) : null,
+          encrypted_payload: {
+            ...(existingDump.encrypted_payload || {}),
+            ...encryptContentFields("dumps", {
+              content,
+              ai_reflection: aiReflection,
+            }),
+          },
           updated_at: new Date().toISOString(),
         })
         .eq("id", dumpId),
@@ -58,6 +72,9 @@ export async function DELETE(request, { params }) {
     const { error, count } = await applyOwnerFilter(supabase.from("dumps").delete({ count: "exact" }).eq("id", dumpId), owner);
     if (error) throw error;
     if (!count) return notFound("dump not found");
+    if (owner.userId) {
+      await cleanupPatternGraphAfterDumpDelete({ supabase, userId: owner.userId, dumpIds: [dumpId], source: "web" });
+    }
 
     return ok({ deleted: true });
   } catch (error) {

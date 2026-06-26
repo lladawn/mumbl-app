@@ -109,6 +109,7 @@ The dump feature keeps the no-signup model. Private dump entries are owned by th
 Team reads show only approved field notes. The flow is: select private dumps, request an OpenAI draft through a server route, save the draft in `field_notes`, let the author edit it, then publish it as `posts.type = 'field_note'`. The old raw-dump team endpoint is intentionally blocked so private dumps stay for dumping thoughts, not public reading.
 
 During the Slack-native beta, `/r/:slug` opens to team reads. Legacy feed and wins routes remain available for compatibility, but they are not the primary room navigation and do not feed the heartbeat.
+New private rooms use capability invite links: the slug identifies the room, and the `?key=` token grants read/write access in the Mumbl app. The token is stored only as `spaces.read_token_hash` on the database side and in browser local storage for people who open the full invite link. If the browser later logs in, Mumbl stores a private `saved_room_access` row so the user can reopen and publish to saved rooms without re-pasting the invite. This is convenience state only: no member list, no member count, no creator view of who has access.
 
 `OPENAI_API_KEY`, `OPENAI_MODEL_FIELD_NOTE`, and `OPENAI_MAX_DAILY_DRAFTS` are server-only. The default model should stay cost-sensitive, currently `gpt-5.4-nano`, and the draft route sends only selected dumps, capped at 10 per request. Field-note drafting should produce publishable working-process notes: specific, human, readable, and useful enough for team reads or a public profile, while staying grounded only in the selected dumps. Draft length is adaptive: tiny dumps should stay short and honest instead of becoming padded essays, while richer dump selections can become story-shaped reads with a real moment, tension, noticing, and takeaway.
 
@@ -132,11 +133,24 @@ The service role key must stay server-only. It is used only in Next.js route han
 
 ## Extension Schema
 
-The extension adds `memory_entries` for future Supermemory sync tracking and `space_plans` for future flat pricing. These tables exist as runway only; there is no Supermemory or billing UI yet.
+The old `memory_entries`/Supermemory runway has been removed. Private dump patterns now use Supabase pgvector through server routes, with `dump_signals`, `patterns`, and `user_dump_counts` owned by authenticated users.
+
+The pattern graph is private user sensemaking, not room analytics:
+
+- Logged-in private dumps are processed asynchronously after save.
+- Anonymous/session-only dumps are not processed.
+- OpenAI extracts structured signals and embeddings.
+- Anthropic generates milestone insights.
+- `/dump/map` uses local graph data plus pgvector search over the authenticated user's own signals.
+- `/patterns` lets the authenticated owner confirm or dismiss generated insights.
+- Pattern APIs must not expose source dump content, and Slack notifications must only link back to Mumbl without including private insight text.
+- Deleting logged-in private dumps should clean up generated pattern rows that cite those dumps and reconcile the active private dump count.
+
+See `docs/pattern-graph.md` for the operational flow, env vars, migrations, and staging QA steps.
 
 ## Public Space Runway
 
-The schema now supports public opt-in with `spaces.is_public` and `spaces.public_name`, plus weekly `culture_snapshots` for a future `/explore` page. Public is off by default and can only be changed with the creator token.
+The schema supports public opt-in with `spaces.is_public` and `spaces.public_name`. Public is off by default and can only be changed with the creator token. `/explore` computes aggregate public pulse live from public spaces/posts; the old snapshot table has been removed.
 
 V1 should show only the room badge and toggle. Do not show individual public posts. `/explore` is aggregate-only and should stay useful even when signal is thin.
 

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRecentSlug } from "../hooks/useRecentSlug";
+import { fetchSavedRooms } from "../lib/api";
 import AccountControl from "./AccountControl";
 import JoinModal from "./JoinModal";
 
@@ -11,8 +12,20 @@ export default function AppShell({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const [joinOpen, setJoinOpen] = useState(false);
+  const [savedRooms, setSavedRooms] = useState(null);
   const recentSlug = useRecentSlug();
-  const dumpActive = pathname?.startsWith("/dump");
+
+  const openJoin = useCallback(async () => {
+    setJoinOpen(true);
+    if (savedRooms !== null) return;
+    try {
+      const data = await fetchSavedRooms();
+      setSavedRooms(data.savedRooms || []);
+    } catch {
+      setSavedRooms([]);
+    }
+  }, [savedRooms]);
+  const dumpActive = pathname?.startsWith("/dump") || pathname?.startsWith("/patterns");
   const missionActive = pathname?.startsWith("/mission");
 
   return (
@@ -31,7 +44,7 @@ export default function AppShell({ children }) {
           <Link className={`topbar-link ${dumpActive ? "active" : ""}`} href="/dump" aria-current={dumpActive ? "page" : undefined}>
             dump
           </Link>
-          <button className="topbar-link" type="button" onClick={() => setJoinOpen(true)}>
+          <button className="topbar-link" type="button" onClick={openJoin}>
             join<span className="topbar-label-extra"> a space</span>
           </button>
         </nav>
@@ -48,6 +61,7 @@ export default function AppShell({ children }) {
       {joinOpen && (
         <JoinModal
           recentSlug={recentSlug}
+          savedRooms={savedRooms}
           close={() => setJoinOpen(false)}
           navigate={(path) => router.push(path)}
         />

@@ -1,7 +1,23 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { fetchSavedRoomAccessToken } from "../../lib/api";
+import { getRoomAccessToken, saveRoomAccessToken } from "../../lib/storage";
+
 export default function SharePanel({ space, copyText }) {
-  const url = typeof window === "undefined" ? `/r/${space.slug}/reads` : `${location.origin}/r/${space.slug}/reads`;
+  const [accessToken, setAccessToken] = useState(() => getRoomAccessToken(space.slug));
+
+  useEffect(() => {
+    if (accessToken) return;
+    fetchSavedRoomAccessToken(space.slug).then((token) => {
+      if (!token) return;
+      saveRoomAccessToken(space.slug, token);
+      setAccessToken(token);
+    });
+  }, [space.slug]);
+
+  const path = `/r/${space.slug}/reads${accessToken ? `?key=${encodeURIComponent(accessToken)}` : ""}`;
+  const url = typeof window === "undefined" ? path : `${location.origin}${path}`;
 
   return (
     <div className={`panel share-panel ${space.firstPostDone ? "ready" : ""}`}>

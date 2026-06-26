@@ -1,6 +1,7 @@
 import { badRequest, ok, serverError } from "../../../../src/server/http";
 import { resolveRequestOwner } from "../../../../src/server/auth";
 import { resolveCreatorAccess } from "../../../../src/server/creatorAccess";
+import { decryptContentFields, encryptContentFields, withoutEncryptedPayload } from "../../../../src/server/encryption";
 import { hashToken } from "../../../../src/server/hash";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 import { cleanString } from "../../../../src/server/validation";
@@ -26,13 +27,18 @@ export async function PATCH(request, { params }) {
 
     const { data: updatedPost, error } = await supabase
       .from("posts")
-      .update({ content })
+      .update({
+        encrypted_payload: {
+          ...(post.encrypted_payload || {}),
+          ...encryptContentFields("posts", { content }),
+        },
+      })
       .eq("id", post.id)
       .select("*")
       .single();
     if (error) throw error;
 
-    return ok({ post: updatedPost });
+    return ok({ post: withoutEncryptedPayload(decryptContentFields("posts", updatedPost, ["content", "display_name", "field_note_title"])) });
   } catch (error) {
     return serverError(error);
   }
@@ -74,7 +80,7 @@ export async function DELETE(request, { params }) {
 async function getPostForMutation(supabase, postId) {
   const { data: post, error } = await supabase
     .from("posts")
-    .select("id,space_id,type,spaces(id,creator_token_hash,creator_user_id)")
+    .select("id,space_id,type,encrypted_payload,spaces(id,creator_token_hash,creator_user_id)")
     .eq("id", postId)
     .single();
   if (error?.code === "PGRST116") {

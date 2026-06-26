@@ -1,6 +1,7 @@
 import { badRequest, ok, serverError } from "../../../../src/server/http";
 import { hashToken } from "../../../../src/server/hash";
 import { resolveRequestOwner } from "../../../../src/server/auth";
+import { isMissingSavedRoomAccessTable } from "../../../../src/server/roomAccess";
 import { getSupabaseAdmin } from "../../../../src/server/supabase";
 import { cleanString } from "../../../../src/server/validation";
 
@@ -9,6 +10,7 @@ export async function POST(request) {
     const body = await request.json();
     const sessionToken = cleanString(body.sessionToken, 256);
     const creatorTokens = parseCreatorTokens(body.creatorTokens);
+    const roomAccessTokens = parseRoomAccessTokens(body.roomAccessTokens);
     const postEditTokens = parsePostEditTokens(body.postEditTokens);
     if (!sessionToken) return badRequest("session token is required");
 
@@ -20,8 +22,8 @@ export async function POST(request) {
       linkTable({ supabase, table: "dumps", owner }),
       linkTable({ supabase, table: "field_notes", owner }),
       linkTable({ supabase, table: "public_profiles", owner, tolerateMissing: true }),
-      linkTable({ supabase, table: "dump_insights", owner, tolerateMissing: true }),
       linkCreatorSpaces({ supabase, owner, creatorTokens }),
+      linkRoomAccess({ supabase, owner, roomAccessTokens }),
       linkPostEditTokens({ supabase, owner, postEditTokens }),
       linkReactions({ supabase, owner }),
     ]);
@@ -31,8 +33,8 @@ export async function POST(request) {
       dumps: updates[0],
       fieldNotes: updates[1],
       publicProfiles: updates[2],
-      dumpInsights: updates[3],
-      creatorSpaces: updates[4],
+      creatorSpaces: updates[3],
+      savedRooms: updates[4],
       editablePosts: updates[5],
       reactions: updates[6],
     });
@@ -61,6 +63,17 @@ function parsePostEditTokens(value) {
     }))
     .filter((item) => item.postId && item.token)
     .slice(0, 200);
+}
+
+function parseRoomAccessTokens(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => ({
+      slug: cleanString(item?.slug, 64),
+      token: cleanString(item?.token, 256),
+    }))
+    .filter((item) => item.slug && item.token)
+    .slice(0, 100);
 }
 
 async function linkCreatorSpaces({ supabase, owner, creatorTokens }) {
@@ -93,6 +106,36 @@ async function linkPostEditTokens({ supabase, owner, postEditTokens }) {
     if (isMissingTableError(error) || isMissingColumnError(error)) return 0;
     if (error) throw error;
     linked += count || 0;
+  }
+  return linked;
+}
+
+async function linkRoomAccess({ supabase, owner, roomAccessTokens }) {
+  if (!roomAccessTokens.length || !owner.userId) return 0;
+  let linked = 0;
+  for (const item of roomAccessTokens) {
+    const tokenHash = hashToken(item.token);
+    const { data: space, error: spaceError } = await supabase
+      .from("spaces")
+      .select("id,read_token_hash")
+      .eq("slug", item.slug)
+      .eq("read_token_hash", tokenHash)
+      .maybeSingle();
+    if (spaceError) throw spaceError;
+    if (!space?.id) continue;
+
+    const { error } = await supabase.from("saved_room_access").upsert(
+      {
+        user_id: owner.userId,
+        space_id: space.id,
+        read_token_hash: tokenHash,
+        last_opened_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,space_id" },
+    );
+    if (isMissingSavedRoomAccessTable(error)) return linked;
+    if (error) throw error;
+    linked += 1;
   }
   return linked;
 }

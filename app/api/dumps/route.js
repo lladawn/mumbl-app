@@ -1,13 +1,16 @@
+import { after } from "next/server";
 import { badRequest, ok, serverError } from "../../../src/server/http";
 import { applyOwnerFilter, assertExpectedAuthenticatedOwner, ownerInsertFields, resolveRequestOwner } from "../../../src/server/auth";
 import { serializeDump, serializeFieldNote, makeLocalReflection } from "../../../src/server/dumps";
+import { decryptContentRows, encryptContentFields } from "../../../src/server/encryption";
+import { cleanupPatternGraphAfterDumpDelete, processSavedPrivateDump } from "../../../src/server/dumpPatterns";
 import { getSupabaseAdmin } from "../../../src/server/supabase";
 import { cleanString } from "../../../src/server/validation";
 
 export async function GET(request) {
   try {
     const url = new URL(request.url);
-    const sessionToken = cleanString(url.searchParams.get("sessionToken"), 256);
+    const sessionToken = cleanString(request.headers.get("x-session-token"), 256);
     const expectsAuthenticatedOwner = url.searchParams.get("expectsAuthenticatedOwner") === "true";
     if (!sessionToken) return badRequest("session token is required");
 
@@ -24,7 +27,12 @@ export async function GET(request) {
     if (error) throw error;
     if (fieldNotesError && !isMissingTableError(fieldNotesError)) throw fieldNotesError;
 
-    return ok({ dumps: (dumps || []).map(serializeDump), fieldNotes: fieldNotesError ? [] : (fieldNotes || []).map(serializeFieldNote) });
+    return ok({
+      dumps: decryptContentRows("dumps", dumps || [], ["content", "ai_reflection", "source_meta"]).map(serializeDump),
+      fieldNotes: fieldNotesError
+        ? []
+        : decryptContentRows("field_notes", fieldNotes || [], ["title", "content"]).map(serializeFieldNote),
+    });
   } catch (error) {
     return serverError(error);
   }
@@ -44,13 +52,17 @@ export async function POST(request) {
     const supabase = getSupabaseAdmin();
     const owner = await resolveRequestOwner({ request, sessionToken });
     assertExpectedAuthenticatedOwner(owner, expectsAuthenticatedOwner);
+    const aiReflection = wantsReflection ? makeLocalReflection(content) : null;
     const { data: dump, error } = await supabase
       .from("dumps")
       .insert({
         ...ownerInsertFields(owner),
-        content,
         visibility: "private",
-        ai_reflection: wantsReflection ? makeLocalReflection(content) : null,
+        encrypted_payload: encryptContentFields("dumps", {
+          content,
+          ai_reflection: aiReflection,
+          source_meta: {},
+        }),
       })
       .select("*")
       .single();
@@ -58,6 +70,12 @@ export async function POST(request) {
       return serverError(missingDumpMigrationError());
     }
     if (error) throw error;
+
+    if (owner.userId) {
+      after(async () => {
+        await processSavedPrivateDump({ supabase, dumpId: dump.id, userId: owner.userId, content, source: "web" });
+      });
+    }
 
     return ok({ dump: serializeDump(dump) });
   } catch (error) {
@@ -86,6 +104,9 @@ export async function DELETE(request) {
       owner,
     );
     if (error) throw error;
+    if (owner.userId && count) {
+      await cleanupPatternGraphAfterDumpDelete({ supabase, userId: owner.userId, dumpIds, source: "web_bulk" });
+    }
 
     return ok({ deleted: count || 0 });
   } catch (error) {
