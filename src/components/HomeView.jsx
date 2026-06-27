@@ -30,22 +30,10 @@ const familiarScenarios = [
   },
 ];
 
-const loopSteps = [
-  {
-    label: "01",
-    title: "catch the thought in Slack",
-    copy: "Use /mumbl or the message shortcut when the context appears. One rough line is enough.",
-  },
-  {
-    label: "02",
-    title: "shape it when it is ready",
-    copy: "Turn the useful parts into something worth sharing once the reasoning is clear enough.",
-  },
-  {
-    label: "03",
-    title: "publish the context",
-    copy: "Share it as a team read. The team gets the why, not just the shipped thing.",
-  },
+const heroFlow = [
+  { label: "01", title: "catch it with /mumbl", hint: "one rough line in Slack" },
+  { label: "02", title: "shape the useful part", hint: "when the reasoning is clear" },
+  { label: "03", title: "publish a team read", hint: "the team gets the why" },
 ];
 
 const memoryLayers = [
@@ -179,6 +167,15 @@ export default function HomeView() {
               sharing as a team read. It is your team's internal record: about the people behind the work,
               not just the product they ship.
             </p>
+            <ol className="hero-mechanic" aria-label="how mumbl works">
+              {heroFlow.map((step) => (
+                <li key={step.label}>
+                  <span>{step.label}</span>
+                  <strong>{step.title}</strong>
+                  <small>{step.hint}</small>
+                </li>
+              ))}
+            </ol>
             <div className="hero-actions">
               <a
                 className="slack-install-button"
@@ -202,7 +199,7 @@ export default function HomeView() {
                 talk it through
               </a>
             </div>
-            <p className="slack-beta-copy">no channel history. mumbl only saves what you explicitly send it.</p>
+            <p className="slack-beta-copy">mumbl only saves what you explicitly send it.</p>
             <div className="landing-proof-strip" aria-label="mumbl promises">
               <span>private by default</span>
               <span>shared by choice</span>
@@ -224,22 +221,6 @@ export default function HomeView() {
                 </div>
                 <h3>{post.title}</h3>
                 <p>{post.copy}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="landing-section landing-dump" aria-labelledby="dump-heading">
-          <div className="landing-section-head">
-            <p className="eyebrow">what mumbl does</p>
-            <h2 id="dump-heading">save engineering context before it turns into archaeology.</h2>
-          </div>
-          <div className="dump-layer-grid">
-            {loopSteps.map((layer) => (
-              <article className="dump-layer-card" key={layer.label}>
-                <span>{layer.label}</span>
-                <h3>{layer.title}</h3>
-                <p>{layer.copy}</p>
               </article>
             ))}
           </div>
