@@ -108,13 +108,14 @@ Create a slash command:
 - Command: `/mumbl`
 - Request URL: `https://mumbl.wtf/api/slack/commands`
 - Short description: `Save a private thought to Mumbl`
-- Usage hint: `[thought]`, `room [team name]`, or `pin [space-slug]`
+- Usage hint: `[thought]`, `room [team name]`, `join [invite-link]`, or `pin [invite-link]`
 
 Expected behavior:
 
 - `/mumbl something I want to keep` saves a private dump.
 - `/mumbl room platform team` creates a Mumbl room.
 - `/mumbl start platform team` is an alias.
+- `/mumbl join <invite-link>` is how teammates join in one step: it best-effort joins the room's private Slack reads channel and pins the room in that user's App Home. Private rooms require the full invite link (with the `key=`) because the join is access-gated by the room read token, so it reuses the same path as `pin`.
 - `/mumbl pin platform-team` pins an existing Mumbl room and best-effort joins the room's Slack reads channel if it exists.
 - Unpinning from App Home removes only that user's publish shortcut and best-effort removes them from the linked Slack reads channel if one exists.
 

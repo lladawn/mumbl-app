@@ -1549,7 +1549,7 @@ export function slackHelpPayload() {
   return blockResponse({
     text: "use /mumbl to save a private thought or create a room.",
     blocks: [
-      section("*mumbl in Slack*\n`/mumbl the thing I want to keep` saves a private dump.\n`/mumbl room platform team` creates a Mumbl room from Slack.\n`/mumbl pin <invite-link>` pins a room to your Slack publish list."),
+      section("*mumbl in Slack*\n`/mumbl the thing I want to keep` saves a private dump.\n`/mumbl room platform team` creates a Mumbl room from Slack.\n`/mumbl join <invite-link>` joins your team's room — reads land in Slack and the room pins in your App Home.\n`/mumbl pin <invite-link>` pins a room to your Slack publish list."),
       context("Private dumps stay private. Team reads only post to Slack if you enable them."),
     ],
   });
@@ -1579,9 +1579,9 @@ export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl,
         { text: "share with team", actionId: "share_room_invite", value: JSON.stringify({ roomUrl, spaceName: space.name }) },
       ]),
       context(
-        pinned
-          ? `Pinned for publishing. Invite link: <${roomUrl}|${roomUrl}>`
-          : `Pin this room in Mumbl App Home, or run \`/mumbl pin\` with the invite link: <${roomUrl}|${roomUrl}>`,
+        `Share with your team — they can join in one step: \`/mumbl join ${roomUrl}\`\n${
+          pinned ? "Pinned for publishing." : "Pin this room in Mumbl App Home, or run `/mumbl pin` with the same link."
+        }`,
       ),
     ],
   });
@@ -1604,16 +1604,18 @@ export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUr
         { text: "share with team", actionId: "share_room_invite", value: JSON.stringify({ roomUrl, spaceName: space.name }) },
       ]),
       context(
-        pinned
-          ? "Pinned for publishing. Slack reads channel is optional and only mirrors published team reads."
-          : "After connecting, Mumbl can pin this space for publishing from Slack.",
+        `Share with your team — they join in one step with \`/mumbl join <invite-link>\`. ${
+          pinned
+            ? "The Slack reads channel only mirrors published team reads."
+            : "After connecting, Mumbl can pin this space for publishing from Slack."
+        }`,
       ),
     ],
   };
 }
 
 export function slackShareRoomInviteModalView({ roomUrl, spaceName }) {
-  const inviteMessage = `hey team — just set up a mumbl room for ${spaceName || "us"}.\nwrite private work thoughts, publish as team reads when ready.\n\njoin here: ${roomUrl}`;
+  const inviteMessage = `hey team — just set up a mumbl room for ${spaceName || "us"}.\nwrite private work thoughts, publish as team reads when ready.\n\none-click join in Slack: \`/mumbl join ${roomUrl}\`\nor open on the web: ${roomUrl}`;
   return {
     type: "modal",
     callback_id: "share_room_invite",
@@ -1998,7 +2000,7 @@ async function slackAppHomeBlocks({ teamId, slackUserId }) {
     section(
       pinnedSpaces.length
         ? `*pinned teamspaces*\n${pinnedList}`
-        : "*join your team's room*\nPaste a room invite link to pin it, or create a new team room.",
+        : "*join your team's room*\nGot an invite link from a teammate? Run `/mumbl join <invite-link>` to join, or paste it below to pin. You can also create a new team room.",
     ),
     actions(
       pinnedSpaces.length
