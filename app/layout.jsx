@@ -8,7 +8,7 @@ const analyticsEnabled = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === "true";
 const umamiScriptSrc = process.env.NEXT_PUBLIC_UMAMI_SRC || "https://breathe-umami.vercel.app/script.js";
 const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID || "";
 const description =
-  "Mumbl is a Slack app for saving the work thoughts people almost say out loud, privately first, then sharing the useful ones as team reads.";
+  "Mumbl is a Slack app for saving the reasoning behind engineering work: the tradeoffs, gut calls, and hard-won lessons that usually disappear.";
 
 export const metadata = {
   metadataBase: new URL(appUrl),
@@ -34,7 +34,7 @@ export const metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "mumbl - had a thought you couldn't say out loud?",
+    title: "mumbl - save the reasoning behind the work",
     description,
     url: "/",
     siteName: "mumbl",
@@ -44,13 +44,13 @@ export const metadata = {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "mumbl - had a thought you couldn't say out loud?",
+        alt: "mumbl - save the reasoning behind the work",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "mumbl - had a thought you couldn't say out loud?",
+    title: "mumbl - save the reasoning behind the work",
     description,
     images: ["/twitter-image"],
   },

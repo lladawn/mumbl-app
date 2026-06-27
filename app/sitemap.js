@@ -15,7 +15,7 @@ export default function sitemap() {
       priority: 0.8,
     },
     {
-      url: `${appUrl}/mission`,
+      url: `${appUrl}/vision`,
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.8,
