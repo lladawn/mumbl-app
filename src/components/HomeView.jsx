@@ -14,61 +14,76 @@ const calendlyHref = "https://calendly.com/lladawn";
 
 const familiarScenarios = [
   {
-    title: "someone left and took everything they knew with them",
-    copy:
-      "The onboarding doc did not cover why the decision was made, what they tried first, or the pattern they spotted.",
-  },
-  {
     title: "you read a PR and had no idea why",
     copy:
       "The code was fine. The reasoning, tradeoff, rejected option, and gut call were nowhere.",
   },
   {
-    title: "your best thinking happens in DMs",
+    title: "you caught the rewrite risk before anyone wanted to say it",
     copy:
-      "Someone says something sharp, six people nod, and then it vanishes. /mumbl keeps it usable.",
+      "It was still being called polish work, but you could feel the shape of a bigger problem.",
+  },
+  {
+    title: "someone left and took the system map with them",
+    copy:
+      "The onboarding doc had the commands. It did not have why the architecture bent that way.",
   },
 ];
 
 const loopSteps = [
   {
     label: "01",
-    title: "save the raw thought",
-    copy: "Use /mumbl or the message shortcut. One line is enough, and it stays private.",
+    title: "catch the thought in Slack",
+    copy: "Use /mumbl or the message shortcut when the context appears. One rough line is enough.",
   },
   {
     label: "02",
-    title: "turn signal into a field note",
-    copy: "Come back later, connect the useful pieces, and make the thinking readable.",
+    title: "shape it when it is ready",
+    copy: "Turn the useful parts into something worth sharing once the reasoning is clear enough.",
   },
   {
     label: "03",
-    title: "share only what helps",
-    copy: "Publish a team read when it is useful. Everything else can stay private forever.",
+    title: "publish the context",
+    copy: "Share it as a team read. The team gets the why, not just the shipped thing.",
+  },
+];
+
+const memoryLayers = [
+  {
+    title: "the reason behind the PR",
+    copy: "Not just what changed. Why the team chose it, what felt risky, and what someone noticed too early to prove.",
+  },
+  {
+    title: "the judgment behind the work",
+    copy: "The taste, tradeoffs, instincts, and hard-won lessons that usually stay in heads and DMs.",
+  },
+  {
+    title: "the way your team thinks over time",
+    copy: "A private record of original thinking your team can return to when people join, leave, or forget.",
   },
 ];
 
 const demoRoomPosts = [
   {
-    author: "priya",
-    team: "engineering",
-    label: "process",
+    author: "maya",
+    team: "staff eng",
+    label: "rewrite",
     title: "i kept calling it a polish issue. it was a rewrite i was avoiding.",
     copy: "three weeks of almost done and i finally just said it in /mumbl. writing it down was when i saw it clearly.",
   },
   {
-    author: "daniel",
-    team: "product",
+    author: "arjun",
+    team: "tech lead",
     label: "decision",
-    title: "why we killed the feature i spent two months on",
-    copy: "the metrics were fine. the feeling was not. here's the actual reasoning, not the version in the retro doc.",
+    title: "why we chose boring queues over the clever thing",
+    copy: "the clever version looked better in the design doc. the boring version fails in ways we know how to repair.",
   },
   {
-    author: "sam",
-    team: "design",
-    label: "taste",
-    title: "the thing about our users i can't put in a spec",
-    copy: "i've been sitting on this for a month. it's not a bug or a feature request. it's a pattern i keep noticing.",
+    author: "nina",
+    team: "backend",
+    label: "incident",
+    title: "the deploy was fine. the handoff was not.",
+    copy: "nothing broke, but three people had to reconstruct the same context. next time the note should exist before the merge.",
   },
   {
     author: "leo",
@@ -81,34 +96,34 @@ const demoRoomPosts = [
 
 const objections = [
   {
-    question: "isn't this just an internal blog?",
-    answer:
-      "kind of. but the bar to write is near zero. it starts as one line from Slack, not a blank page, and it is private by default so people write honestly instead of performing.",
-  },
-  {
-    question: "does mumbl read our Slack channels?",
-    answer:
-      "no. it only saves what someone explicitly sends with /mumbl or the message shortcut. no passive reading, no channel history.",
-  },
-  {
-    question: "who sees my private dumps?",
-    answer:
-      "only you. nothing becomes a team read without your explicit action. private by default, shared by choice.",
-  },
-  {
     question: "do we actually need another tool?",
     answer:
-      "probably not if your team already knows each other's reasoning, taste, and hard-won lessons. most remote teams don't. they know each other's output. mumbl is for that gap.",
+      "probably not if your team already knows each other's reasoning, taste, and hard-won lessons. most remote engineering teams don't. they know each other's output. mumbl is for that gap.",
   },
   {
-    question: "what is the heartbeat based on?",
+    question: "do I have to write a lot?",
     answer:
-      "published team reads only. not private dumps, not Slack history, not who joined, not who lurked.",
+      "no. one rough line is the whole point. you're catching a thought, not writing a doc. the habit works because it's near zero effort, and putting even one sentence into words is where thinking gets sharper.",
   },
   {
-    question: "what becomes a team read?",
+    question: "what do I actually get back?",
     answer:
-      "a field note someone explicitly publishes. it can be anonymous or use a chosen mumbl handle. slack identity is never the author label.",
+      "your own thinking over time: how you reasoned, what you sensed early, how you've grown. the realest data you have is how you actually think, and until now it had nowhere to go.",
+  },
+  {
+    question: "what happens to a thought after I dump it?",
+    answer:
+      "your call. keep it private forever, or turn the useful part into a team read when it's ready. nothing leaves your hands until you decide it should.",
+  },
+  {
+    question: "can my thinking become something more, like a digital twin?",
+    answer:
+      "that's where this is heading, and it's your choice. your thinking stays yours and nothing is trained on it without your explicit consent. if you want to build something from how you actually think, that's a door you open, never a default.",
+  },
+  {
+    question: "isn't this just journaling?",
+    answer:
+      "kind of, and that's the point. but the bar to write is near zero, it starts as one line from Slack instead of a blank page, and it is private by default so people think honestly instead of performing.",
   },
 ];
 
@@ -158,10 +173,11 @@ export default function HomeView() {
         <section className="hero landing-hero direct-landing-hero">
           <div className="hero-copy landing-hero-copy">
             <p className="eyebrow">slack app for teams - beta</p>
-            <h1>your team's internal blog, about the people, not the product.</h1>
+            <h1>save the why behind your team's work — one line from Slack.</h1>
             <p>
-              Mumbl is where your team writes about how they actually think, decide, and work. Not the polished retro.
-              The real thing, from Slack, private first, shared only when it is worth it.
+              Hit /mumbl in Slack to capture a thought the moment it happens, then publish the ones worth
+              sharing as a team read. It is your team's internal record: about the people behind the work,
+              not just the product they ship.
             </p>
             <div className="hero-actions">
               <a
@@ -182,6 +198,9 @@ export default function HomeView() {
               <a className="ghost-button button-link" href="#team-reads" onClick={() => trackPublicCta("team_reads_anchor", { source: "hero" })}>
                 see examples
               </a>
+              <a className="ghost-button button-link" href={calendlyHref} target="_blank" rel="noreferrer" onClick={() => trackPublicCta("calendly_outbound", { source: "hero" })}>
+                talk it through
+              </a>
             </div>
             <p className="slack-beta-copy">no channel history. mumbl only saves what you explicitly send it.</p>
             <div className="landing-proof-strip" aria-label="mumbl promises">
@@ -192,10 +211,28 @@ export default function HomeView() {
           </div>
         </section>
 
+        <section id="team-reads" className="landing-section team-reads-showcase" aria-labelledby="team-reads-heading">
+          <p className="eyebrow">what team reads look like</p>
+          <h2 id="team-reads-heading">read the reasoning, not just the result.</h2>
+          <div className="team-read-list">
+            {demoRoomPosts.map((post) => (
+              <article className="team-read-example" key={post.title}>
+                <div>
+                  <span>{post.author}</span>
+                  <span>{post.team}</span>
+                  <em>{post.label}</em>
+                </div>
+                <h3>{post.title}</h3>
+                <p>{post.copy}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
         <section className="landing-section landing-dump" aria-labelledby="dump-heading">
           <div className="landing-section-head">
             <p className="eyebrow">what mumbl does</p>
-            <h2 id="dump-heading">your team thinks out loud every day. right now none of it survives.</h2>
+            <h2 id="dump-heading">save engineering context before it turns into archaeology.</h2>
           </div>
           <div className="dump-layer-grid">
             {loopSteps.map((layer) => (
@@ -211,7 +248,7 @@ export default function HomeView() {
         <section className="landing-section familiar-section" aria-labelledby="familiar-heading">
           <div className="landing-section-head">
             <p className="eyebrow">sounds familiar?</p>
-            <h2 id="familiar-heading">the context keeps disappearing.</h2>
+            <h2 id="familiar-heading">mumbl is for the moments senior engineers keep having.</h2>
           </div>
           <div className="familiar-list">
             {familiarScenarios.map((scenario) => (
@@ -223,18 +260,20 @@ export default function HomeView() {
           </div>
         </section>
 
-        <section id="team-reads" className="landing-section team-reads-showcase" aria-labelledby="team-reads-heading">
-          <p className="eyebrow">what team reads look like</p>
-          <div className="team-read-list">
-            {demoRoomPosts.map((post) => (
-              <article className="team-read-example" key={post.title}>
-                <div>
-                  <span>{post.author}</span>
-                  <span>{post.team}</span>
-                  <em>{post.label}</em>
-                </div>
-                <h2 id={post === demoRoomPosts[0] ? "team-reads-heading" : undefined}>{post.title}</h2>
-                <p>{post.copy}</p>
+        <section className="landing-section human-layer-section" aria-labelledby="human-layer-heading">
+          <div className="human-layer-copy">
+            <p className="eyebrow">why it matters</p>
+            <h2 id="human-layer-heading">the human layer of work starts with the context people already have.</h2>
+            <p>
+              Mumbl is not trying to replace docs, tickets, or Slack. It catches the original thinking before it
+              disappears, then turns the parts worth keeping into team reads.
+            </p>
+          </div>
+          <div className="human-layer-list">
+            {memoryLayers.map((layer) => (
+              <article className="human-layer-card" key={layer.title}>
+                <h3>{layer.title}</h3>
+                <p>{layer.copy}</p>
               </article>
             ))}
           </div>
@@ -322,9 +361,12 @@ export default function HomeView() {
                 </p>
               ) : null}
             </form>
-            <Link className="ghost-button button-link" href="/mission" onClick={() => trackPublicCta("mission", { source: "bottom_cta" })}>
-              read the mission
+            <Link className="ghost-button button-link" href="/vision" onClick={() => trackPublicCta("vision", { source: "bottom_cta" })}>
+              read the vision
             </Link>
+            <a className="ghost-button button-link" href={calendlyHref} target="_blank" rel="noreferrer" onClick={() => trackPublicCta("calendly_outbound", { source: "bottom_cta" })}>
+              book a call
+            </a>
           </div>
         </section>
 

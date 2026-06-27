@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useCallback } from "react";
 import { useRecentSlug } from "../hooks/useRecentSlug";
 import { fetchSavedRooms } from "../lib/api";
+import { trackPublicCta } from "../lib/analytics";
 import AccountControl from "./AccountControl";
 import JoinModal from "./JoinModal";
 
@@ -26,7 +27,7 @@ export default function AppShell({ children }) {
     }
   }, [savedRooms]);
   const dumpActive = pathname?.startsWith("/dump") || pathname?.startsWith("/patterns");
-  const missionActive = pathname?.startsWith("/mission");
+  const visionActive = pathname?.startsWith("/vision");
   const isHome = pathname === "/";
 
   return (
@@ -39,8 +40,8 @@ export default function AppShell({ children }) {
           <span>mumbl</span>
         </Link>
         <nav className="topbar-nav" aria-label="mumbl navigation">
-          <Link className={`topbar-link ${missionActive ? "active" : ""}`} href="/mission" aria-current={missionActive ? "page" : undefined}>
-            mission
+          <Link className={`topbar-link ${visionActive ? "active" : ""}`} href="/vision" aria-current={visionActive ? "page" : undefined} onClick={() => trackPublicCta("vision", { source: "topbar" })}>
+            vision
           </Link>
           {isHome ? (
             <a className="topbar-link" href="#team-reads">
