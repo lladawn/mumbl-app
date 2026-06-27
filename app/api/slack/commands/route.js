@@ -103,6 +103,21 @@ function parseJoinCommand(text) {
   return null;
 }
 
+// Accept the `<room-name> <key>` two-token form (what we tell teams to share) and
+// normalize it into the slug-or-URL string findSpaceForSlackPin already understands.
+// A pasted full invite URL still works for backwards compatibility.
+function joinArgsToLookup(args) {
+  const raw = cleanString(args, 2000) || "";
+  if (/\/r\/|https?:/i.test(raw)) return raw;
+  const parts = raw.split(/\s+/).filter(Boolean);
+  const slug = parts[0] || "";
+  const key = parts[1] || "";
+  if (!slug) return "";
+  // Slack may wrap a pasted slug in <...>; strip stray angle brackets.
+  const cleanSlug = slug.replace(/[<>]/g, "");
+  return key ? `/r/${cleanSlug}?key=${key}` : cleanSlug;
+}
+
 async function startRoomFromSlack({ teamId, slackUserId, name }) {
   return createSlackStartedSpacePayload({ teamId, slackUserId, name });
 }
@@ -116,7 +131,8 @@ async function pinSpaceFromSlack({ teamId, slackUserId, slug }) {
 }
 
 async function joinSpaceFromSlack({ teamId, slackUserId, slug }) {
-  const { space, channelJoin } = await pinSlackSpaceBySlug({ teamId, slackUserId, slug });
+  const lookup = joinArgsToLookup(slug);
+  const { space, channelJoin } = await pinSlackSpaceBySlug({ teamId, slackUserId, slug: lookup });
   const channel = channelJoin?.channelName ? `#${channelJoin.channelName}` : "the team reads channel";
   return channelJoin?.joined
     ? ephemeralText(`you're in 🎉 — ${space.name} reads will land in ${channel}, and the room is pinned in your mumbl App Home.`)

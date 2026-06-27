@@ -1332,6 +1332,24 @@ function slackRoomReadsUrl(space, accessToken = "") {
   return `${appUrl}${roomInvitePath(slug, token)}`;
 }
 
+// Build the copy-pasteable `/mumbl join <slug> <key>` command from a room invite URL.
+// Two plain tokens (not a URL) so Slack never linkifies and crops the room key.
+export function slackJoinCommand(roomUrl) {
+  const raw = cleanString(roomUrl, 2000) || "";
+  const slug = raw.match(/\/r\/([^/?#]+)/)?.[1] || "";
+  let key = "";
+  const keyMatch = raw.match(/[?&]key=([^&]+)/);
+  if (keyMatch) {
+    try {
+      key = decodeURIComponent(keyMatch[1]);
+    } catch {
+      key = keyMatch[1];
+    }
+  }
+  if (!slug) return "/mumbl join";
+  return key ? `/mumbl join ${slug} ${key}` : `/mumbl join ${slug}`;
+}
+
 async function pinSlackSpace({ connection, spaceId }) {
   const supabase = getSupabaseAdmin();
   const { data: existingPins, error: existingError } = await supabase
@@ -1549,7 +1567,7 @@ export function slackHelpPayload() {
   return blockResponse({
     text: "use /mumbl to save a private thought or create a room.",
     blocks: [
-      section("*mumbl in Slack*\n`/mumbl the thing I want to keep` saves a private dump.\n`/mumbl room platform team` creates a Mumbl room from Slack.\n`/mumbl join <invite-link>` joins your team's room — reads land in Slack and the room pins in your App Home.\n`/mumbl pin <invite-link>` pins a room to your Slack publish list."),
+      section("*mumbl in Slack*\n`/mumbl the thing I want to keep` saves a private dump.\n`/mumbl room platform team` creates a Mumbl room from Slack.\n`/mumbl join <room-name> <key>` joins your team's room — reads land in Slack and the room pins in your App Home.\n`/mumbl pin <invite-link>` pins a room to your Slack publish list."),
       context("Private dumps stay private. Team reads only post to Slack if you enable them."),
     ],
   });
@@ -1579,8 +1597,8 @@ export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl,
         { text: "share with team", actionId: "share_room_invite", value: JSON.stringify({ roomUrl, spaceName: space.name }) },
       ]),
       context(
-        `Share with your team — they can join in one step: \`/mumbl join ${roomUrl}\`\n${
-          pinned ? "Pinned for publishing." : "Pin this room in Mumbl App Home, or run `/mumbl pin` with the same link."
+        `Share this with your team so they can join in one step:\n\`${slackJoinCommand(roomUrl)}\`\n${
+          pinned ? "Pinned for publishing." : "Pin this room in Mumbl App Home, or run `/mumbl pin` with the invite link."
         }`,
       ),
     ],
@@ -1604,7 +1622,7 @@ export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUr
         { text: "share with team", actionId: "share_room_invite", value: JSON.stringify({ roomUrl, spaceName: space.name }) },
       ]),
       context(
-        `Share with your team — they join in one step with \`/mumbl join <invite-link>\`. ${
+        `Share with your team so they join in one step:\n\`${slackJoinCommand(roomUrl)}\`\n${
           pinned
             ? "The Slack reads channel only mirrors published team reads."
             : "After connecting, Mumbl can pin this space for publishing from Slack."
@@ -1615,7 +1633,7 @@ export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUr
 }
 
 export function slackShareRoomInviteModalView({ roomUrl, spaceName }) {
-  const inviteMessage = `hey team — just set up a mumbl room for ${spaceName || "us"}.\nwrite private work thoughts, publish as team reads when ready.\n\none-click join in Slack: \`/mumbl join ${roomUrl}\`\nor open on the web: ${roomUrl}`;
+  const inviteMessage = `hey team — just set up a mumbl room for ${spaceName || "us"}.\nwrite private work thoughts, publish as team reads when ready.\n\nto join, run this in Slack:\n${slackJoinCommand(roomUrl)}`;
   return {
     type: "modal",
     callback_id: "share_room_invite",
@@ -2000,7 +2018,7 @@ async function slackAppHomeBlocks({ teamId, slackUserId }) {
     section(
       pinnedSpaces.length
         ? `*pinned teamspaces*\n${pinnedList}`
-        : "*join your team's room*\nGot an invite link from a teammate? Run `/mumbl join <invite-link>` to join, or paste it below to pin. You can also create a new team room.",
+        : "*join your team's room*\nGot a join command from a teammate? Run `/mumbl join <room-name> <key>` to join. You can also pin a room from its invite link, or create a new team room.",
     ),
     actions(
       pinnedSpaces.length
