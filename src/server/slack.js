@@ -322,7 +322,21 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
   }
 
   const handoff = await createCreatorHandoff({ spaceId: insertedSpace.id, creatorToken, accessToken });
-  const teamReadsSetup = await createTeamReadsSetup({ spaceId: insertedSpace.id });
+
+  // The room already exists at this point. If building the optional team-reads
+  // install link fails (e.g. missing Slack OAuth env), don't fail the whole
+  // creation — the user already has a working room. Just omit the button.
+  let teamReadsUrl = null;
+  try {
+    const teamReadsSetup = await createTeamReadsSetup({ spaceId: insertedSpace.id });
+    teamReadsUrl = slackTeamReadsInstallUrl(teamReadsSetup);
+  } catch (error) {
+    console.error("Slack team reads setup link failed after room creation", {
+      spaceId: insertedSpace.id,
+      message: error.message,
+    });
+  }
+
   return {
     space: insertedSpace,
     creatorToken,
@@ -331,7 +345,7 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
     pinned: Boolean(connection),
     openUrl: slackSpaceHandoffUrl(handoff),
     roomUrl: slackRoomReadsUrl(insertedSpace, accessToken),
-    teamReadsUrl: slackTeamReadsInstallUrl(teamReadsSetup),
+    teamReadsUrl,
   };
 }
 
@@ -805,6 +819,17 @@ async function findSlackConnectionForAutoPin({ teamId, slackUserId }) {
   }
 }
 
+// Resolve a connection for joining/pinning a room. If the Slack user already
+// has (or can be matched to) a mumbl account, use that real connection so the
+// pin is attributed to it. Otherwise synthesize a Slack-identity-only stand-in:
+// pins are keyed on (slack_team_id, slack_user_id), so this is enough to pin and
+// invite in one step. `mumbl_user_id` stays null and backfills on connect.
+async function resolveSlackConnectionForJoin({ teamId, slackUserId }) {
+  const connection = await findSlackConnectionForAutoPin({ teamId, slackUserId });
+  if (connection) return connection;
+  return { slack_team_id: teamId, slack_user_id: slackUserId, mumbl_user_id: null };
+}
+
 export async function connectSlackUser({ teamId, slackUserId, mumblUserId }) {
   const supabase = getSupabaseAdmin();
   const sessionTokenHash = hashToken(`slack:${teamId}:${slackUserId}`);
@@ -824,7 +849,22 @@ export async function connectSlackUser({ teamId, slackUserId, mumblUserId }) {
     .single();
   if (error) throw error;
   await reconcileSlackStartedSpacesForConnection(data);
+  await backfillPinnedSpacesUserId(data);
   return data;
+}
+
+// When a Slack user connects their mumbl account, attribute any rooms they
+// joined earlier (pinned with a null mumbl_user_id) to that account.
+async function backfillPinnedSpacesUserId(connection) {
+  if (!connection?.mumbl_user_id || !connection.slack_team_id || !connection.slack_user_id) return;
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("slack_pinned_spaces")
+    .update({ mumbl_user_id: connection.mumbl_user_id })
+    .eq("slack_team_id", connection.slack_team_id)
+    .eq("slack_user_id", connection.slack_user_id)
+    .is("mumbl_user_id", null);
+  if (error) throw error;
 }
 
 export async function saveSlackDump({ connection, content, sourceMeta = {} }) {
@@ -1001,7 +1041,7 @@ export async function updateSlackFieldNoteDraft({ teamId, slackUserId, fieldNote
 }
 
 export async function pinSlackSpaceBySlug({ teamId, slackUserId, slug }) {
-  const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+  const connection = await resolveSlackConnectionForJoin({ teamId, slackUserId });
   const space = await findSpaceForSlackPin(slug);
   const pin = await pinSlackSpace({ connection, spaceId: space.id });
   const channelJoin = await inviteSlackUserToSpaceChannel({ teamId, slackUserId, spaceId: space.id });
@@ -1592,7 +1632,7 @@ export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl,
     blocks: [
       section(`*${escapeSlackText(space.name)} is ready.*\n${status}`),
       actions([
-        { text: "create team reads channel", url: teamReadsUrl, style: "primary" },
+        ...(teamReadsUrl ? [{ text: "create team reads channel", url: teamReadsUrl, style: "primary" }] : []),
         { text: creatorLinked ? "open team reads" : "claim room", url: openUrl },
         { text: "share with team", actionId: "share_room_invite", value: JSON.stringify({ roomUrl, spaceName: space.name }) },
       ]),
@@ -1617,7 +1657,7 @@ export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUr
           : `*${escapeSlackText(space.name)} is ready.*\nConnect once to claim creator access in Mumbl.`,
       ),
       actions([
-        { text: "create team reads channel", url: teamReadsUrl, style: "primary" },
+        ...(teamReadsUrl ? [{ text: "create team reads channel", url: teamReadsUrl, style: "primary" }] : []),
         { text: creatorLinked ? "open team reads" : "claim room", url: openUrl },
         { text: "share with team", actionId: "share_room_invite", value: JSON.stringify({ roomUrl, spaceName: space.name }) },
       ]),
@@ -1633,7 +1673,7 @@ export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUr
 }
 
 export function slackShareRoomInviteModalView({ roomUrl, spaceName }) {
-  const inviteMessage = `hey team — just set up a mumbl room for ${spaceName || "us"}.\nwrite private work thoughts, publish as team reads when ready.\n\nto join, run this in Slack:\n${slackJoinCommand(roomUrl)}`;
+  const inviteMessage = `📓 hey team — I set up a mumbl room for ${spaceName || "us"}.\n\nmumbl is where we keep the half-formed work thoughts privately, then shape the good ones into team reads when they're ready. ✍️\n\n👉 to join, copy this and run it in Slack:\n${slackJoinCommand(roomUrl)}\n\nyou'll land in our reads channel right away and the room pins to your mumbl App Home. ✨`;
   return {
     type: "modal",
     callback_id: "share_room_invite",
@@ -1963,7 +2003,7 @@ async function slackApi(method, token, body) {
 }
 
 function channelNameForSpace(space) {
-  return `mumbl-${slugify(space?.slug || space?.name || "team-reads")}`.slice(0, 80);
+  return `${slugify(space?.slug || space?.name || "team-reads")}`.slice(0, 80);
 }
 
 function teamReadMessage({ space, post, channel, roomAccessToken = "" }) {
@@ -1987,12 +2027,13 @@ async function slackAppHomeBlocks({ teamId, slackUserId }) {
   const { appUrl } = getServerEnv();
   const connection = await findSlackConnection({ teamId, slackUserId });
   const { patternGraphEnabled } = getServerEnv();
-  const [pinnedSpaces, pendingPattern] = connection
-    ? await Promise.all([
-        listSlackPinnedSpaces(connection),
-        patternGraphEnabled ? findPendingPattern(connection.mumbl_user_id) : null,
-      ])
-    : [[], null];
+  // Pins are keyed on Slack identity, so list them even before the user has a
+  // linked mumbl account — a teammate who just ran `/mumbl join` should see the
+  // room here without connecting first.
+  const [pinnedSpaces, pendingPattern] = await Promise.all([
+    listSlackPinnedSpaces(connection || { slack_team_id: teamId, slack_user_id: slackUserId }),
+    connection && patternGraphEnabled ? findPendingPattern(connection.mumbl_user_id) : null,
+  ]);
   const topPinnedSpaces = pinnedSpaces.slice(0, 5);
   const pinnedList = topPinnedSpaces
     .map((pin) => {
@@ -2313,6 +2354,25 @@ async function slackPinnedSpacesModal({ pinnedSpaces, notice = "" }) {
       { text: "open team reads", url: openReadsUrl },
       { text: "publish a draft", actionId: "review_field_note_drafts" },
     ];
+
+    // Offer a one-step "create reads channel" link for spaces that don't have
+    // one yet. Building the install link is optional — skip it if it fails.
+    if (!channel?.slack_channel_name && space.id) {
+      try {
+        const teamReadsSetup = await createTeamReadsSetup({ spaceId: space.id });
+        rowActions.push({
+          text: "create reads channel",
+          url: slackTeamReadsInstallUrl(teamReadsSetup),
+          style: "primary",
+        });
+      } catch (error) {
+        console.error("Slack team reads setup link failed in manage teamspaces", {
+          spaceId: space.id,
+          message: error.message,
+        });
+      }
+    }
+
     rowActions.push({ text: "unpin", actionId: "unpin_pinned_space_start", value: pin.id, style: "danger" });
 
     blocks.push(
