@@ -28,7 +28,7 @@ export function slackInstallUrl() {
   return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
 }
 
-export function slackTeamReadsInstallUrl({ setupId, setupToken }) {
+export function slackTeamReadsInstallUrl({ setupId, setupToken, teamId = "" }) {
   const { appUrl, slackClientId } = assertSlackEnv();
   const params = new URLSearchParams({
     client_id: slackClientId,
@@ -36,6 +36,12 @@ export function slackTeamReadsInstallUrl({ setupId, setupToken }) {
     redirect_uri: `${appUrl}/api/slack/team-reads/oauth/callback`,
     state: createSlackState({ setupId, setupToken }),
   });
+
+  // Pin the consent to the workspace the user is acting from. Without this,
+  // Slack authorizes against whatever workspace the browser session defaults
+  // to — the wrong one for anyone signed into multiple workspaces.
+  const pinnedTeam = cleanString(teamId, 80);
+  if (pinnedTeam) params.set("team", pinnedTeam);
 
   return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
 }
@@ -224,16 +230,24 @@ export async function createSlackSpaceChannel({ oauthResult, setup }) {
   const slackBotToken = cleanString(oauthResult.access_token, 4096);
   if (!teamId || !slackBotToken) throw new Error("Slack team reads install was missing workspace access.");
 
-  const channel = await createPrivateChannel({
+  return createSlackChannelForSpace({
+    teamId,
     token: slackBotToken,
-    name: channelNameForSpace(setup.spaces),
+    createdBy: cleanString(oauthResult.authed_user?.id, 80),
+    spaceId: setup.space_id,
+    space: setup.spaces,
+    roomAccessToken: cleanString(setup.roomAccessToken, 256),
   });
-  const createdBy = cleanString(oauthResult.authed_user?.id, 80);
+}
+
+// Core channel creation, independent of how the bot token was obtained (a fresh
+// team-reads OAuth grant, or the elevated token already stored for the workspace).
+async function createSlackChannelForSpace({ teamId, token, createdBy, spaceId, space, roomAccessToken = "" }) {
+  const channel = await createPrivateChannel({ token, name: channelNameForSpace(space) });
   if (createdBy) {
-    await inviteUserToSlackChannel({ token: slackBotToken, channelId: channel.id, slackUserId: createdBy });
+    await inviteUserToSlackChannel({ token, channelId: channel.id, slackUserId: createdBy });
   }
 
-  const roomAccessToken = cleanString(setup.roomAccessToken, 256);
   const encryptedAccess = roomAccessToken ? encryptSlackSecret(roomAccessToken) : null;
 
   const supabase = getSupabaseAdmin();
@@ -241,7 +255,7 @@ export async function createSlackSpaceChannel({ oauthResult, setup }) {
     .from("slack_space_channels")
     .upsert(
       {
-        space_id: setup.space_id,
+        space_id: spaceId,
         slack_team_id: teamId,
         slack_channel_id: channel.id,
         slack_channel_name: channel.name,
@@ -266,10 +280,48 @@ export async function createSlackSpaceChannel({ oauthResult, setup }) {
   if (error) throw error;
   if (createdBy) {
     const connection = await findSlackConnectionForAutoPin({ teamId, slackUserId: createdBy });
-    if (connection) await pinSlackSpace({ connection, spaceId: setup.space_id });
+    if (connection) await pinSlackSpace({ connection, spaceId });
   }
-  await postSlackChannelIntro({ token: slackBotToken, channel: data, space: setup.spaces, roomAccessToken });
+  await postSlackChannelIntro({ token, channel: data, space, roomAccessToken });
   return data;
+}
+
+// If the workspace has already granted the team-reads (private channel) scopes,
+// create the reads channel inline using the stored bot token — no second OAuth.
+// Returns the channel on success, or null if the workspace hasn't granted the
+// scopes yet or the stored token can no longer create channels (caller then
+// falls back to surfacing the one-time upgrade link).
+async function tryAutoCreateSlackSpaceChannel({ teamId, slackUserId, spaceId, space, roomAccessToken = "" }) {
+  let installation;
+  try {
+    installation = await getSlackInstallation(teamId);
+  } catch {
+    return null;
+  }
+  if (missingSlackScopes(installation?.scopes, SLACK_TEAM_READS_SCOPES).length) return null;
+
+  let token;
+  try {
+    token = decryptSlackToken({
+      ciphertext: installation.bot_access_token_ciphertext,
+      iv: installation.bot_access_token_iv,
+      tag: installation.bot_access_token_tag,
+    });
+  } catch {
+    return null;
+  }
+
+  try {
+    return await createSlackChannelForSpace({ teamId, token, createdBy: slackUserId, spaceId, space, roomAccessToken });
+  } catch (error) {
+    // Token revoked or scope dropped since it was stored — fall back to the link.
+    console.error("Auto team-reads channel create failed; falling back to upgrade link", {
+      spaceId,
+      slackError: error.slack?.error,
+      message: error.message,
+    });
+    return null;
+  }
 }
 
 export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
@@ -323,18 +375,31 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
 
   const handoff = await createCreatorHandoff({ spaceId: insertedSpace.id, creatorToken, accessToken });
 
+  // If this workspace already granted team-reads scopes (anyone enabled reads
+  // once before), create the reads channel inline now — no second OAuth. Only
+  // fall back to the one-time upgrade link when the scope isn't there yet.
+  const teamReadsChannel = await tryAutoCreateSlackSpaceChannel({
+    teamId,
+    slackUserId,
+    spaceId: insertedSpace.id,
+    space: insertedSpace,
+    roomAccessToken: accessToken,
+  });
+
   // The room already exists at this point. If building the optional team-reads
   // install link fails (e.g. missing Slack OAuth env), don't fail the whole
   // creation — the user already has a working room. Just omit the button.
   let teamReadsUrl = null;
-  try {
-    const teamReadsSetup = await createTeamReadsSetup({ spaceId: insertedSpace.id });
-    teamReadsUrl = slackTeamReadsInstallUrl(teamReadsSetup);
-  } catch (error) {
-    console.error("Slack team reads setup link failed after room creation", {
-      spaceId: insertedSpace.id,
-      message: error.message,
-    });
+  if (!teamReadsChannel) {
+    try {
+      const teamReadsSetup = await createTeamReadsSetup({ spaceId: insertedSpace.id });
+      teamReadsUrl = slackTeamReadsInstallUrl({ ...teamReadsSetup, teamId });
+    } catch (error) {
+      console.error("Slack team reads setup link failed after room creation", {
+        spaceId: insertedSpace.id,
+        message: error.message,
+      });
+    }
   }
 
   return {
@@ -346,6 +411,7 @@ export async function createSlackStartedSpace({ teamId, slackUserId, name }) {
     openUrl: slackSpaceHandoffUrl(handoff),
     roomUrl: slackRoomReadsUrl(insertedSpace, accessToken),
     teamReadsUrl,
+    teamReadsChannelName: teamReadsChannel?.slack_channel_name || null,
   };
 }
 
@@ -722,7 +788,7 @@ export async function slackPinnedSpacesView({ teamId, slackUserId, notice = "" }
   const connection = await findSlackConnection({ teamId, slackUserId });
   if (!connection) return slackPinnedSpacesEmptyModal({ connected: false });
   const pinnedSpaces = await listSlackPinnedSpaces(connection);
-  return pinnedSpaces.length ? await slackPinnedSpacesModal({ pinnedSpaces, notice }) : slackPinnedSpacesEmptyModal({ connected: true });
+  return pinnedSpaces.length ? await slackPinnedSpacesModal({ pinnedSpaces, teamId, notice }) : slackPinnedSpacesEmptyModal({ connected: true });
 }
 
 export async function openSlackFieldNoteReviewModal({ teamId, slackUserId, triggerId }) {
@@ -1623,7 +1689,7 @@ export function slackRoomNeedsNamePayload() {
   });
 }
 
-export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl, creatorLinked, pinned }) {
+export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl, teamReadsChannelName, creatorLinked, pinned }) {
   const status = creatorLinked
     ? "linked to your Mumbl login and pinned in Slack."
     : "created from Slack. Connect once to claim creator access in Mumbl.";
@@ -1637,7 +1703,7 @@ export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl,
         { text: "share with team", actionId: "share_room_invite", value: JSON.stringify({ roomUrl, spaceName: space.name }) },
       ]),
       context(
-        `Share this with your team so they can join in one step:\n\`${slackJoinCommand(roomUrl)}\`\n${
+        `${teamReadsChannelName ? `📣 published reads will post to *#${escapeSlackText(teamReadsChannelName)}*.\n` : ""}Share this with your team so they can join in one step:\n\`${slackJoinCommand(roomUrl)}\`\n${
           pinned ? "Pinned for publishing." : "Pin this room in Mumbl App Home, or run `/mumbl pin` with the invite link."
         }`,
       ),
@@ -1645,7 +1711,7 @@ export function slackRoomCreatedPayload({ space, openUrl, roomUrl, teamReadsUrl,
   });
 }
 
-export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUrl, creatorLinked, pinned }) {
+export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUrl, teamReadsChannelName, creatorLinked, pinned }) {
   return {
     type: "modal",
     title: { type: "plain_text", text: "room created" },
@@ -1662,7 +1728,7 @@ export function slackRoomCreatedModalView({ space, openUrl, roomUrl, teamReadsUr
         { text: "share with team", actionId: "share_room_invite", value: JSON.stringify({ roomUrl, spaceName: space.name }) },
       ]),
       context(
-        `Share with your team so they join in one step:\n\`${slackJoinCommand(roomUrl)}\`\n${
+        `${teamReadsChannelName ? `📣 published reads will post to *#${escapeSlackText(teamReadsChannelName)}*.\n` : ""}Share with your team so they join in one step:\n\`${slackJoinCommand(roomUrl)}\`\n${
           pinned
             ? "The Slack reads channel only mirrors published team reads."
             : "After connecting, Mumbl can pin this space for publishing from Slack."
@@ -2334,7 +2400,7 @@ function slackPinnedSpacesEmptyModal({ connected }) {
   };
 }
 
-async function slackPinnedSpacesModal({ pinnedSpaces, notice = "" }) {
+async function slackPinnedSpacesModal({ pinnedSpaces, teamId = "", notice = "" }) {
   const blocks = [
     section("*your pinned teamspaces*\nThese are personal Slack publish destinations. Unpinning only removes your shortcut."),
   ];
@@ -2362,7 +2428,7 @@ async function slackPinnedSpacesModal({ pinnedSpaces, notice = "" }) {
         const teamReadsSetup = await createTeamReadsSetup({ spaceId: space.id });
         rowActions.push({
           text: "create reads channel",
-          url: slackTeamReadsInstallUrl(teamReadsSetup),
+          url: slackTeamReadsInstallUrl({ ...teamReadsSetup, teamId }),
           style: "primary",
         });
       } catch (error) {

@@ -449,22 +449,31 @@ export async function POST(request) {
         });
       }
 
-      try {
-        const view = await createSlackStartedSpaceModalView({ teamId, slackUserId, name: roomName });
-        after(async () => {
-          try {
-            await publishSlackAppHome({ teamId, slackUserId });
-          } catch (error) {
-            console.error("Slack App Home refresh after room creation failed", { message: error.message, slackError: error.slack?.error });
+      // Creating the room can now create the Slack reads channel inline, which
+      // adds Slack API round-trips. Respond instantly with a loading modal and
+      // do the work in after(), then swap in the result — so we never risk the
+      // ~3s view_submission timeout reporting a failure for a room that was made.
+      const viewId = slackModalViewId(payload);
+      after(async () => {
+        try {
+          const view = await createSlackStartedSpaceModalView({ teamId, slackUserId, name: roomName });
+          if (viewId) await updateSlackView({ teamId, viewId, view });
+          await publishSlackAppHome({ teamId, slackUserId });
+        } catch (error) {
+          console.error("Slack room creation failed", { message: error.message, slackError: error.slack?.error });
+          if (viewId) {
+            await updateSlackView({
+              teamId,
+              viewId,
+              view: slackLoadingModalView({ title: "couldn't create room", message: error.message || "try again in a moment." }),
+            }).catch(() => {});
           }
-        });
-        return ok({ response_action: "update", view });
-      } catch (error) {
-        return ok({
-          response_action: "errors",
-          errors: { room_name: error.message || "couldn't create that room yet." },
-        });
-      }
+        }
+      });
+      return ok({
+        response_action: "update",
+        view: slackLoadingModalView({ title: "creating room", message: "setting up your room and reads channel…" }),
+      });
     }
 
     if (payload.type === "view_submission" && payload.view?.callback_id === "share_room_invite") {
