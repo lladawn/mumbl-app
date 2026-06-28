@@ -19,6 +19,9 @@ import {
   slackHelpPayload,
   slackSavedDumpPayload,
   openSlackRoomModal,
+  openSlackFieldNoteDraftModal,
+  openSlackFieldNoteReviewModal,
+  openSlackPublishPickModal,
 } from "../../../../src/server/slack";
 import { cleanString } from "../../../../src/server/validation";
 
@@ -33,9 +36,26 @@ export async function POST(request) {
     const roomName = parseRoomCommand(text);
     const pinSlug = parsePinCommand(text);
     const joinSlug = parseJoinCommand(text);
+    const modalCommand = parseModalCommand(text);
 
     if (!teamId || !slackUserId) return ok(ephemeralText("couldn't tell which Slack workspace this came from."));
     if (!text || text.toLowerCase() === "help") return ok(slackHelpPayload());
+
+    // draft / review / publish each open a modal the same way the empty `room`
+    // command does — fire the views.open in the background and ack immediately so
+    // Slack doesn't time out the slash command.
+    if (modalCommand) {
+      after(async () => {
+        try {
+          if (modalCommand === "draft") await openSlackFieldNoteDraftModal({ teamId, slackUserId, triggerId });
+          else if (modalCommand === "review") await openSlackFieldNoteReviewModal({ teamId, slackUserId, triggerId });
+          else await openSlackPublishPickModal({ teamId, slackUserId, triggerId });
+        } catch (error) {
+          await postSlackResponse(responseUrl, ephemeralText(error.message || "couldn't open that Mumbl view."));
+        }
+      });
+      return new Response(null, { status: 200 });
+    }
     if (pinSlug !== null && !pinSlug) return ok(ephemeralText("try `/mumbl pin` followed by the room invite link."));
     if (joinSlug !== null && !joinSlug) return ok(ephemeralText("try `/mumbl join` followed by the room invite link your teammate shared."));
     if (roomName !== null && !roomName) {
@@ -92,6 +112,14 @@ function parsePinCommand(text) {
   const lower = trimmed.toLowerCase();
   if (lower === "pin") return "";
   if (lower.startsWith("pin ")) return cleanString(trimmed.slice(4), 2000);
+  return null;
+}
+
+function parseModalCommand(text) {
+  const lower = cleanString(text, 4000).toLowerCase();
+  if (lower === "draft") return "draft";
+  if (lower === "review") return "review";
+  if (lower === "publish") return "publish";
   return null;
 }
 
