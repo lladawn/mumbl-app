@@ -280,6 +280,28 @@ export async function POST(request) {
       }
     }
 
+    if (payload.type === "view_submission" && payload.view?.callback_id === "publish_field_note_pick") {
+      const teamId = slackTeamId(payload);
+      const slackUserId = cleanString(payload.user?.id, 80);
+      const fieldNoteId = cleanString(payload.view?.state?.values?.field_note_id?.value?.selected_option?.value, 64);
+      if (!fieldNoteId) {
+        return ok({
+          response_action: "errors",
+          errors: { field_note_id: "choose a draft to publish." },
+        });
+      }
+
+      try {
+        const view = await slackPublishOptionsView({ teamId, slackUserId, fieldNoteId });
+        return ok({ response_action: "update", view });
+      } catch (error) {
+        return ok({
+          response_action: "errors",
+          errors: { field_note_id: error.message || "couldn't open publish options for that draft." },
+        });
+      }
+    }
+
     if (payload.type === "view_submission" && payload.view?.callback_id === "edit_field_note_draft") {
       const teamId = slackTeamId(payload);
       const slackUserId = cleanString(payload.user?.id, 80);

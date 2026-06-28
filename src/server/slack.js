@@ -814,6 +814,29 @@ export async function openSlackFieldNoteReviewModal({ teamId, slackUserId, trigg
   });
 }
 
+export async function openSlackPublishPickModal({ teamId, slackUserId, triggerId }) {
+  const installation = await getSlackInstallation(teamId);
+  const token = decryptSlackToken({
+    ciphertext: installation.bot_access_token_ciphertext,
+    iv: installation.bot_access_token_iv,
+    tag: installation.bot_access_token_tag,
+  });
+
+  let view;
+  try {
+    const connection = await findOrCreateSlackConnectionByEmail({ teamId, slackUserId });
+    const fieldNotes = await recentSlackFieldNoteDrafts(connection);
+    view = fieldNotes.length ? slackPublishPickModal({ fieldNotes }) : slackNoFieldNoteDraftsModal();
+  } catch (error) {
+    view = slackFieldNoteDraftUnavailableModal(error.message || "connect mumbl first.");
+  }
+
+  return slackApi("views.open", token, {
+    trigger_id: triggerId,
+    view,
+  });
+}
+
 export async function updateSlackView({ teamId, viewId, view }) {
   const installation = await getSlackInstallation(teamId);
   const token = decryptSlackToken({
@@ -1673,7 +1696,7 @@ export function slackHelpPayload() {
   return blockResponse({
     text: "use /mumbl to save a private thought or create a room.",
     blocks: [
-      section("*mumbl in Slack*\n`/mumbl the thing I want to keep` saves a private dump.\n`/mumbl room platform team` creates a Mumbl room from Slack.\n`/mumbl join <room-name> <key>` joins your team's room — reads land in Slack and the room pins in your App Home.\n`/mumbl pin <invite-link>` pins a room to your Slack publish list."),
+      section("*mumbl in Slack*\n`/mumbl the thing I want to keep` saves a private dump.\n`/mumbl draft` turns your recent dumps into an AI field-note draft.\n`/mumbl review` opens your private drafts to edit.\n`/mumbl publish` ships a draft to a room as a team read.\n`/mumbl room platform team` creates a Mumbl room from Slack.\n`/mumbl join <room-name> <key>` joins your team's room — reads land in Slack and the room pins in your App Home.\n`/mumbl pin <invite-link>` pins a room to your Slack publish list."),
       context("Private dumps stay private. Team reads only post to Slack if you enable them."),
     ],
   });
@@ -2297,6 +2320,30 @@ function slackFieldNoteReviewModal({ fieldNotes }) {
         },
       },
       context("Drafts stay private here. Publish from Slack or open the draft in Mumbl."),
+    ],
+  };
+}
+
+function slackPublishPickModal({ fieldNotes }) {
+  return {
+    type: "modal",
+    callback_id: "publish_field_note_pick",
+    title: { type: "plain_text", text: "publish a draft" },
+    submit: { type: "plain_text", text: "next" },
+    close: { type: "plain_text", text: "cancel" },
+    blocks: [
+      {
+        type: "input",
+        block_id: "field_note_id",
+        label: { type: "plain_text", text: "draft" },
+        element: {
+          type: "static_select",
+          action_id: "value",
+          placeholder: { type: "plain_text", text: "choose a draft to publish" },
+          options: fieldNotes.map((fieldNote) => fieldNoteOption(fieldNote)),
+        },
+      },
+      context("Next you'll pick the room and how you want to show up."),
     ],
   };
 }
