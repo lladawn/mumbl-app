@@ -17,24 +17,25 @@ const analyticsEnabled = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === "true";
 const umamiScriptSrc = process.env.NEXT_PUBLIC_UMAMI_SRC || "https://breathe-umami.vercel.app/script.js";
 const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID || "";
 const description =
-  "Mumbl is a Slack app for saving the reasoning behind engineering work: the tradeoffs, gut calls, and hard-won lessons that usually disappear.";
+  "Agent work still feels like a terminal. Mumbl is a workspace where your AI agents are collaborators you can see — working, blocked, or done, legible at a glance.";
 
 export const metadata = {
   metadataBase: new URL(appUrl),
   title: {
-    default: "mumbl",
+    default: "mumbl — see your agents work",
     template: "%s · mumbl",
   },
   description,
   applicationName: "mumbl",
   keywords: [
     "mumbl",
-    "slack private notes",
-    "team reads",
-    "field notes",
+    "ai agents",
+    "agent workspace",
+    "agent observability",
+    "spatial workspace",
+    "claude code",
+    "mcp",
     "engineering teams",
-    "team heartbeat",
-    "work culture",
   ],
   authors: [{ name: "mumbl" }],
   creator: "mumbl",
@@ -43,7 +44,7 @@ export const metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "mumbl - save the reasoning behind the work",
+    title: "mumbl — a workspace where your AI agents are collaborators you can see",
     description,
     url: "/",
     siteName: "mumbl",
@@ -53,13 +54,13 @@ export const metadata = {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "mumbl - save the reasoning behind the work",
+        alt: "A pixel workspace: AI collaborators at their stations, marked working, blocked and done.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "mumbl - save the reasoning behind the work",
+    title: "mumbl — a workspace where your AI agents are collaborators you can see",
     description,
     images: ["/twitter-image"],
   },
