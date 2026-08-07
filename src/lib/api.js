@@ -14,11 +14,11 @@ import {
 } from "./storage";
 import { authRequestContext } from "./auth";
 
-export async function joinWaitlist({ email }) {
+export async function joinWaitlist({ email, company, teamSize, agentTools, source }) {
   const response = await fetch("/api/waitlist", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, company, teamSize, agentTools, source }),
   });
   return parseJson(response);
 }

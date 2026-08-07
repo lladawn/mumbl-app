@@ -26,12 +26,16 @@ export default function AppShell({ children }) {
       setSavedRooms([]);
     }
   }, [savedRooms]);
-  const dumpActive = pathname?.startsWith("/dump") || pathname?.startsWith("/patterns");
-  const visionActive = pathname?.startsWith("/vision");
-  const isHome = pathname === "/";
+  const homeActive = pathname === "/";
+  const visionActive = pathname?.startsWith("/slack/vision");
+  const slackActive = pathname === "/slack" || visionActive;
+  // The room surfaces (/dump, /create, /explore, /r/*) stay live so existing
+  // rooms and Slack installs keep working — they are just out of the top nav
+  // while the landing tells the agent-collaborator story.
+  const isPublicFront = homeActive || visionActive || slackActive;
 
   return (
-    <div className="shell">
+    <div className={`shell ${homeActive ? "shell-dark" : ""}`}>
       <header className="topbar">
         <Link className="brand" href="/" aria-label="go to mumbl home">
           <span className="brand-mark" aria-hidden="true">
@@ -40,35 +44,27 @@ export default function AppShell({ children }) {
           <span>mumbl</span>
         </Link>
         <nav className="topbar-nav" aria-label="mumbl navigation">
-          <Link className={`topbar-link ${visionActive ? "active" : ""}`} href="/vision" aria-current={visionActive ? "page" : undefined} onClick={() => trackPublicCta("vision", { source: "topbar" })}>
-            vision
+          <a className="topbar-link" href="/demo" onClick={() => trackPublicCta("demo", { source: "topbar" })}>
+            demo
+          </a>
+          <Link className={`topbar-link ${slackActive ? "active" : ""}`} href="/slack" aria-current={slackActive ? "page" : undefined} onClick={() => trackPublicCta("slack_landing", { source: "topbar" })}>
+            for<span className="topbar-label-extra">&nbsp;slack</span>
           </Link>
-          {isHome ? (
-            <a className="topbar-link" href="#team-reads">
-              examples
-            </a>
-          ) : (
-            <>
-              <Link className={`topbar-link ${dumpActive ? "active" : ""}`} href="/dump" aria-current={dumpActive ? "page" : undefined}>
-                dump
-              </Link>
-              <button className="topbar-link" type="button" onClick={openJoin}>
-                join<span className="topbar-label-extra"> a space</span>
-              </button>
-            </>
+          {!isPublicFront && (
+            <button className="topbar-link" type="button" onClick={openJoin}>
+              join{" "}<span className="topbar-label-extra">a&nbsp;space</span>
+            </button>
           )}
         </nav>
         <div className="topbar-actions">
-          {isHome ? (
-            <a className="topbar-create button-link" href="/api/slack/install" target="_blank" rel="noreferrer">
-              add to slack
-            </a>
+          {isPublicFront ? (
+            <Link className="topbar-create button-link" href="/#waitlist">
+              join<span className="topbar-label-extra">&nbsp;waitlist</span>
+            </Link>
           ) : (
             <>
               <AccountControl />
-              <Link className="topbar-create button-link" href="/create">
-                create<span className="topbar-label-extra"> space</span>
-              </Link>
+              <Link className="topbar-create button-link" href="/create">create{" "}<span className="topbar-label-extra">space</span></Link>
             </>
           )}
         </div>

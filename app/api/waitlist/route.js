@@ -10,10 +10,20 @@ export async function POST(request) {
     if (!email) return badRequest("email is required");
     if (!isValidEmail(email)) return badRequest("drop in a real email and we'll save your spot.");
 
+    // optional research fields — the agent-collaborator landing asks for these,
+    // the older slack landing posts email only.
+    const company = cleanString(body.company, 160);
+    const teamSize = cleanString(body.teamSize, 40);
+    const agentTools = cleanString(body.agentTools, 400);
+    const source = cleanString(body.source, 40) || "landing";
+
     const supabase = getSupabaseAdmin();
     const { error } = await supabase.from("waitlist_signups").insert({
       email,
-      source: "landing",
+      source,
+      company: company || null,
+      team_size: teamSize || null,
+      agent_tools: agentTools || null,
     });
 
     if (error && error.code !== "23505") throw error;

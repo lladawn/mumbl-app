@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mumbl — a workspace where your AI agents are collaborators you can see</title>
+<meta name="description" content="Agent work still feels like a terminal. Most people use a code editor. Ask for help and a new collaborator walks in." />
+<meta property="og:title" content="mumbl — see your agents work" />
+<meta property="og:description" content="Agent work still feels like a terminal. Most people use a code editor." />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%2314312F'/><rect x='4' y='5' width='8' height='6' fill='%23E0A458'/></svg>" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #0A1413;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 24px 16px;
+  }
+
+  #mumbl-root {
+    --ink:        #10201F;
+    --teal-deep:  #14312F;
+    --ochre:      #E0A458;
+    --ochre-dim:  #C8873F;
+    --cream:      #F0E2C8;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    font-family: var(--mono);
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  #stage {
+    position: relative;
+    width: 100%;
+    max-width: 960px;
+    aspect-ratio: 960 / 600;
+    background: var(--teal-deep);
+    border: 3px solid var(--ink);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,.35);
+  }
+
+  /* Phaser owns canvas sizing (Scale.FIT). Do not force 100% here — forcing it
+     fights the scale manager and strands the absolute overlays after a resize. */
+  #game { position: absolute; inset: 0; }
+  #game canvas { display: block; }
+
+  /* ---- terminal overlay ---- */
+  #terminal {
+    position: absolute; inset: 0;
+    background: #070B0B;
+    opacity: 0; pointer-events: none;
+    transition: opacity .32s ease;
+    z-index: 40;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 22px 24px 16px;
+  }
+  #terminal.on { opacity: 1; pointer-events: auto; }
+  #termInner { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+  #termLines {
+    color: #7E8C82;
+    font-size: 12px; line-height: 1.75;
+    white-space: pre-wrap;
+  }
+  #termLines .dim { color: #38443E; }
+  #termLines .amb { color: var(--ochre-dim); }
+  #termHint {
+    margin-top: 14px; padding-top: 12px;
+    border-top: 1px solid #1B2422;
+    color: #4C5A53; font-size: 11px; letter-spacing: .04em;
+    cursor: pointer;
+  }
+  #termHint b { color: var(--ochre); }
+
+  /* ---- on-screen view toggle (always reachable) ---- */
+  #viewToggle {
+    position: absolute; top: 10px; right: 12px; z-index: 45;
+    background: rgba(7,11,11,.86);
+    border: 1px solid var(--ochre-dim);
+    color: var(--cream);
+    font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 7px 12px; border-radius: 2px; cursor: pointer;
+  }
+  #viewToggle:hover { background: var(--ochre); color: #17110A; }
+  #viewToggle b { color: var(--ochre); }
+  #viewToggle:hover b { color: #17110A; }
+
+  /* ---- agent panel ---- */
+  #panel {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: 300px; max-width: 62%;
+    background: rgba(7,11,11,.94);
+    border-left: 2px solid var(--ochre-dim);
+    padding: 20px;
+    transform: translateX(102%);
+    transition: transform .26s cubic-bezier(.4,0,.2,1);
+    z-index: 30;
+    display: flex; flex-direction: column;
+    color: var(--cream);
+  }
+  #panel.on { transform: translateX(0); }
+  #panelClose {
+    position: absolute; top: 10px; right: 12px;
+    background: none; border: 0; color: #5C6A63;
+    font-size: 22px; line-height: 1; cursor: pointer; font-family: var(--mono);
+  }
+  #panelClose:hover { color: var(--cream); }
+  #panelRole { color: var(--ochre); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; }
+  #panelName { margin: 4px 0 10px; font-size: 19px; font-weight: 600; }
+  #panelStatus { display: inline-block; align-self: flex-start; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; padding: 3px 9px; border-radius: 2px; }
+  #panelTaskLabel, #panelLogLabel { margin-top: 18px; color: #4C5A53; font-size: 9px; letter-spacing: .18em; }
+  #panelTask { margin-top: 6px; font-size: 13px; line-height: 1.5; color: var(--cream); }
+  #panelLog {
+    margin: 6px 0 0; flex: 1; overflow-y: auto;
+    font-family: var(--mono); font-size: 11px; line-height: 1.7;
+    color: #8A9A90; white-space: pre-wrap;
+  }
+  #panelLog::-webkit-scrollbar { width: 5px; }
+  #panelLog::-webkit-scrollbar-thumb { background: #2A3531; }
+
+  /* ---- spawn bar ---- */
+  #spawnBar {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    display: flex;
+    background: rgba(7,11,11,.9);
+    border-top: 2px solid #223330;
+    z-index: 20;
+  }
+  #spawnInput {
+    flex: 1; background: none; border: 0; outline: none;
+    color: var(--cream); font-family: var(--mono); font-size: 13px;
+    padding: 13px 16px;
+  }
+  #spawnInput::placeholder { color: #4C5A53; }
+  #spawnBtn {
+    background: var(--ochre); border: 0; cursor: pointer;
+    color: #17110A; font-family: var(--mono); font-weight: 700;
+    font-size: 12px; letter-spacing: .1em; padding: 0 20px;
+  }
+  #spawnBtn:hover { background: var(--cream); }
+
+  /* ---- hud ---- */
+  #hud {
+    position: absolute; top: 12px; left: 12px; z-index: 15;
+    display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: 10px; color: rgba(240,226,200,.5); letter-spacing: .04em;
+    text-shadow: 0 1px 2px rgba(0,0,0,.8);
+    pointer-events: none;
+  }
+  #hud b { color: var(--ochre); }
+
+  /* ---- toast ---- */
+  #toast {
+    position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%) translateY(8px);
+    background: rgba(7,11,11,.94); border: 1px solid var(--ochre-dim);
+    color: var(--cream); font-size: 12px; padding: 8px 16px; border-radius: 2px;
+    opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; z-index: 25;
+  }
+  #toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---- page chrome around the stage ---- */
+  .page-line {
+    width: 100%; max-width: 960px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: #6E7F77; font-size: 12px; line-height: 1.6;
+    display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .page-line strong { color: #F0E2C8; font-weight: 600; }
+  .page-line a { color: #E0A458; text-decoration: none; }
+  .page-line a:hover { text-decoration: underline; }
+  .page-note { color: #4C5A53; white-space: nowrap; }
+
+  @media (max-width: 620px) {
+    #hud { font-size: 9px; gap: 9px; }
+    #panel { width: 82%; }
+    #viewToggle { font-size: 9px; padding: 6px 9px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-line">
+  <span><strong>mumbl</strong> — agent work still feels like a terminal. most people use a code editor.</span>
+  <span class="page-note">prototype · agents are scripted</span>
+</div>
+
+<div id="mumbl-root">
+  <div id="stage">
+    <div id="game"></div>
+
+    <!-- Terminal / workspace toggle overlay -->
+    <div id="terminal">
+      <div id="termInner">
+        <div id="termLines"></div>
+      </div>
+      <div id="termHint">the same work, in a terminal &nbsp;·&nbsp; press <b>T</b> to go back</div>
+    </div>
+
+    <button id="viewToggle" type="button">terminal view <b>[T]</b></button>
+
+    <!-- Agent detail panel -->
+    <aside id="panel">
+      <button id="panelClose" aria-label="Close panel">×</button>
+      <div id="panelRole"></div>
+      <h2 id="panelName"></h2>
+      <div id="panelStatus"></div>
+      <div id="panelTaskLabel">CURRENT TASK</div>
+      <div id="panelTask"></div>
+      <div id="panelLogLabel">ACTIVITY</div>
+      <pre id="panelLog"></pre>
+    </aside>
+
+    <!-- Spawn input -->
+    <form id="spawnBar" autocomplete="off">
+      <input id="spawnInput" type="text" placeholder="What do you need help with?" maxlength="80" />
+      <button type="submit" id="spawnBtn">Ask</button>
+    </form>
+
+    <div id="hud">
+      <span><b>WASD</b> / arrows to walk</span>
+      <span><b>Click</b> an agent</span>
+    </div>
+
+    <div id="toast"></div>
+  </div>
+</div>
+
+<div class="page-line">
+  <span>try: <strong>"I need help with competitor research"</strong></span>
+  <span><a href="/">mumbl.wtf →</a></span>
+</div>
+
+<!-- absolute, not relative: this page is served at /demo (no trailing slash),
+     where a relative src would resolve to /phaser.min.js and 404. -->
+<script src="/demo/phaser.min.js"></script>
+<script>
+(function () {
+  const W = 960, H = 600;
+  const C = {
+    floorA: 0x6B4A2F, floorB: 0x63432A, floorLine: 0x553920,
+    wall: 0x245055, wallDark: 0x14312F, wallTrim: 0x2E6167,
+    desk: 0x8A5E38, deskTop: 0xA5713F, monitor: 0x14201F,
+    ochre: 0xE0A458, cream: 0xF0E2C8, green: 0x6FA88A, red: 0xC25450
+  };
+
+  // ---------- pixel sprite factory ----------
+  function px(ctx, x, y, w, h, col) { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); }
+
+  function makePerson(scene, key, opts) {
+    const w = 14, h = 20;
+    const tex = scene.textures.createCanvas(key, w, h);
+    const ctx = tex.getContext();
+    ctx.clearRect(0, 0, w, h);
+    const { hair, skin, shirt, pants, glow } = opts;
+
+    if (glow) { // soft aura for AI collaborators
+      ctx.globalAlpha = .22;
+      px(ctx, 1, 1, 12, 18, glow);
+      ctx.globalAlpha = 1;
+    }
+    px(ctx, 4, 1, 6, 3, hair);      // hair top
+    px(ctx, 3, 2, 8, 4, hair);      // hair sides
+    px(ctx, 4, 4, 6, 4, skin);      // face
+    px(ctx, 4, 3, 6, 1, hair);      // fringe
+    px(ctx, 5, 6, 1, 1, C_hex(C.monitor)); // eyes
+    px(ctx, 8, 6, 1, 1, C_hex(C.monitor));
+    px(ctx, 3, 8, 8, 7, shirt);     // torso
+    px(ctx, 2, 9, 1, 5, shirt);     // arms
+    px(ctx, 11, 9, 1, 5, shirt);
+    px(ctx, 2, 13, 1, 2, skin);     // hands
+    px(ctx, 11, 13, 1, 2, skin);
+    px(ctx, 4, 15, 2, 4, pants);    // legs
+    px(ctx, 8, 15, 2, 4, pants);
+    px(ctx, 3, 19, 3, 1, C_hex(0x2A1D12)); // shoes
+    px(ctx, 8, 19, 3, 1, C_hex(0x2A1D12));
+    tex.refresh();
+  }
+  function C_hex(n) { return '#' + n.toString(16).padStart(6, '0'); }
+
+  // ---------- content ----------
+  const DESKS = [
+    { x: 190, y: 200 }, { x: 420, y: 200 }, { x: 650, y: 200 },
+    { x: 190, y: 400 }, { x: 420, y: 400 }, { x: 650, y: 400 }
+  ];
+  const DOOR = { x: 66, y: 128 };
+
+  const SEED = [
+    {
+      name: 'Scout', role: 'Research', status: 'working',
+      task: 'Pulling pricing pages for 6 competitors',
+      log: ['fetch gather.town/pricing → ok (4 tiers)', 'fetch sowork.com/pricing → ok', 'fetch kumospace.com/pricing → 403, retrying', 'retry via cache → ok', 'normalising per-seat vs flat…', '4 of 6 complete'],
+      look: { hair: '#3B2A1E', skin: '#D9A277', shirt: '#2F6B63', pants: '#2A2E33', glow: '#7FD4C6' }
+    },
+    {
+      name: 'Scribe', role: 'Writing', status: 'done',
+      task: 'Drafting the changelog for v2.1',
+      log: ['read 24 merged PRs since v2.0', 'grouped into 5 themes', 'drafted 340 words', 'flagged 2 breaking changes', 'done — waiting for your review'],
+      look: { hair: '#5A3418', skin: '#EBC49A', shirt: '#C8873F', pants: '#33302B', glow: '#F3C98B' }
+    },
+    {
+      name: 'Auditor', role: 'Review', status: 'blocked',
+      task: 'Weekly funnel check',
+      log: ['connected to warehouse → ok', 'query signups_daily → ok', 'query activation_events → PERMISSION DENIED', 'retried 3× — same', 'BLOCKED: needs analytics dashboard access'],
+      look: { hair: '#22201E', skin: '#B87F55', shirt: '#8C4B4B', pants: '#2A2E33', glow: '#E08A86' }
+    },
+    {
+      name: 'Builder', role: 'Engineering', status: 'working',
+      task: 'Refactoring the auth module',
+      log: ['read src/auth/*.ts (7 files)', 'extracted session logic → session.ts', 'updated 12 call sites', 'running test suite…', '38 passing, 2 failing — investigating'],
+      look: { hair: '#1E1B18', skin: '#8C5F3C', shirt: '#3E5F8A', pants: '#242830', glow: '#8FB6E8' }
+    }
+  ];
+
+  const ROLE_MAP = [
+    { kw: ['research', 'competitor', 'find', 'market', 'look up', 'search'], role: 'Research', name: 'Scout' },
+    { kw: ['write', 'draft', 'copy', 'blog', 'post', 'changelog', 'doc'], role: 'Writing', name: 'Scribe' },
+    { kw: ['review', 'check', 'audit', 'qa', 'test', 'verify'], role: 'Review', name: 'Auditor' },
+    { kw: ['build', 'code', 'fix', 'refactor', 'ship', 'bug', 'deploy'], role: 'Engineering', name: 'Builder' },
+    { kw: ['schedule', 'calendar', 'meeting', 'book', 'plan'], role: 'Scheduling', name: 'Steward' },
+    { kw: ['design', 'mockup', 'ui', 'brand', 'logo'], role: 'Design', name: 'Drafter' }
+  ];
+  const PALETTES = [
+    { hair: '#3B2A1E', skin: '#D9A277', shirt: '#4E7A5C', pants: '#2A2E33', glow: '#93D6A6' },
+    { hair: '#4A2C1A', skin: '#EBC49A', shirt: '#7A5490', pants: '#2E2A33', glow: '#C09BD8' },
+    { hair: '#211E1B', skin: '#A06E48', shirt: '#B5763A', pants: '#332E28', glow: '#F0B679' }
+  ];
+  const STATUS_COL = { working: C.ochre, blocked: C.red, done: C.green };
+
+  // ---------- DOM ----------
+  const D = id => document.getElementById(id);
+  const panel = D('panel'), termEl = D('terminal'), termLines = D('termLines'), toast = D('toast');
+  let logTimer = null;
+
+  function showToast(msg) {
+    toast.textContent = msg; toast.classList.add('on');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toast.classList.remove('on'), 2600);
+  }
+
+  function openPanel(a) {
+    D('panelRole').textContent = a.role;
+    D('panelName').textContent = a.name;
+    const s = D('panelStatus');
+    s.textContent = a.status;
+    s.style.background = { working: '#3A2C14', blocked: '#3A1E1E', done: '#1E3128' }[a.status];
+    s.style.color = { working: '#E0A458', blocked: '#C25450', done: '#6FA88A' }[a.status];
+    D('panelTask').textContent = a.task;
+
+    const logEl = D('panelLog');
+    logEl.textContent = '';
+    panel.classList.add('on');
+
+    // type the log out so it reads live
+    clearInterval(logTimer);
+    const full = a.log.map(l => '› ' + l).join('\n');
+    let i = 0;
+    logTimer = setInterval(() => {
+      i += 2;
+      logEl.textContent = full.slice(0, i);
+      logEl.scrollTop = logEl.scrollHeight;
+      if (i >= full.length) clearInterval(logTimer);
+    }, 12);
+  }
+  D('panelClose').onclick = () => { panel.classList.remove('on'); clearInterval(logTimer); };
+
+  // ---------- terminal view ----------
+  function buildTerminal(agents) {
+    const rows = [];
+    agents.forEach(a => {
+      rows.push(`<span class="dim">[agent:${a.name.toLowerCase()}]</span> ${a.task}`);
+      a.log.forEach(l => rows.push(`<span class="dim">  ${l}</span>`));
+      rows.push('');
+    });
+    rows.push('<span class="amb">$ _</span>');
+    termLines.innerHTML = rows.join('\n');
+  }
+  function toggleTerminal() {
+    const on = termEl.classList.toggle('on');
+    D('viewToggle').innerHTML = on ? 'workspace view <b>[T]</b>' : 'terminal view <b>[T]</b>';
+  }
+  D('termHint').onclick = toggleTerminal;
+  D('viewToggle').onclick = toggleTerminal;
+
+  // T works from anywhere on the page, except while typing in the spawn box.
+  window.addEventListener('keydown', e => {
+    if (e.key !== 't' && e.key !== 'T') return;
+    if (document.activeElement === D('spawnInput')) return;
+    e.preventDefault();
+    toggleTerminal();
+  });
+
+  // ---------- scene ----------
+  class Room extends Phaser.Scene {
+    constructor() { super('room'); }
+
+    create() {
+      this.agents = [];
+      this.freeDesks = DESKS.slice();
+
+      this.drawRoom();
+
+      // sprite textures
+      SEED.forEach((a, i) => makePerson(this, 'agent' + i, a.look));
+      makePerson(this, 'player', { hair: '#2B211A', skin: '#C98B5E', shirt: '#F0E2C8', pants: '#2A2E33', glow: null });
+
+      // seat the seeded agents
+      SEED.forEach((a, i) => this.seatAgent({ ...a }, 'agent' + i, this.freeDesks.shift(), false));
+
+      // player
+      this.player = this.physics.add.sprite(480, 520, 'player').setScale(3).setDepth(500);
+      this.player.body.setSize(10, 8).setOffset(2, 12);
+      this.physics.add.collider(this.player, this.solids);
+      this.cursors = this.input.keyboard.createCursorKeys();
+      this.keys = this.input.keyboard.addKeys('W,A,S,D');
+
+      buildTerminal(this.agents);
+    }
+
+    drawRoom() {
+      const g = this.add.graphics().setDepth(0);
+
+      // floor
+      for (let y = 96; y < H; y += 24) {
+        for (let x = 0; x < W; x += 48) {
+          const off = ((y / 24) % 2) * 24;
+          g.fillStyle((x / 48 + y / 24) % 2 ? C.floorA : C.floorB, 1);
+          g.fillRect(x + off - 48, y, 48, 24);
+        }
+      }
+      g.lineStyle(1, C.floorLine, .35);
+      for (let y = 96; y < H; y += 24) { g.lineBetween(0, y, W, y); }
+
+      // back wall
+      g.fillStyle(C.wall, 1); g.fillRect(0, 0, W, 96);
+      g.fillStyle(C.wallDark, 1); g.fillRect(0, 84, W, 12);
+      g.fillStyle(C.wallTrim, 1);
+      for (let x = 0; x < W; x += 8) g.fillRect(x, 78, 4, 6);
+
+      // windows with warm evening light
+      [230, 470, 710].forEach(x => {
+        g.fillStyle(C.wallDark, 1); g.fillRect(x, 16, 96, 56);
+        g.fillStyle(0xE8B979, 1); g.fillRect(x + 4, 20, 88, 48);
+        g.fillStyle(0xF2D4A2, 1); g.fillRect(x + 4, 20, 88, 18);
+        g.fillStyle(C.wallDark, 1);
+        g.fillRect(x + 46, 16, 4, 56); g.fillRect(x, 42, 96, 4);
+      });
+
+      // door
+      g.fillStyle(0x3A2617, 1); g.fillRect(DOOR.x - 26, 30, 52, 66);
+      g.fillStyle(0x513520, 1); g.fillRect(DOOR.x - 21, 35, 42, 61);
+      g.fillStyle(C.ochre, 1); g.fillRect(DOOR.x + 12, 66, 4, 4);
+
+      // plants + rug for lived-in feel
+      this.blob(g, 880, 140, 0x3E6B4A);
+      this.blob(g, 90,  470, 0x3E6B4A);
+      g.fillStyle(0x7A4A46, .5); g.fillEllipse(480, 520, 300, 120);
+
+      // desks
+      this.solids = [];
+      DESKS.forEach(d => {
+        g.fillStyle(C.desk, 1); g.fillRect(d.x - 52, d.y - 6, 104, 34);
+        g.fillStyle(C.deskTop, 1); g.fillRect(d.x - 52, d.y - 14, 104, 10);
+        g.fillStyle(C.monitor, 1); g.fillRect(d.x - 26, d.y - 48, 52, 34);
+        g.fillStyle(0x2E4A46, 1); g.fillRect(d.x - 22, d.y - 44, 44, 26);
+        g.fillStyle(C.deskTop, 1); g.fillRect(d.x - 6, d.y - 16, 12, 4);
+        // monitor glow on the desk
+        g.fillStyle(0x9FD4C4, .13); g.fillEllipse(d.x, d.y - 4, 120, 34);
+
+        const s = this.add.rectangle(d.x, d.y + 2, 104, 46, 0, 0);
+        this.physics.add.existing(s, true);
+        this.solids.push(s);
+      });
+
+      // wall collider
+      const wallBody = this.add.rectangle(W / 2, 60, W, 120, 0, 0);
+      this.physics.add.existing(wallBody, true);
+      this.solids.push(wallBody);
+
+      // warm vignette
+      const v = this.add.graphics().setDepth(900);
+      v.fillStyle(0x0A1614, .3);
+      v.fillRect(0, 0, W, 26); v.fillRect(0, H - 26, W, 26);
+      v.fillRect(0, 0, 26, H); v.fillRect(W - 26, 0, 26, H);
+    }
+
+    blob(g, x, y, col) {
+      g.fillStyle(0x6B4A2F, 1); g.fillRect(x - 10, y + 8, 20, 14);
+      g.fillStyle(col, 1);
+      g.fillRect(x - 14, y - 16, 28, 24);
+      g.fillRect(x - 8, y - 24, 16, 10);
+    }
+
+    seatAgent(data, texKey, desk, animateIn) {
+      const seatY = desk.y + 34;
+      const startX = animateIn ? DOOR.x : desk.x;
+      const startY = animateIn ? DOOR.y : seatY;
+
+      const spr = this.add.sprite(startX, startY, texKey).setScale(3).setDepth(400).setInteractive({ useHandCursor: true });
+
+      const pillBg = this.add.rectangle(desk.x, seatY - 42, 74, 17, 0x070B0B, .88).setDepth(600).setStrokeStyle(1, STATUS_COL[data.status]);
+      const pillTx = this.add.text(desk.x, seatY - 42, data.status.toUpperCase(), {
+        fontFamily: 'ui-monospace, Menlo, monospace', fontSize: '9px', color: C_hex(STATUS_COL[data.status])
+      }).setOrigin(.5).setDepth(601).setResolution(3);
+      const nameTx = this.add.text(desk.x, seatY + 26, data.name, {
+        fontFamily: 'ui-monospace, Menlo, monospace', fontSize: '10px', color: '#F0E2C8'
+      }).setOrigin(.5).setDepth(601).setResolution(3);
+
+      if (animateIn) {
+        [pillBg, pillTx, nameTx].forEach(o => o.setAlpha(0));
+        spr.setDepth(700);
+        // NOTE: the idle bob also tweens `y`. Starting it now would collide with
+        // this walk tween and strand the sprite in the doorway — bob only after
+        // the walk finishes.
+        this.tweens.add({
+          targets: spr, x: desk.x, y: seatY, duration: 1500, ease: 'Sine.easeInOut',
+          onComplete: () => {
+            spr.setDepth(400);
+            this.tweens.add({ targets: [pillBg, pillTx, nameTx], alpha: 1, duration: 300 });
+            showToast(data.name + ' is on it.');
+            this.bob(spr);
+          }
+        });
+      } else {
+        this.bob(spr);
+      }
+
+      const agent = { ...data, spr, pillBg, pillTx, nameTx, desk };
+      spr.on('pointerdown', () => openPanel(agent));
+      this.agents.push(agent);
+      return agent;
+    }
+
+    bob(spr) {
+      this.tweens.add({
+        targets: spr, y: spr.y - 2, duration: 900 + Math.random() * 500,
+        yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: Math.random() * 600
+      });
+    }
+
+    spawn(text) {
+      if (!this.freeDesks.length) { showToast('Every station is taken.'); return; }
+      const lower = text.toLowerCase();
+      let match = ROLE_MAP.find(r => r.kw.some(k => lower.includes(k)));
+      if (!match) match = { role: 'General', name: 'Aide' };
+
+      const taken = this.agents.map(a => a.name);
+      let name = match.name, n = 2;
+      while (taken.includes(name)) name = match.name + ' ' + n++;
+
+      const look = PALETTES[this.agents.length % PALETTES.length];
+      const key = 'spawn' + this.agents.length;
+      makePerson(this, key, look);
+
+      const data = {
+        name, role: match.role, status: 'working',
+        task: text.charAt(0).toUpperCase() + text.slice(1),
+        log: ['request received', 'scoping the work…', 'gathering context from the workspace', 'starting now']
+      };
+      const a = this.seatAgent(data, key, this.freeDesks.shift(), true);
+      buildTerminal(this.agents);
+      return a;
+    }
+
+    update() {
+      const sp = 190, k = this.keys, c = this.cursors, b = this.player.body;
+      let vx = 0, vy = 0;
+      if (c.left.isDown || k.A.isDown) vx = -sp;
+      if (c.right.isDown || k.D.isDown) vx = sp;
+      if (c.up.isDown || k.W.isDown) vy = -sp;
+      if (c.down.isDown || k.S.isDown) vy = sp;
+      if (vx && vy) { vx *= .707; vy *= .707; }
+      b.setVelocity(vx, vy);
+      if (vx < 0) this.player.setFlipX(true);
+      if (vx > 0) this.player.setFlipX(false);
+      this.player.setDepth(400 + this.player.y);
+    }
+  }
+
+  const game = new Phaser.Game({
+    type: Phaser.AUTO,
+    parent: 'game',
+    width: W, height: H,
+    pixelArt: true,
+    roundPixels: true,
+    backgroundColor: '#14312F',
+    physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, parent: 'game', width: W, height: H },
+    scene: [Room]
+  });
+
+  // Projector / external-display insurance: re-fit the canvas whenever the
+  // stage box changes, instead of trusting the window resize event alone.
+  //
+  // Must wait for boot: Phaser.Game() boots asynchronously, and observe() fires
+  // its callback immediately with an initial observation, so refreshing here
+  // straight away hits a scale manager whose canvas is not wired up yet.
+  if (window.ResizeObserver) {
+    game.events.once(Phaser.Core.Events.READY, () => {
+      new ResizeObserver(() => {
+        if (game.isBooted) game.scale.refresh();
+      }).observe(D('stage'));
+    });
+  }
+
+  function submitSpawn() {
+    const input = D('spawnInput');
+    const v = input.value.trim();
+    if (!v) return;
+    const scene = game.scene.getScene('room');
+    if (scene) scene.spawn(v);
+    input.value = '';
+    input.blur();
+  }
+
+  D('spawnBar').addEventListener('submit', e => { e.preventDefault(); submitSpawn(); });
+
+  // Phaser swallows keystrokes at the window level, which eats the Enter key's
+  // implicit form submit. Handle Enter explicitly before stopping propagation.
+  D('spawnInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); submitSpawn(); }
+    e.stopPropagation();
+  });
+})();
+</script>
+</body>
+</html>

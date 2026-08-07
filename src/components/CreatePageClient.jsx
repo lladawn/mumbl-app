@@ -33,7 +33,7 @@ export default function CreatePageClient() {
   }
 
   return (
-    <section className="create-view">
+    <section className="create-view pixel-screen">
       <div className="create-grid">
         <div className="panel">
           <p className="eyebrow">create a room in 30 seconds</p>

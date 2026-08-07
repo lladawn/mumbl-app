@@ -1,5 +1,5 @@
-import HomeView from "../src/components/HomeView";
+import AgentLandingView from "../src/components/AgentLandingView";
 
 export default function HomePage() {
-  return <HomeView />;
+  return <AgentLandingView />;
 }
