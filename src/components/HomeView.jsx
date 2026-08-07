@@ -342,7 +342,7 @@ export default function HomeView() {
                 </p>
               ) : null}
             </form>
-            <Link className="ghost-button button-link" href="/vision" onClick={() => trackPublicCta("vision", { source: "bottom_cta" })}>
+            <Link className="ghost-button button-link" href="/slack/vision" onClick={() => trackPublicCta("vision", { source: "bottom_cta" })}>
               read the vision
             </Link>
             <a className="ghost-button button-link" href={calendlyHref} target="_blank" rel="noreferrer" onClick={() => trackPublicCta("calendly_outbound", { source: "bottom_cta" })}>

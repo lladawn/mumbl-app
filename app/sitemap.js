@@ -15,10 +15,22 @@ export default function sitemap() {
       priority: 0.8,
     },
     {
-      url: `${appUrl}/vision`,
+      url: `${appUrl}/demo`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
+    {
+      url: `${appUrl}/slack`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${appUrl}/slack/vision`,
       lastModified: new Date(),
       changeFrequency: "monthly",
-      priority: 0.8,
+      priority: 0.7,
     },
     {
       url: `${appUrl}/privacy`,

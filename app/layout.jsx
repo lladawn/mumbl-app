@@ -1,7 +1,16 @@
 import Script from "next/script";
+import { Press_Start_2P } from "next/font/google";
 import AnalyticsTracker from "../src/components/AnalyticsTracker";
 import AppShell from "../src/components/AppShell";
 import "../styles.css";
+
+// bitmap display font for headings, labels, buttons, nav. body stays Inter.
+const pixelFont = Press_Start_2P({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://mumbl.wtf";
 const analyticsEnabled = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === "true";
@@ -72,7 +81,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" className={pixelFont.variable}>
       <body>
         <AppShell>{children}</AppShell>
         {analyticsEnabled && umamiWebsiteId ? <AnalyticsTracker /> : null}
