@@ -15,7 +15,8 @@
     "db:status": "supabase migration list --linked",
     "content-encryption:backfill": "node scripts/content-encryption-backfill.mjs",
     "heartbeat:test": "node scripts/heartbeat-test.mjs",
-    "side-quests:smoke": "node scripts/side-quests-smoke.mjs"
+    "side-quests:smoke": "node scripts/side-quests-smoke.mjs",
+    "booking:test": "node scripts/booking-tz-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",

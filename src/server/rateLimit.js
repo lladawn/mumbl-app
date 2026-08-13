@@ -11,6 +11,10 @@ const LIMITS = {
   // hooks fire per tool call, so this is per space and much higher than the
   // human-facing actions above
   agent_ingest: { limit: 300, windowSeconds: 60 },
+  // keyed on the booking host, not a visitor session: a public booking link is
+  // an unauthenticated way to make the app send mail, so the ceiling has to be
+  // per link. Generous for a real calendar, useless as a spam relay.
+  booking_create: { limit: 20, windowSeconds: 60 * 60 },
 };
 
 export async function enforceRateLimit({ supabase, action, sessionToken }) {

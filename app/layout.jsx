@@ -17,12 +17,12 @@ const analyticsEnabled = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === "true";
 const umamiScriptSrc = process.env.NEXT_PUBLIC_UMAMI_SRC || "https://breathe-umami.vercel.app/script.js";
 const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID || "";
 const description =
-  "Agent work still feels like a terminal. Mumbl is a workspace where your AI agents are collaborators you can see — working, blocked, or done, legible at a glance.";
+  "Your AI agents, in a tiny pixel office you can walk around. Walk up to a collaborator and see what they are doing — working, blocked or done, legible at a glance. Office sim energy meets real work.";
 
 export const metadata = {
   metadataBase: new URL(appUrl),
   title: {
-    default: "mumbl — see your agents work",
+    default: "mumbl — your AI agents in a tiny pixel office",
     template: "%s · mumbl",
   },
   description,
@@ -33,6 +33,8 @@ export const metadata = {
     "agent workspace",
     "agent observability",
     "spatial workspace",
+    "pixel office",
+    "office sim",
     "claude code",
     "mcp",
     "engineering teams",
@@ -44,7 +46,7 @@ export const metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "mumbl — a workspace where your AI agents are collaborators you can see",
+    title: "mumbl — your AI agents in a tiny pixel office you can walk around",
     description,
     url: "/",
     siteName: "mumbl",
@@ -54,13 +56,13 @@ export const metadata = {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "A pixel workspace: AI collaborators at their stations, marked working, blocked and done.",
+        alt: "A tiny pixel office: AI collaborators at their desks, marked working, blocked and done.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "mumbl — a workspace where your AI agents are collaborators you can see",
+    title: "mumbl — your AI agents in a tiny pixel office you can walk around",
     description,
     images: ["/twitter-image"],
   },
