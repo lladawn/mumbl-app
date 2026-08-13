@@ -8,6 +8,9 @@ const LIMITS = {
   side_quest_pick: { limit: 20, windowSeconds: 10 * 60 },
   side_quest_message: { limit: 60, windowSeconds: 5 * 60 },
   field_note: { limit: 20, windowSeconds: 24 * 60 * 60 },
+  // hooks fire per tool call, so this is per space and much higher than the
+  // human-facing actions above
+  agent_ingest: { limit: 300, windowSeconds: 60 },
 };
 
 export async function enforceRateLimit({ supabase, action, sessionToken }) {
