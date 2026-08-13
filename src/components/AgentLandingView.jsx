@@ -41,7 +41,8 @@ function Person({ look, ai = false }) {
   const tx = look.build === "slim" ? 4 : 3;
   const tw = look.build === "slim" ? 6 : look.build === "broad" ? 9 : 8;
   const legL = tx + 1;
-  const legR = tx + tw - 3;
+  // a slim torso is only 6 wide, so the usual offsets make the legs touch
+  const legR = tx + tw - (tw >= 8 ? 3 : 2);
   const plainTop = hairStyle === "short" || hairStyle === "long" || hairStyle === "bun";
 
   return (
@@ -155,10 +156,9 @@ function Person({ look, ai = false }) {
       {/* one accessory */}
       {accessory === "glasses" ? (
         <>
-          <rect x="4" y="6" width="1" height="1" fill={LINE} />
-          <rect x="9" y="6" width="1" height="1" fill={LINE} />
-          <rect x="6" y="6" width="2" height="1" fill={LINE} />
           <rect x="4" y="5" width="6" height="1" fill={LINE} />
+          <rect x="3" y="5" width="1" height="2" fill={LINE} />
+          <rect x="10" y="5" width="1" height="2" fill={LINE} />
         </>
       ) : accessory === "headphones" ? (
         <>
@@ -491,11 +491,15 @@ export default function AgentLandingView() {
     <section className="agent-landing pixel-screen">
       <header className="agent-hero">
         <div className="agent-hero-copy">
-          <p className="eyebrow">mumbl — early build</p>
-          <h1>agent work still feels like a terminal.</h1>
+          <p className="eyebrow">office sim energy meets real work</p>
+          {/* Leads with the office, not the problem: people arrive from "a tiny
+              pixel office you can walk around" and should land on the same
+              sentence they got excited about. The terminal argument still runs,
+              one line down. */}
+          <h1>your AI agents, in a tiny pixel office you can walk around.</h1>
           <p className="agent-hero-lede">
-            Most people use a code editor instead — same power, legible surface. Mumbl is a workspace where
-            your AI agents are collaborators you can see.
+            Agent work still feels like a terminal. Most people use a code editor instead — same power,
+            legible surface. Mumbl is that surface for your agents.
           </p>
           <div className="agent-hero-actions">
             <a
@@ -511,7 +515,8 @@ export default function AgentLandingView() {
             <a className="text-link" href="#waitlist">or join the waitlist</a>
           </div>
           <p className="agent-hero-hint">
-            walkable, no signup. type <b>&ldquo;I need help with competitor research&rdquo;</b> and watch what happens.
+            walkable, no signup. wander in, type <b>&ldquo;I need help with competitor research&rdquo;</b> and watch someone
+            walk in and take a desk.
           </p>
           <p className="agent-hero-note">
             A prototype: the interface is real, the agents are scripted. Nothing is connected to your tools yet.

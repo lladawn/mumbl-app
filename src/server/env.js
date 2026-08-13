@@ -17,6 +17,8 @@ export function getServerEnv() {
     patternGraphInsightInterval: positiveInteger(process.env.MUMBL_PATTERN_GRAPH_INSIGHT_INTERVAL, 25),
     patternGraphEnabled: process.env.MUMBL_ENABLE_PATTERN_GRAPH === "true",
     patternGraphTestToolsEnabled: process.env.MUMBL_ENABLE_PATTERN_TEST_TOOLS === "true",
+    resendApiKey: process.env.RESEND_API_KEY,
+    bookingFromEmail: process.env.MUMBL_BOOKING_FROM,
     slackClientId: process.env.SLACK_CLIENT_ID,
     slackClientSecret: process.env.SLACK_CLIENT_SECRET,
     slackSigningSecret: process.env.SLACK_SIGNING_SECRET,

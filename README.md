@@ -64,6 +64,7 @@ Most product routes need the Supabase and app secrets from `.env.example`. Witho
 - Aggregate-only `/explore` page for public-space culture pulse
 - Public sample reads at `/r/it-works-on-my-machine/reads` for seeing Mumbl before adding it to Slack
 - Side Quests: short-lived anonymous 2-person backchannels inside a room
+- Booking desk at `/cal/:handle`: a Calendly-shaped booking link fronted by a walkable pixel office and a receptionist, with `.ics` invites by email — see `docs/booking-desk.md`
 
 ## Product Principles
 
@@ -184,3 +185,19 @@ npm run heartbeat:test
 ```
 
 Use `npm run heartbeat:test -- https://your-deployment-url` to test a deployed environment.
+
+## Booking desk
+
+Create a booking link and its Mon-Fri availability with:
+
+```bash
+node scripts/cal-host-create.mjs --slug disha --name "Disha Agarwalla" --office "DUSK & DAWN" --email you@example.com --tz Asia/Kolkata
+```
+
+Timezone maths has its own regression test:
+
+```bash
+npm run booking:test
+```
+
+Full setup, including the Resend/DNS step for invite emails, is in `docs/booking-desk.md`.

@@ -6431,3 +6431,163 @@ html:has(.shell-soft) body {
 }
 .shell-soft .waitlist-message.success { color: #2E7F5C; }
 .shell-soft .waitlist-message.error { color: #B0554C; }
+
+/* ---------------------------------------------------------------------------
+   Booking desk — /cal/[handle]
+
+   The pixel room is a dark stage sitting on the normal paper page, the way the
+   demo canvas does. The booking flow is HTML on top of it, never drawn into the
+   canvas, so it stays selectable, focusable and screen-reader navigable — this
+   is a link strangers open to finish a chore.
+   --------------------------------------------------------------------------- */
+
+.cal-page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 32px 20px 72px;
+}
+
+.cal-header { margin-bottom: 20px; }
+.cal-office {
+  margin: 0 0 6px;
+  color: var(--gold-ink);
+  font: 700 .68rem/1 var(--px-display);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+/* Press Start 2P is wide, and a host's name is arbitrary text we do not get to
+   shorten — so size down hard and let a long name break rather than run off the
+   edge of a phone. */
+.cal-page h1 {
+  margin: 0;
+  font-size: clamp(1.15rem, 5.2vw, 2.1rem);
+  overflow-wrap: anywhere;
+}
+.cal-header .cal-meta { margin-top: 10px; }
+
+.cal-stage-wrap {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.cal-stage-wrap.has-scene { grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr); }
+
+.cal-stage {
+  position: relative;
+  background: #14312f;
+  border: 3px solid var(--px-edge);
+  box-shadow: var(--px-shadow);
+  overflow: hidden;
+  min-height: 320px;
+  aspect-ratio: 960 / 600;
+}
+.cal-stage canvas { display: block; image-rendering: pixelated; }
+.cal-stage-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #7e8c82;
+  font: .7rem/1 var(--px-display);
+  letter-spacing: .1em;
+}
+
+.cal-stage-hints {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--faint);
+  font-size: .78rem;
+}
+
+.cal-overlay { min-width: 0; }
+
+.cal-desk { display: grid; gap: 14px; align-content: start; }
+
+.cal-speech {
+  border: 2px solid var(--px-edge);
+  background: #14312f;
+  box-shadow: var(--px-shadow-sm);
+  padding: 14px 16px;
+  color: #f0e2c8;
+}
+.cal-speech-who {
+  display: block;
+  color: #e0a458;
+  font: 700 .6rem/1 var(--px-display);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.cal-speech-line { margin: 10px 0 0; font-size: .92rem; line-height: 1.55; }
+
+.cal-panel {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  border: 2px solid var(--px-edge);
+  background: var(--panel);
+  box-shadow: var(--px-shadow-sm);
+  padding: 16px;
+}
+
+.cal-meta, .cal-muted { margin: 0; color: var(--muted); font-size: .84rem; line-height: 1.5; }
+.cal-confirmed-time { margin: 0; font-weight: 700; font-size: 1.02rem; }
+.cal-problem { margin: 0; color: var(--clay-ink); font-size: .84rem; }
+.cal-aside { margin: 0; color: var(--faint); font-size: .76rem; font-style: italic; }
+.cal-back { justify-self: start; }
+.cal-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.cal-cancel-link { text-decoration: none; }
+
+.cal-options { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; width: 100%; }
+.cal-options-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+
+.cal-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  /* comfortably past the 44px touch target minimum */
+  min-height: 46px;
+  padding: 0 14px;
+  border: 2px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink);
+  font: 700 .8rem/1.3 var(--px-font);
+  text-align: left;
+  cursor: pointer;
+  transition: transform .1s steps(2), box-shadow .1s steps(2), border-color .1s;
+}
+.cal-option:hover, .cal-option:focus-visible {
+  border-color: var(--px-edge);
+  box-shadow: var(--px-shadow-sm);
+  transform: translate(-1px, -1px);
+}
+.cal-option-hint { color: var(--faint); font-size: .72rem; font-weight: 600; }
+
+.cal-field { display: grid; gap: 6px; width: 100%; }
+.cal-field > span { color: var(--muted); font-size: .78rem; font-weight: 700; }
+.cal-field input, .cal-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: .9rem;
+}
+.cal-field input:focus, .cal-field textarea:focus { outline: none; border-color: var(--px-edge); }
+.cal-field textarea { resize: vertical; }
+
+@media (max-width: 900px) {
+  /* the room stacks above the flow rather than shrinking beside it; on a phone
+     the picker is what the visitor came for, so it must never be pushed under
+     a canvas that has taken the whole viewport */
+  .cal-stage-wrap.has-scene { grid-template-columns: minmax(0, 1fr); }
+  .cal-stage { aspect-ratio: 520 / 660; max-height: 52vh; }
+  .cal-stage canvas { margin: 0 auto; }
+}

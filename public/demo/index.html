@@ -3,25 +3,25 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>mumbl — a workspace where your AI agents are collaborators you can see</title>
-<meta name="description" content="Agent work still feels like a terminal. Most people use a code editor. Ask for help and a new collaborator walks in." />
+<title>mumbl — your AI agents in a tiny pixel office you can walk around</title>
+<meta name="description" content="Walk around a tiny pixel office where your AI agents work. Ask for help and a new collaborator walks in and takes a desk. Office sim energy, real work." />
 <!-- Static page: no Next metadata here, so these are absolute and hardcoded to
      the production origin. Update if the domain ever changes. -->
-<meta property="og:title" content="mumbl — a workspace where your AI agents are collaborators you can see" />
-<meta property="og:description" content="Walk around a live prototype. Ask for help and a new collaborator walks in and gets to work." />
+<meta property="og:title" content="mumbl — your AI agents in a tiny pixel office you can walk around" />
+<meta property="og:description" content="Walk around a live prototype. Ask for help and a new collaborator walks in, takes a free desk and gets to work." />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="mumbl" />
 <meta property="og:url" content="https://mumbl.wtf/demo" />
 <meta property="og:image" content="https://mumbl.wtf/opengraph-image" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="A pixel workspace: AI collaborators at their stations, marked working, blocked and done." />
+<meta property="og:image:alt" content="A tiny pixel office: AI collaborators at their desks, marked working, blocked and done." />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="mumbl — a workspace where your AI agents are collaborators you can see" />
-<meta name="twitter:description" content="Walk around a live prototype. Ask for help and a new collaborator walks in and gets to work." />
+<meta name="twitter:title" content="mumbl — your AI agents in a tiny pixel office you can walk around" />
+<meta name="twitter:description" content="Walk around a live prototype. Ask for help and a new collaborator walks in, takes a free desk and gets to work." />
 <meta name="twitter:image" content="https://mumbl.wtf/opengraph-image" />
 <link rel="canonical" href="https://mumbl.wtf/demo" />
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%2314312F'/><rect x='4' y='5' width='8' height='6' fill='%23E0A458'/></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23FBF4E8'/><rect x='4' y='5' width='8' height='6' fill='%23F6D9A8'/></svg>" />
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -203,7 +203,7 @@
 <body>
 
 <div class="page-line">
-  <span><strong>mumbl</strong> — agent work still feels like a terminal. most people use a code editor.</span>
+  <span><strong>mumbl</strong> — a tiny pixel office where your AI agents work. walk up and talk to one.</span>
   <span class="page-note">prototype · agents are scripted</span>
 </div>
 
@@ -326,7 +326,9 @@
     // ---- build: torso width and shoulder line ----
     const tx = build === 'slim' ? 4 : 3;
     const tw = build === 'slim' ? 6 : build === 'broad' ? 9 : 8;
-    const legL = tx + 1, legR = tx + tw - 3;
+    // a slim torso is only 6 wide, so the usual leg offsets touch and read as
+    // one block — give the narrow build a wider stance
+    const legL = tx + 1, legR = tx + tw - (tw >= 8 ? 3 : 2);
 
     // ---- hair, drawn behind the face ----
     if (hairStyle === 'hood') {
@@ -400,11 +402,10 @@
 
     // ---- one accessory, drawn last so it reads ----
     if (accessory === 'glasses') {
-      // rims either side of the eyes and a bridge between them — a solid bar at
-      // this size reads as a blindfold
-      px(ctx, 4, 6, 1, 1, LINE); px(ctx, 9, 6, 1, 1, LINE);
-      px(ctx, 6, 6, 2, 1, LINE);
+      // a single brow bar above the eyes. Rims and a bridge fill nearly the
+      // whole 6px face and read as a blindfold, especially blown up.
       px(ctx, 4, 5, 6, 1, LINE);
+      px(ctx, 3, 5, 1, 2, LINE); px(ctx, 10, 5, 1, 2, LINE);
     } else if (accessory === 'headphones') {
       px(ctx, 3, 0, 8, 1, LINE);
       px(ctx, 2, 3, 2, 3, LINE); px(ctx, 10, 3, 2, 3, LINE);
