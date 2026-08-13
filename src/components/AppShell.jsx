@@ -35,7 +35,7 @@ export default function AppShell({ children }) {
   const isPublicFront = homeActive || visionActive || slackActive;
 
   return (
-    <div className={`shell ${homeActive ? "shell-dark" : ""}`}>
+    <div className={`shell ${homeActive ? "shell-soft" : ""}`}>
       <header className="topbar">
         <Link className="brand" href="/" aria-label="go to mumbl home">
           <span className="brand-mark" aria-hidden="true">
