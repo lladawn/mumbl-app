@@ -1,5 +1,11 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+// This frontend is served RAW from `src/` (tauri.conf.json `frontendDist`) —
+// there is no bundler and no import map, so a bare specifier like
+// "@tauri-apps/api/core" cannot be resolved by the webview: the module throws
+// `Failed to resolve module specifier` at load and NOTHING in this file runs
+// (which silently killed every button, Save included). Use the globals that
+// `withGlobalTauri: true` injects instead.
+const { invoke } = window.__TAURI__.core;
+const { listen } = window.__TAURI__.event;
 
 const $ = (id) => document.getElementById(id);
 
