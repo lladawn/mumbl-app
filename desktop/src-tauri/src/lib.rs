@@ -106,11 +106,36 @@ pub fn run() {
                 let _ = tx.send(change);
             });
 
-            // Menubar app: don't keep a dock icon / window on launch.
+            // Menubar `Accessory` app: no dock icon. We still surface the
+            // Settings window on launch (below) so the user never has to hunt
+            // for a menubar tray icon that may be hidden under the notch.
             #[cfg(target_os = "macos")]
             {
                 use tauri::ActivationPolicy;
                 app.set_activation_policy(ActivationPolicy::Accessory);
+            }
+
+            // Closing the Settings window should HIDE it (not destroy it), so
+            // the tray "Settings…" item can reliably re-show it and closing the
+            // window never quits the app.
+            if let Some(win) = app.get_webview_window("main") {
+                let win_for_close = win.clone();
+                win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = win_for_close.hide();
+                        log::info!("settings window close intercepted — hidden, not destroyed");
+                    }
+                });
+
+                // Show + focus the Settings window on launch so the config UI
+                // appears immediately (the window is `visible:false` in
+                // tauri.conf.json). No tray-hunting required.
+                let _ = win.show();
+                let _ = win.set_focus();
+                log::info!("settings window shown on launch");
+            } else {
+                log::error!("main webview window not found at setup — settings UI unavailable");
             }
 
             Ok(())
@@ -140,11 +165,22 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "Quit mumbl helper", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &pause, &sep, &quit])?;
 
+    // Embed the icon at compile time (no runtime unwrap / panic risk). Log its
+    // dimensions at boot so we can confirm it's not degenerate (e.g. 0x0).
+    // NOTE: the menubar icon may be hidden under the notch on crowded bars —
+    // the Settings window (shown on launch) is the primary entry point, so a
+    // hidden tray icon is non-blocking.
+    let icon = tauri::include_image!("icons/icon.png");
+    log::info!(
+        "tray icon embedded ({}x{})",
+        icon.width(),
+        icon.height()
+    );
+
     let _tray = TrayIconBuilder::with_id("mumbl-tray")
-        // Embed the icon at compile time (no runtime unwrap / panic risk) and
-        // render it as a macOS template image so it inverts correctly for
+        // Render the icon as a macOS template image so it inverts correctly for
         // light/dark menubars.
-        .icon(tauri::include_image!("icons/icon.png"))
+        .icon(icon)
         .icon_as_template(true)
         .tooltip("mumbl office helper")
         .menu(&menu)
