@@ -100,6 +100,27 @@ The rest of this doc designs the **visual vocabulary** that C needs — and ever
 
 ---
 
+## 1.5. SHIPPED (branch `feat/office-sim`) — per-app + per-category rendering
+
+The full vocabulary below is now **live in the engine** (`public/office/office-scene.js`) and mirrored on the OG card (`app/office/[slug]/opengraph-image.jsx`), built to the locked owner decisions:
+
+1. **Hybrid-C** cast model (teammates/agents already distinct avatars; recent-stack stand-ins deferred — see data note below).
+2. **Core identity stays constant per actor** — hair/skin/build/outfit come from `PALETTES`/`external_id` and never change. The tool is signalled by a **light accessory + brand accent** on the body + the **desk station** (screen art + prop) + the **badge glyph**. No full outfit swaps.
+3. **Render the SPECIFIC APP first** (owner direction, supersedes the earlier "category-level only" call). The ingest `tool` field already carries the app id (from `desktop/src-tauri/src/catalog.rs`), so resolution is **`tool → category → plain`**:
+   - `TOOL_LOOK[tool]` gives the app's brand **accent** + a short **badge glyph** (`VS`, `Fi`, `Zm`, `#`, `>_`, `N`…) + its **screen painter** + a **category fallback** (station/zone).
+   - `TOOL_SCREEN[key]` paints a **recognizable procedural monitor**: VS Code (dark IDE, blue sidebar, colored code lines), Terminal (black + green prompt), Figma (light canvas + 4-color blocks), Zoom (blue camera tiles), Chrome (white page + 4-color ring), Slack (aubergine sidebar + hash colors), Notion (clean doc + mono `N`).
+   - Unknown/uncatalogued apps fall back to their **category** station; no tool and no category → today's plain seated look (no regression).
+
+**Apps covered** (every `tool` id `catalog.rs` emits): `vscode, cursor, xcode, intellij, pycharm, zed, sublime, terminal, iterm, ghostty, warp` (coding); `figma, sketch, photoshop, illustrator` (design); `zoom, teams, discord, meet` (call); `spotify, apple-music` (music); `notion, obsidian, notes, word` (writing); `chrome, safari, arc, firefox` (browsing); `slack` (chat→browsing zone); `other` (generic focus).
+
+**Procedural-approximation note (asset ceiling):** these are **recognizable-at-a-glance approximations** (brand color + a stylized glyph/screen), NOT pixel-perfect logos. Pixel-perfect per-app **logos** would require the spritesheet/tilemap migration flagged in §2 (a real future cost + an IP review per-logo). Procedural approximation is the v1 posture — it keeps the "no asset pipeline" strength and stays clear of trademark-lockup issues.
+
+**Verified:** `npm run build` passes; the OG card was rendered to PNG with a mixed stack (VS Code · Figma · Zoom · Spotify) and each app reads distinctly (dark IDE vs 4-color canvas vs camera tiles vs green music screen), headline is the specific-app stack. The live Phaser canvas can't be screenshotted headlessly in this environment (needs a browser/WebGL); the OG card shares the exact same rect/color vocabulary, so its render is a faithful proxy for legibility.
+
+**Recent-stack stand-ins — DEFERRED, and why (data need):** the Hybrid-C "dimmed stand-in at recently-used stations" tier needs to know *which tools you used in the last N minutes*. Under privacy posture #2, `agent_events` are **ephemeral (~15 min TTL)** and there is no durable recent-tool history — so today the engine can only light the **current** station per actor. To ship stand-ins we need a small **shape-only recent-tools signal** (e.g. the last k distinct `tool`s per actor within a short rolling window, plaintext, no content). This is a strict subset of the day-recap aggregate specced in §7 — build that first and stand-ins fall out of it. Not blocking the core per-app work.
+
+---
+
 ## 2. Tool → visual vocabulary (the design system)
 
 The distinctiveness budget has four legible-at-42px levers, in priority order:
@@ -232,13 +253,66 @@ The engine already has real seams here; the design has to respect them:
 
 ---
 
+## 7. Day Recap — "Wrapped for your workday" (PROTOTYPE shipped)
+
+A second shareable: not "my office right now" but **"my whole day."** One postable card summarizing which **apps** you used and roughly **how long**, in the office aesthetic, reusing the per-app vocabulary (brand accent + glyph). The "Spotify Wrapped for your workday" flex.
+
+**Prototype:** `app/office/[slug]/recap/opengraph-image.jsx` — a real OG-image route rendering against **representative mock data** (so we have an image to react to). Layout: left column = headline (`disha's day.`) + the day line (`Aug 18 · 6 tools · 9h35 focused`) + stat chips (`focused`, `tools used`) + a **MOST TIME IN** spotlight; right column = a per-app **time chart** (brand-colored bars, glyph chips, durations right-aligned). Verified by rendering to PNG.
+
+```
+  ┌ mumbl ───────────────────────────────────────────────────────┐
+  │  disha's day.                 WHERE THE DAY WENT               │
+  │  Aug 18 · 6 tools · 9h35      [VS] VS Code   ████████████ 4h20 │
+  │  ┌─────────┐ ┌─────────┐      [Sp] Spotify   ████████▁▁▁  3h10 │
+  │  │ 9h35    │ │ 6       │      [Fi] Figma     █████▁▁▁▁▁▁  2h05 │
+  │  │ focused │ │ tools   │      [Zm] Zoom      ████▁▁▁▁▁▁▁  1h40 │
+  │  └─────────┘ └─────────┘      [# ] Slack     ██▁▁▁▁▁▁▁▁▁   55m │
+  │  [VS] MOST TIME IN            [N ] Notion    █▁▁▁▁▁▁▁▁▁▁   35m │
+  │       VS Code · 4h20                                          │
+  │  mumbl.wtf/office/disha/recap                                 │
+  └───────────────────────────────────────────────────────────────┘
+```
+
+**SHAPE-ONLY:** app names + durations only — never a window title, repo, doc name, or any content. Same boundary as the live card. "focused" excludes ambient apps (music/other).
+
+### Data spec — the minimal durable aggregate the real version needs
+
+**Reality:** posture #2 makes `agent_events` **ephemeral (~15 min TTL)**, so there is **no durable day history today**. The recap must NOT resurrect a full event log (that would regress posture #2). Instead it needs a tiny **per-day, per-app AGGREGATE** — shape-only, no content, no per-event rows:
+
+```sql
+-- daily_app_totals: one row per (space actor, day, app). Shape-only rollup — the
+-- SUM of focused seconds, never the events themselves. Respects posture #2: this
+-- is an aggregate, not a log; it carries no titles/URLs/tasks, only the `tool`
+-- shape token + a duration + a coarse day.
+create table daily_app_totals (
+  space_id     uuid    not null,           -- tenant (existing agent_spaces)
+  external_id  text    not null,           -- actor (existing)
+  day          date    not null,           -- civil day in the space's tz
+  tool         text    not null,           -- SHAPE token (vscode/figma/… ; 'other' for uncatalogued)
+  category     text,                        -- SHAPE fallback grouping
+  seconds      integer not null default 0,  -- summed focused seconds that day
+  updated_at   timestamptz not null default now(),
+  primary key (space_id, external_id, day, tool)
+);
+```
+
+**How it fills (no new capture, no heavy storage):** the ingest path already receives `tool` + `occurredAt` heartbeats (~60s coalesced, per the spike). On each write, **increment** `daily_app_totals.seconds` for `(actor, today, tool)` by the dwell since the last heartbeat (clamped to a sane cap so a backgrounded app can't inflate it). That's a single upsert-add per heartbeat — O(1), bounded rows (≤ ~#apps/day/actor), and it's an **aggregate**, so nothing content-bearing is retained. TTL/retention: keep ~30–90 days of these rollups (they're tiny), or fewer — a taste/privacy call.
+
+**Wiring the prototype to real data later (drop-in):** the route already isolates the data shape in `recapMock()` → `mockToRecap()`. Real version: replace `recapMock()` with a read that `SELECT tool, category, sum(seconds) … FROM daily_app_totals WHERE external_id=? AND day=? GROUP BY tool` (owner-scoped, service-role, like the office read), pass it through the same `mockToRecap()` (which already derives top-app / focused / counts), and render unchanged. Public/redacted recap = the same, since the aggregate is already shape-only. A weekly/monthly "Wrapped" is the same query over a wider `day` range.
+
+**Bonus:** this same `daily_app_totals` (or a short rolling-window variant) is exactly the **recent-tools signal** the Hybrid-C stand-ins need (§1.5) — build the aggregate once, get both the recap and the stand-ins.
+
+---
+
 ## 6. Open questions for the owner (the taste calls)
 
-1. **Character model — confirm Hybrid (C)?** Specifically: do you want **recent-stack stand-ins** (ghosted "you were just here" presence, the breadth flex) or is that too busy / does it read as "phantom clones"? If you'd rather keep it strictly one-body-one-you, we ship **A** (this design degrades to A for free).
-2. **Is "you" ever a costumed mascot, or always a neutral human?** The costume-per-category read (hoodie for coding, apron for design) is what makes the *body* legible out of zone. But it means "you" visibly change outfits as you switch tools. Cute and expressive — or do you want *you* to stay one consistent look and let only the **station/prop** carry the category? (This is the single biggest taste fork in §2.)
-3. **Music as prop-only vs a body.** I've proposed music = spinning record player with **no person** (it's a vibe, not a worker, and it never eats a desk). Agree, or do you want a little DJ/listener body when Spotify's on?
-4. **Distinctiveness ceiling — category-level is enough for v1?** Figma and Sketch both read as "design"; VS Code and a terminal both as "coding." Going per-*tool* means the spritesheet migration (§2). Confirm category-level distinctiveness is the v1 target (recommended) so we stay procedural.
-5. **Palette discipline.** I reused the existing category accent colors (green/violet/pink/sky/amber/coral) so it stays on-brand with the current room. Any category whose color you'd change for stronger contrast on the card?
+_(Q2/Q4 are now resolved by locked owner decisions — recorded in §1.5. Remaining calls:)_
+
+1. **Recent-stack stand-ins — build now or later?** Needs the `daily_app_totals` aggregate (§7) since `agent_events` are ephemeral. Build the aggregate first (it also powers the recap), then stand-ins are cheap. Confirm you want the ghosted "you were just here" presence at all, vs strictly one-body-one-you.
+2. **Brand-color fidelity vs the room's soft palette.** The per-app accents lean toward real brand hues (VS Code blue, Figma red/orange, Spotify green) for recognizability, but the office palette is deliberately soft/pastel. Do you want the app accents pulled toward the pastel family (more cohesive room, slightly less "instantly Spotify"), or kept punchy for recognizability (current)?
+3. **Procedural approximation ceiling — good enough?** The app screens/glyphs are recognizable approximations, not logos (logos = spritesheet migration + per-logo IP review). Confirm approximations are the v1 bar.
+4. **Recap cadence + what counts as "focused."** The recap prototype defines "focused" as non-ambient app time (music/other excluded). Agree? And is the shareable a **daily** recap, a **weekly** "Wrapped," or both?
+5. **Recap retention window.** `daily_app_totals` is tiny; how many days do we keep (30/90/forever)? A privacy call, not a technical one.
 
 ---
 
