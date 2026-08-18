@@ -63,6 +63,7 @@ pub type FocusSender = mpsc::UnboundedSender<FocusChange>;
 /// Spawn the watcher task and return a sender the platform hook feeds.
 pub fn spawn(app: AppHandle) -> FocusSender {
     let (tx, rx) = mpsc::unbounded_channel::<FocusChange>();
+    log::info!("focus watcher starting");
     tauri::async_runtime::spawn(run(app, rx));
     tx
 }

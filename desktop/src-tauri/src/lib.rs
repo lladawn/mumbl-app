@@ -83,6 +83,13 @@ fn get_last_receipt(app: AppHandle) -> Option<Receipt> {
 
 pub fn run() {
     tauri::Builder::default()
+        // Install a logger first so `log::info!`/errors surface in the
+        // `tauri dev` console (silent-failure was masking tray/watcher issues).
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
         .plugin(tauri_plugin_store::Builder::new().build())
         .manage(LastReceipt::default())
         .setup(|app| {
@@ -134,7 +141,11 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let menu = Menu::with_items(app, &[&open, &pause, &sep, &quit])?;
 
     let _tray = TrayIconBuilder::with_id("mumbl-tray")
-        .icon(app.default_window_icon().unwrap().clone())
+        // Embed the icon at compile time (no runtime unwrap / panic risk) and
+        // render it as a macOS template image so it inverts correctly for
+        // light/dark menubars.
+        .icon(tauri::include_image!("icons/icon.png"))
+        .icon_as_template(true)
         .tooltip("mumbl office helper")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -150,6 +161,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             }
         })
         .build(app)?;
+    log::info!("tray built (menubar icon installed)");
     Ok(())
 }
 
