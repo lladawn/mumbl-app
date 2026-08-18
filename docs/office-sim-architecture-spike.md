@@ -365,3 +365,15 @@ interface PublicOfficeState {
   generatedAt: string;
 }
 ```
+
+---
+
+## Privacy posture (DECIDED — posture #2, ephemeral relay)
+
+The office is a thin relay, not a surveillance log. Implemented in Phase 1 (branch `feat/office-sim-phase1`):
+
+- **Stored:** only the current *shape* of work per agent (the `agents` upsert). The office renders from that alone. Content stays encrypted; the public card never exposes task strings (`redactForPublic`).
+- **`agent_events`:** a short panel trail, not history. Each event gets `expires_at = now + MUMBL_OFFICE_EVENT_TTL_MINUTES` (default 15). Reads exclude expired rows; writes purge lapsed rows. Migration `0008_agent_events_ephemeral.sql`.
+- **History:** OFF by default. `MUMBL_OFFICE_HISTORY=true` retains events (no TTL/purge) — explicit opt-in only.
+- **Offline:** if the freshest agent hasn't been seen within `MUMBL_OFFICE_OFFLINE_MINUTES` (default 5), the live page + public card render an "away" empty office — never a stale live-looking snapshot.
+- **Fully local option** remains available: if a user never shares, nothing needs to leave their machine (relevant once the desktop helper lands).
