@@ -85,20 +85,261 @@
     call: { glyph: "☎", bg: 0x2E3A4A, ink: "#BEE7F7" },
     music: { glyph: "♪", bg: 0x2E4A3A, ink: "#9BD8B4" },
     writing: { glyph: "✎", bg: 0x4A3A2E, ink: "#F8DFA0" },
+    browsing: { glyph: "⌂", bg: 0x2E3A42, ink: "#F4B3A6" },
+    focus: { glyph: "•", bg: 0x33383A, ink: "#C7D2CE" },
+    other: { glyph: "•", bg: 0x33383A, ink: "#C7D2CE" },
   };
 
-  // --- PROOF-OF-CONCEPT (docs/office-visual-design.md, Phase 1) ------------
-  // Makes a few tools read as DISTINCT CHARACTERS by mapping category → costume
-  // knobs makePerson already supports (outfit/accessory/accent). This is the
-  // smallest change that makes coding/design/call visibly different bodies in
-  // the real engine — no new sprites, no asset pipeline. Categories not listed
-  // here (and agent/unknown) fall through to today's look with no regression.
-  // Non-costume categories can be added later; this slice is deliberately small.
+  // --- Tool → visual vocabulary (docs/office-visual-design.md §2) ----------
+  // Locked owner decisions: (1) Hybrid-C; (2) an actor's CORE identity stays
+  // constant (hair/skin/build/outfit come from PALETTES/external_id) — the tool
+  // is signalled by a LIGHT ACCESSORY change + accent + the desk's STATION PROP,
+  // NOT a full outfit swap; (3) category-level, procedural, no spritesheet.
+  //
+  // So CATEGORY_LOOK only ever overrides `accessory` + `accent` — never outfit,
+  // hair, skin, or build. The heavy lifting of "what tool is this" is carried by
+  // stationProp() (the desk prop) + the badge glyph, both of which survive the
+  // animation-free OG card. accent is the sprite's trim colour; screen tints the
+  // monitor. Categories not listed fall through to the actor's plain look.
   const CATEGORY_LOOK = {
-    coding: { outfit: "hoodie", accessory: "headphones", accent: "#9BD8B4" },
-    design: { outfit: "apron", accessory: "scarf", accent: "#F6BCD1" },
-    call: { outfit: "plain", accessory: "headphones", accent: "#BEE7F7" },
+    coding:   { accessory: "headphones", accent: "#9BD8B4", screen: 0x1E262B },
+    review:   { accessory: "glasses",    accent: "#CFBBF0", screen: 0x241E2E },
+    design:   { accessory: "scarf",      accent: "#F6BCD1", screen: 0xF6BCD1 },
+    call:     { accessory: "headphones", accent: "#BEE7F7", screen: 0xBEE7F7 },
+    writing:  { accessory: "glasses",    accent: "#F8DFA0", screen: 0xF3E4B8 },
+    browsing: { accessory: "none",       accent: "#F4B3A6", screen: 0xF4B3A6 },
+    music:    { accessory: "headphones", accent: "#9BD8B4", screen: 0x2E4A3A },
+    focus:    { accessory: "none",       accent: "#C7D2CE", screen: 0x9FB3BE },
+    other:    { accessory: "none",       accent: "#C7D2CE", screen: 0x9FB3BE },
   };
+
+  // Per-category STATION PROP painters. Each draws the signature desk object for
+  // a category using the same procedural fillRect primitives as the rest of the
+  // furniture (no assets). Signature: (scene, g, x, y, objs, desk) where g is a
+  // graphics layer already at desk depth, (x,y) is the desk centre, and objs is
+  // the list to push any animated Phaser objects into (so they can be destroyed
+  // when the category changes). The STATIC shape carries the read; tweens only
+  // reinforce it — the same shapes are mirrored as static divs on the OG card.
+  const S = {
+    codeGreen: 0x9BD8B4, codeDim: 0x4E7D66, screenDark: 0x1E262B,
+    pink: 0xF6BCD1, pinkDk: 0xE29CBE, violet: 0xCFBBF0, sky: 0xBEE7F7,
+    amber: 0xF8DFA0, coral: 0xF4B3A6, paper: 0xFFFBF0, ink: 0x59696E,
+    wood: 0xCBA87C, vinyl: 0x2A2622, grey: 0xC7D2CE, metal: 0xB7C9CB,
+  };
+  const STATION_DRAW = {
+    // CODING — dark IDE screen with green code lines + a small terminal caret.
+    coding(scene, g, x, y, objs) {
+      g.fillStyle(S.codeGreen, 0.9); g.fillRect(x - 19, y - 42, 18, 2);
+      g.fillStyle(S.codeDim, 0.9); g.fillRect(x - 19, y - 38, 26, 2);
+      g.fillStyle(S.codeGreen, 0.9); g.fillRect(x - 15, y - 34, 20, 2);
+      g.fillStyle(S.codeDim, 0.9); g.fillRect(x - 19, y - 30, 14, 2);
+      const caret = scene.add.rectangle(x + 8, y - 30, 3, 4, S.codeGreen).setDepth(y + 32);
+      scene.tweens.add({ targets: caret, alpha: 0.1, duration: 620, yoyo: true, repeat: -1 });
+      objs.push(caret);
+    },
+    // REVIEW — coding screen (diff green/red lines) + a pinned PR ticket w/ a ✓.
+    review(scene, g, x, y, objs) {
+      g.fillStyle(0x86CFA6, 0.9); g.fillRect(x - 19, y - 42, 22, 2);
+      g.fillStyle(0xF09B90, 0.9); g.fillRect(x - 19, y - 38, 16, 2);
+      g.fillStyle(0x86CFA6, 0.9); g.fillRect(x - 19, y - 34, 26, 2);
+      // PR ticket on the desk
+      g.fillStyle(S.paper, 1); g.fillRect(x + 30, y - 12, 16, 12);
+      g.fillStyle(S.violet, 1); g.fillRect(x + 30, y - 12, 16, 3);
+      g.fillStyle(0x2E7F5C, 1); g.fillRect(x + 33, y - 6, 3, 3); g.fillRect(x + 36, y - 8, 2, 5);
+    },
+    // DESIGN — mood-board wall (2x3 swatches) behind the desk + a stylus.
+    design(scene, g, x, y, objs) {
+      const board = scene.add.graphics().setDepth(y - 60);
+      board.fillStyle(0xF3E9DA, 1); board.fillRect(x - 44, y - 92, 40, 28);
+      board.fillStyle(0xCBA87C, 1); board.fillRect(x - 44, y - 92, 40, 2);
+      const sw = [S.coral, S.amber, 0x9BD8B4, S.sky, S.violet, S.pink];
+      let hue = null;
+      sw.forEach((c, i) => {
+        const cx = x - 41 + (i % 3) * 13, cy = y - 88 + Math.floor(i / 3) * 12;
+        const r = scene.add.rectangle(cx + 5, cy + 4, 10, 8, c).setDepth(y - 59);
+        if (i === 4) hue = r;
+        objs.push(r);
+      });
+      objs.push(board);
+      // stylus on the desk
+      g.fillStyle(S.pinkDk, 1); g.fillRect(x + 30, y - 8, 12, 2); g.fillStyle(S.ink, 1); g.fillRect(x + 40, y - 8, 3, 2);
+      if (hue) scene.tweens.add({ targets: hue, alpha: 0.45, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    },
+    // CALL — speech bubble + a "● live" dot floating over the desk.
+    call(scene, g, x, y, objs) {
+      g.fillStyle(S.paper, 1); g.fillRect(x - 6, y - 64, 24, 14); g.fillRect(x - 2, y - 50, 5, 4);
+      g.fillStyle(S.sky, 1); g.fillRect(x - 3, y - 60, 18, 2); g.fillRect(x - 3, y - 56, 12, 2);
+      const dot = scene.add.rectangle(x + 20, y - 60, 5, 5, 0x86CFA6).setDepth(y + 32);
+      scene.tweens.add({ targets: dot, alpha: 0.2, duration: 800, yoyo: true, repeat: -1 });
+      objs.push(dot);
+    },
+    // MUSIC — record player on the desk: spinning vinyl + rising ♪ notes. This is
+    // the "why does theirs have a record player" hook. Reads even with no body.
+    music(scene, g, x, y, objs) {
+      g.fillStyle(S.wood, 1); g.fillRect(x - 20, y - 14, 34, 18);
+      g.fillStyle(S.vinyl, 1); g.fillEllipse(x - 3, y - 5, 22, 14);
+      g.fillStyle(S.coral, 1); g.fillEllipse(x - 3, y - 5, 6, 4);
+      g.fillStyle(0xF0E2C8, 1); g.fillRect(x - 4, y - 6, 2, 2);
+      // tonearm
+      g.fillStyle(S.metal, 1); g.fillRect(x + 8, y - 12, 2, 9);
+      // spinning highlight
+      const spin = scene.add.rectangle(x - 3, y - 9, 3, 3, 0x6E7E79).setDepth(y + 32);
+      scene.tweens.add({ targets: spin, angle: 360, duration: 1400, repeat: -1, ease: "Linear",
+        onUpdate: (tw) => { const a = spin.angle * Math.PI / 180; spin.setPosition(x - 3 + Math.cos(a) * 7, y - 5 + Math.sin(a) * 4); } });
+      objs.push(spin);
+      // rising notes
+      [0, 1].forEach((i) => {
+        const note = scene.add.text(x + 12 + i * 6, y - 10, "♪", { fontFamily: "monospace", fontSize: "10px", color: "#9BD8B4" }).setDepth(y + 33);
+        scene.tweens.add({ targets: note, y: y - 30, alpha: 0, duration: 1800, delay: i * 600, repeat: -1, ease: "Sine.easeOut" });
+        objs.push(note);
+      });
+    },
+    // WRITING — warm desk lamp + a page with a line of ink "writing" across it.
+    writing(scene, g, x, y, objs) {
+      // lamp
+      g.fillStyle(S.metal, 1); g.fillRect(x + 26, y - 6, 2, 8); g.fillRect(x + 20, y - 16, 12, 2);
+      g.fillStyle(S.amber, 1); g.fillRect(x + 18, y - 16, 8, 5);
+      const glow = scene.add.rectangle(x + 24, y - 4, 26, 12, S.amber, 0.18).setDepth(y - 58);
+      objs.push(glow);
+      // page
+      g.fillStyle(S.paper, 1); g.fillRect(x - 20, y - 12, 18, 13);
+      g.fillStyle(S.ink, 0.7); g.fillRect(x - 17, y - 8, 10, 1); g.fillRect(x - 17, y - 5, 12, 1);
+      const inkline = scene.add.rectangle(x - 17, y - 2, 2, 1, S.ink).setOrigin(0, 0.5).setDepth(y + 32);
+      scene.tweens.add({ targets: inkline, scaleX: 6, duration: 1500, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      objs.push(inkline);
+    },
+    // BROWSING — a tablet propped on the desk with scrolling lines.
+    browsing(scene, g, x, y, objs) {
+      g.fillStyle(0x3A4348, 1); g.fillRect(x - 14, y - 16, 22, 15);
+      g.fillStyle(S.coral, 1); g.fillRect(x - 12, y - 14, 18, 3);
+      g.fillStyle(0xEFE7DA, 1); g.fillRect(x - 12, y - 10, 18, 8);
+      const rows = [];
+      for (let i = 0; i < 3; i++) { const r = scene.add.rectangle(x - 11, y - 8 + i * 3, 14, 1, S.ink, 0.6).setOrigin(0, 0.5).setDepth(y + 32); rows.push(r); objs.push(r); }
+      scene.tweens.add({ targets: rows, y: "-=2", duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    },
+    // FOCUS / OTHER — deliberately quiet: a dim desk, a coffee cup, no signature.
+    focus(scene, g, x, y, objs) {
+      g.fillStyle(S.paper, 1); g.fillRect(x + 30, y - 8, 7, 6); g.fillStyle(S.coral, 1); g.fillRect(x + 37, y - 7, 2, 3);
+      const glow = scene.add.rectangle(x, y - 30, 40, 20, 0xBBDCF0, 0.12).setDepth(y + 30);
+      scene.tweens.add({ targets: glow, alpha: 0.04, duration: 2400, yoyo: true, repeat: -1 });
+      objs.push(glow);
+    },
+  };
+  STATION_DRAW.other = STATION_DRAW.focus;
+
+  // --- Per-APP (tool) identity (docs/office-visual-design.md §2a) ----------
+  // Owner direction: the office should read as the SPECIFIC app, not a vague
+  // category. The ingest `tool` field already carries the app id (from the
+  // desktop helper's catalog.rs: 'vscode','figma','chrome','spotify','zoom',
+  // 'slack','notion','terminal', …). We render tool-FIRST, then fall back to
+  // category, then to the plain look. Procedural approximation only — brand
+  // ACCENT COLOR + a recognizable glyph/screen + the category's station/prop.
+  // Pixel-perfect logos would need the spritesheet migration (future cost).
+  //
+  // Each entry: { accent (sprite trim + badge ink), badge (short glyph),
+  //   category (station/zone fallback), screen (monitor painter key in
+  //   TOOL_SCREEN, or null to keep the category screen) }.
+  const TOOL_LOOK = {
+    // ---- coding ----
+    vscode:   { accent: "#4FA5E0", badge: "VS", category: "coding", screen: "vscode" },
+    cursor:   { accent: "#C7D2CE", badge: "Cu", category: "coding", screen: "vscode" },
+    xcode:    { accent: "#4FA5E0", badge: "Xc", category: "coding", screen: "vscode" },
+    intellij: { accent: "#F0A79E", badge: "IJ", category: "coding", screen: "vscode" },
+    pycharm:  { accent: "#9BD8B4", badge: "Py", category: "coding", screen: "vscode" },
+    zed:      { accent: "#6E9FD8", badge: "Ze", category: "coding", screen: "vscode" },
+    sublime:  { accent: "#EFC08A", badge: "Su", category: "coding", screen: "vscode" },
+    // ---- terminal (coding, but a black prompt screen) ----
+    terminal: { accent: "#9BD8B4", badge: ">_", category: "coding", screen: "terminal" },
+    iterm:    { accent: "#9BD8B4", badge: ">_", category: "coding", screen: "terminal" },
+    ghostty:  { accent: "#CFBBF0", badge: ">_", category: "coding", screen: "terminal" },
+    warp:     { accent: "#6E9FD8", badge: ">_", category: "coding", screen: "terminal" },
+    // ---- design ----
+    figma:      { accent: "#F0A79E", badge: "Fi", category: "design", screen: "figma" },
+    sketch:     { accent: "#EFC08A", badge: "Sk", category: "design", screen: "figma" },
+    photoshop:  { accent: "#6E9FD8", badge: "Ps", category: "design", screen: "figma" },
+    illustrator:{ accent: "#EFB472", badge: "Ai", category: "design", screen: "figma" },
+    // ---- call ----
+    zoom:    { accent: "#6E9FD8", badge: "Zm", category: "call", screen: "zoom" },
+    teams:   { accent: "#9E86C8", badge: "Te", category: "call", screen: "zoom" },
+    discord: { accent: "#9E86C8", badge: "Dc", category: "call", screen: "zoom" },
+    meet:    { accent: "#86CFA6", badge: "Mt", category: "call", screen: "zoom" },
+    // ---- music ----
+    spotify:      { accent: "#86CFA6", badge: "Sp", category: "music", screen: null },
+    "apple-music":{ accent: "#F0A79E", badge: "AM", category: "music", screen: null },
+    // ---- writing ----
+    notion:   { accent: "#59696E", badge: "N", category: "writing", screen: "notion" },
+    obsidian: { accent: "#9E86C8", badge: "Ob", category: "writing", screen: "notion" },
+    notes:    { accent: "#F8DFA0", badge: "Nt", category: "writing", screen: "notion" },
+    word:     { accent: "#6E9FD8", badge: "W", category: "writing", screen: "notion" },
+    // ---- browsing ----
+    chrome:  { accent: "#6E9FD8", badge: "Ch", category: "browsing", screen: "chrome" },
+    safari:  { accent: "#6E9FD8", badge: "Sf", category: "browsing", screen: "chrome" },
+    arc:     { accent: "#F6BCD1", badge: "Ac", category: "browsing", screen: "chrome" },
+    firefox: { accent: "#EFB472", badge: "Fx", category: "browsing", screen: "chrome" },
+    // ---- chat (maps to browsing zone per catalog.rs) ----
+    slack:   { accent: "#9E86C8", badge: "#", category: "browsing", screen: "slack" },
+    // ---- generic ----
+    other:   { accent: "#C7D2CE", badge: "•", category: "focus", screen: null },
+  };
+
+  // Monitor-screen painters: draw an app-recognizable picture on the desk's
+  // 46x26 screen (top-left at x-23, y-46). Static — carries the read on the OG
+  // card too. Signature: (g, x, y).
+  const TOOL_SCREEN = {
+    vscode(g, x, y) { // dark IDE, blue accent bar + code lines
+      g.fillStyle(0x1E262B, 1); g.fillRect(x - 23, y - 46, 46, 26);
+      g.fillStyle(0x2C6F9E, 1); g.fillRect(x - 23, y - 46, 4, 26);
+      g.fillStyle(0x4FA5E0, 0.9); g.fillRect(x - 16, y - 42, 18, 2);
+      g.fillStyle(0x86CFA6, 0.85); g.fillRect(x - 16, y - 38, 12, 2);
+      g.fillStyle(0xEFC08A, 0.85); g.fillRect(x - 12, y - 34, 16, 2);
+      g.fillStyle(0x6E7E79, 0.8); g.fillRect(x - 16, y - 30, 20, 2);
+    },
+    terminal(g, x, y) { // black screen, green prompt
+      g.fillStyle(0x11161A, 1); g.fillRect(x - 23, y - 46, 46, 26);
+      g.fillStyle(0x9BD8B4, 1); g.fillRect(x - 19, y - 42, 3, 2); g.fillRect(x - 14, y - 42, 12, 2);
+      g.fillStyle(0x86CFA6, 0.8); g.fillRect(x - 19, y - 37, 18, 2); g.fillRect(x - 19, y - 32, 10, 2);
+      g.fillStyle(0x9BD8B4, 1); g.fillRect(x - 5, y - 32, 4, 2);
+    },
+    figma(g, x, y) { // light canvas + the 4-colour blocks
+      g.fillStyle(0xF3ECE4, 1); g.fillRect(x - 23, y - 46, 46, 26);
+      g.fillStyle(0xF0A79E, 1); g.fillRect(x - 16, y - 42, 8, 8);   // red
+      g.fillStyle(0xEFB472, 1); g.fillRect(x - 6, y - 42, 8, 8);    // orange
+      g.fillStyle(0x86CFA6, 1); g.fillRect(x - 16, y - 32, 8, 8);   // green
+      g.fillStyle(0x6E9FD8, 1); g.fillRect(x - 6, y - 32, 8, 8);    // blue
+      g.fillStyle(0x9E86C8, 1); g.fillRect(x + 4, y - 37, 8, 8);    // purple
+    },
+    zoom(g, x, y) { // blue call screen, camera tiles
+      g.fillStyle(0x2C4A6E, 1); g.fillRect(x - 23, y - 46, 46, 26);
+      g.fillStyle(0x8FB8E0, 1); g.fillRect(x - 19, y - 42, 18, 8); g.fillRect(x + 1, y - 42, 18, 8);
+      g.fillStyle(0xBEE7F7, 1); g.fillRect(x - 19, y - 32, 18, 8); g.fillRect(x + 1, y - 32, 18, 8);
+      g.fillStyle(0xFFFFFF, 0.9); g.fillRect(x - 12, y - 40, 4, 4); g.fillRect(x + 8, y - 40, 4, 4);
+    },
+    chrome(g, x, y) { // white page + the 4-colour ring
+      g.fillStyle(0xFFFFFF, 1); g.fillRect(x - 23, y - 46, 46, 26);
+      g.fillStyle(0xEDEDED, 1); g.fillRect(x - 23, y - 46, 46, 6);
+      g.fillStyle(0xF0A79E, 1); g.fillRect(x - 5, y - 36, 6, 3);
+      g.fillStyle(0x86CFA6, 1); g.fillRect(x - 8, y - 33, 4, 5);
+      g.fillStyle(0xEFC08A, 1); g.fillRect(x + 1, y - 33, 4, 5);
+      g.fillStyle(0x6E9FD8, 1); g.fillRect(x - 4, y - 34, 4, 4);
+    },
+    slack(g, x, y) { // aubergine sidebar + the # colours
+      g.fillStyle(0x3F2A3F, 1); g.fillRect(x - 23, y - 46, 46, 26);
+      g.fillStyle(0xF0A79E, 1); g.fillRect(x - 19, y - 42, 5, 5); g.fillStyle(0x86CFA6, 1); g.fillRect(x - 13, y - 42, 5, 5);
+      g.fillStyle(0xEFC08A, 1); g.fillRect(x - 19, y - 36, 5, 5); g.fillStyle(0x6E9FD8, 1); g.fillRect(x - 13, y - 36, 5, 5);
+      g.fillStyle(0xEADFC7, 0.9); g.fillRect(x - 5, y - 42, 8, 2); g.fillRect(x - 5, y - 38, 6, 2); g.fillRect(x - 5, y - 34, 8, 2);
+    },
+    notion(g, x, y) { // clean white doc, a mono 'N' + text lines
+      g.fillStyle(0xF7F5F1, 1); g.fillRect(x - 23, y - 46, 46, 26);
+      g.fillStyle(0x2A2622, 1); g.fillRect(x - 19, y - 42, 2, 8); g.fillRect(x - 13, y - 42, 2, 8); g.fillRect(x - 18, y - 41, 5, 2);
+      g.fillStyle(0x9AA3A0, 0.9); g.fillRect(x - 6, y - 40, 16, 2); g.fillRect(x - 19, y - 34, 28, 2); g.fillRect(x - 19, y - 30, 20, 2);
+    },
+  };
+
+  // Resolve an actor's app look: tool first, then category, then null (plain).
+  function appLook(a) {
+    const t = a && a.tool ? TOOL_LOOK[a.tool] : null;
+    return t || null;
+  }
   // ------------------------------------------------------------------------
 
   function px(ctx, x, y, w, h, col) { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); }
@@ -212,6 +453,8 @@
         this.agents = [];          // seated actors, keyed by external_id
         this.byId = new Map();
         this.freeDesks = DESKS.slice();
+        this.overflow = new Set();  // actors present but with no free desk → "+N more"
+        this.overflowTag = null;
         this.solids = [];
         this.near = null;
         this.openAgent = null;
@@ -264,6 +507,19 @@
         for (const [id, agent] of this.byId) {
           if (!seen.has(id)) this.removeAgent(agent);
         }
+        // drop overflow ids that are no longer present, then, if seats freed up,
+        // pull waiting actors in from the overflow list
+        for (const id of Array.from(this.overflow)) if (!seen.has(id)) this.overflow.delete(id);
+        if (this.freeDesks.length && this.overflow.size) {
+          for (const a of actors) {
+            if (!this.freeDesks.length) break;
+            if (this.overflow.has(a.externalId) && !this.byId.has(a.externalId)) {
+              this.overflow.delete(a.externalId);
+              this.addAgent(a);
+            }
+          }
+        }
+        this.renderOverflowTag();
 
         this.buildTerminal();
         if (this.openAgent && this.byId.has(this.openAgent.externalId)) {
@@ -272,14 +528,29 @@
       }
 
       lookFor(a) {
-        // a demo actor carries its own look; a live actor gets a stable one
+        // a demo actor carries its own look; a live actor gets a stable one.
         const base = a.look || PALETTES[hashString(a.externalId) % PALETTES.length];
-        // PROOF-OF-CONCEPT: overlay category costume so different tools read as
-        // different characters (docs/office-visual-design.md §2/Phase 1). The
-        // base palette still supplies the person's identity (hair/skin/build);
-        // only the outfit/accessory/accent shift per category.
-        const costume = CATEGORY_LOOK[a.category];
-        return costume ? { ...base, ...costume } : base;
+        // Overlay ONLY the light signal (accessory + accent) — the actor's core
+        // identity (hair/skin/build/outfit) is preserved, per the locked
+        // decision. accent uses the SPECIFIC APP's brand colour first (tool),
+        // then the category, so a VS Code coder trims blue and a Figma designer
+        // trims red. The heavy "which app" read is carried by the screen + prop +
+        // badge, not the body.
+        const app = appLook(a);
+        const cat = CATEGORY_LOOK[a.category];
+        const accent = (app && app.accent) || (cat && cat.accent);
+        const accessory = cat && cat.accessory;
+        if (!accent && !accessory) return base;
+        return { ...base, ...(accessory ? { accessory } : {}), ...(accent ? { accent } : {}) };
+      }
+      // The desk-monitor screen: a specific app paints a recognizable screen
+      // (VS Code / Figma / Zoom / …); otherwise fall back to the category tint.
+      paintScreen(g, a, x, y) {
+        const app = appLook(a);
+        if (app && app.screen && TOOL_SCREEN[app.screen]) { TOOL_SCREEN[app.screen](g, x, y); return true; }
+        const c = CATEGORY_LOOK[(a && a.category) || ""];
+        if (c && c.screen != null) { g.fillStyle(c.screen, 1); g.fillRect(x - 23, y - 46, 46, 26); return true; }
+        return false;
       }
 
       deskFor(a) {
@@ -293,10 +564,10 @@
 
       addAgent(a) {
         const desk = this.deskFor(a);
-        if (!desk) return; // office is full; overflow is a later phase
-        // category is part of the texture key so a costume change re-skins the
-        // sprite (makePerson caches by key). PoC: docs/office-visual-design.md.
-        const key = "actor-" + hashString(a.externalId) + "-" + (a.category || "none");
+        if (!desk) { this.overflow.add(a.externalId); return; } // seats full → counted, shown as "+N more"
+        // tool + category are part of the texture key so an app change re-skins
+        // the sprite accent (makePerson caches by key).
+        const key = this.actorTexKey(a);
         makePerson(this, key, this.lookFor(a));
         const agent = this.seatAgent(a, key, desk);
         this.byId.set(a.externalId, agent);
@@ -308,23 +579,32 @@
         agent.status = a.status;
         agent.currentTask = a.currentTask;
         agent.events = a.events || [];
-        agent.tool = a.tool || null;
         agent.object = a.object || null;
         const col = STATUS_COL[a.status] || STATUS_COL.idle;
         agent.pillBg.setStrokeStyle(2, col);
         agent.pillTx.setText((a.status || "").toUpperCase()).setColor(STATUS_INK[a.status] || STATUS_INK.idle);
         agent.nameTx.setText(a.name);
-        // the desk re-skins if the actor's category changed (e.g. a GitHub actor
-        // moved from coding a push to reviewing a PR)
-        if ((a.category || null) !== agent.category) {
-          agent.category = a.category || null;
-          // PoC: re-skin the costume when the category changes (a coder who
-          // starts a call swaps to a headset). Reuses makePerson's key cache.
-          const key = "actor-" + hashString(agent.externalId) + "-" + (agent.category || "none");
+        // Re-skin the desk when the actor's APP or category changed (a coder who
+        // switches from VS Code to a Zoom call, or a GitHub actor who moves from
+        // a push to a PR review). The screen/prop/badge carry the specific-app
+        // read; the body swaps only its accent + a light accessory.
+        const toolChanged = (a.tool || null) !== agent.tool;
+        const catChanged = (a.category || null) !== agent.category;
+        agent.tool = a.tool || null;
+        agent.category = a.category || null;
+        if (toolChanged || catChanged) {
+          const key = this.actorTexKey(a);
           makePerson(this, key, this.lookFor(a));
           if (agent.spr) agent.spr.setTexture(key);
-          if (agent.desk) this.setCategoryBadge(agent, agent.desk);
+          if (agent.desk) {
+            this.setCategoryBadge(agent, agent.desk);
+            this.setStationProp(agent, agent.desk);
+          }
         }
+      }
+
+      actorTexKey(a) {
+        return "actor-" + hashString(a.externalId) + "-" + (a.tool || "_") + "-" + (a.category || "none");
       }
 
       removeAgent(agent) {
@@ -335,6 +615,7 @@
         if (this.near === agent) this.near = null;
         if (agent.desk) this.freeDesks.push(agent.desk);
         if (agent.badge) { agent.badge.bg.destroy(); agent.badge.tx.destroy(); agent.badge = null; }
+        if (agent.station) { agent.station.forEach((o) => o && o.destroy()); agent.station = null; }
         [agent.pillBg, agent.pillTx, agent.nameTx, agent.spr, agent.shadow].forEach((o) => o && o.destroy());
       }
 
@@ -943,9 +1224,10 @@
           externalId: data.externalId, name: data.name, role: data.role, status,
           category: data.category || null, tool: data.tool || null, object: data.object || null,
           currentTask: data.currentTask, events: data.events || [],
-          spr, shadow, pillBg, pillTx, nameTx, desk, badge: null,
+          spr, shadow, pillBg, pillTx, nameTx, desk, badge: null, station: null,
         };
         this.setCategoryBadge(agent, desk);
+        this.setStationProp(agent, desk);
         spr.on("pointerdown", () => { this.openAgent === agent ? this.closePanel() : this.openPanel(agent); });
         this.agents.push(agent);
         return agent;
@@ -956,17 +1238,71 @@
       // coding desk for GitHub coding/review, etc.). Reuses existing text/rect
       // primitives — no new sprites. Idempotent: recreated when category changes.
       setCategoryBadge(agent, desk) {
-        const spec = CATEGORY_BADGE[agent.category];
         if (agent.badge) { agent.badge.bg.destroy(); agent.badge.tx.destroy(); agent.badge = null; }
-        if (!spec) return;
+        // Badge shows the SPECIFIC APP glyph when the tool is known ('VS','Fi',
+        // 'Zm','#',…), else falls back to the category glyph ('</>','◑',…). The
+        // dark chip is chosen by the app's category so it stays legible.
+        const app = appLook(agent);
+        const cat = (app && app.category) || agent.category;
+        const catSpec = CATEGORY_BADGE[cat];
+        if (!app && !catSpec) return;
+        const glyph = (app && app.badge) || (catSpec && catSpec.glyph);
+        const ink = (app && app.accent) || (catSpec && catSpec.ink) || "#FFF6E4";
+        const bgCol = (catSpec && catSpec.bg) != null ? catSpec.bg : 0x33383A;
         const bx = desk.x + 40, by = desk.y - 40;
-        const bg = this.add.rectangle(bx, by, 26, 16, spec.bg, 0.92).setDepth(1202).setStrokeStyle(1, 0xFFF6E4, 0.6);
-        const tx = this.add.text(bx, by, spec.glyph, {
-          fontFamily: "ui-monospace, Menlo, monospace", fontSize: "9px", color: spec.ink,
+        const bg = this.add.rectangle(bx, by, 26, 16, bgCol, 0.92).setDepth(1202).setStrokeStyle(1, 0xFFF6E4, 0.6);
+        const tx = this.add.text(bx, by, glyph, {
+          fontFamily: "ui-monospace, Menlo, monospace", fontSize: "9px", color: ink,
         }).setOrigin(0.5).setDepth(1203).setResolution(3);
         bg.setAlpha(0); tx.setAlpha(0);
         this.tweens.add({ targets: [bg, tx], alpha: 1, duration: 300 });
         agent.badge = { bg, tx };
+      }
+
+      // The STATION PROP: the signature object on an actor's desk that makes the
+      // tool read at a glance — a dark IDE screen for coding, a mood-board for
+      // design, a record player for music, etc. This carries the "which tool"
+      // read together with the badge; the body only changes a light accessory
+      // (locked decision #2). Built from the same procedural fillRect primitives
+      // as the rest of the furniture — no asset pipeline (decision #3).
+      //
+      // Everything that defines the read is STATIC (shape + colour), so it
+      // survives the animation-free OG share card; tweens are pure reinforcement.
+      // Idempotent: destroyed + rebuilt when the category changes; cleaned up in
+      // removeAgent. Returns a flat list of display objects stored on agent.station.
+      setStationProp(agent, desk) {
+        if (agent.station) { agent.station.forEach((o) => o && o.destroy()); agent.station = null; }
+        // Station/zone falls back to the app's category when the tool is known
+        // (so an uncatalogued app still lands somewhere sensible), then to the
+        // raw category. No category at all → the plain seated look, no prop.
+        const app = appLook(agent);
+        const cat = (app && app.category) || agent.category;
+        if (!cat && !app) return;
+        const objs = [];
+        const g = this.add.graphics().setDepth(desk.y + 31); // just above the desk top
+        objs.push(g);
+        const x = desk.x, y = desk.y;
+        // Paint the desk monitor: the SPECIFIC APP's screen if known (VS Code,
+        // Figma, Zoom, …), else the category tint. Static — reads on the card too.
+        this.paintScreen(g, agent, x, y);
+        (STATION_DRAW[cat] || STATION_DRAW.focus)(this, g, x, y, objs, desk);
+        agent.station = objs;
+      }
+
+      // Overflow indicator: when more actors are present than the 6 desks can
+      // seat, the extras are shown as a single "+N more" pill by reception rather
+      // than dropped silently. They get seated automatically as desks free up.
+      renderOverflowTag() {
+        const n = this.overflow.size;
+        if (!n) { if (this.overflowTag) { this.overflowTag.forEach((o) => o.destroy()); this.overflowTag = null; } return; }
+        const label = "+" + n + " more in the lobby";
+        if (this.overflowTag) { this.overflowTag[1].setText(label); return; }
+        const bx = 900, by = 838;
+        const bg = this.add.rectangle(bx, by, 168, 20, 0xFFF6E4, 0.95).setStrokeStyle(2, 0xE0A458, 0.9).setDepth(1200);
+        const tx = this.add.text(bx, by, label, {
+          fontFamily: "ui-monospace, Menlo, monospace", fontSize: "10px", color: "#8A4B12",
+        }).setOrigin(0.5).setDepth(1201).setResolution(3);
+        this.overflowTag = [bg, tx];
       }
 
       bob(spr) {

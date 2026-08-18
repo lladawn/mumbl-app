@@ -49,6 +49,76 @@ const STATUS_STYLE = {
   idle: { ink: C.idleInk, ring: C.idleRing },
 };
 
+// category → the card's SHAPE vocabulary: monitor screen tint + a short label
+// for the stack headline. Mirrors CATEGORY_LOOK / STATION_DRAW in
+// public/office/office-scene.js so the card reads like the live office. Static
+// only — the shape carries the read (docs/office-visual-design.md §3).
+const CATEGORY_CARD = {
+  coding:   { screen: "#1E262B", accent: "#9BD8B4", label: "coding" },
+  review:   { screen: "#241E2E", accent: "#CFBBF0", label: "reviewing" },
+  design:   { screen: "#F6BCD1", accent: "#F6BCD1", label: "designing" },
+  call:     { screen: "#BEE7F7", accent: "#BEE7F7", label: "on a call" },
+  writing:  { screen: "#F3E4B8", accent: "#F8DFA0", label: "writing" },
+  browsing: { screen: "#F4B3A6", accent: "#F4B3A6", label: "browsing" },
+  music:    { screen: "#2E4A3A", accent: "#9BD8B4", label: "records spinning" },
+  focus:    { screen: "#9FB3BE", accent: "#C7D2CE", label: "heads-down" },
+  other:    { screen: "#9FB3BE", accent: "#C7D2CE", label: "heads-down" },
+  agent:    { screen: "#9BD8B4", accent: "#9BD8B4", label: "agents at work" },
+};
+
+// Specific-app vocabulary (mirrors TOOL_LOOK / TOOL_SCREEN in the live engine).
+// `screen` names a painter in TOOL_SCREEN_RECTS; `category` is the station/zone
+// fallback; `label` is the human name shown in the stack headline. Tool wins
+// over category so the card reads "VS Code · Figma · Zoom", not "coding · …".
+const TOOL_CARD = {
+  vscode: { accent: "#4FA5E0", category: "coding", screen: "vscode", label: "VS Code" },
+  cursor: { accent: "#C7D2CE", category: "coding", screen: "vscode", label: "Cursor" },
+  xcode: { accent: "#4FA5E0", category: "coding", screen: "vscode", label: "Xcode" },
+  intellij: { accent: "#F0A79E", category: "coding", screen: "vscode", label: "IntelliJ" },
+  pycharm: { accent: "#9BD8B4", category: "coding", screen: "vscode", label: "PyCharm" },
+  zed: { accent: "#6E9FD8", category: "coding", screen: "vscode", label: "Zed" },
+  sublime: { accent: "#EFC08A", category: "coding", screen: "vscode", label: "Sublime" },
+  terminal: { accent: "#9BD8B4", category: "coding", screen: "terminal", label: "Terminal" },
+  iterm: { accent: "#9BD8B4", category: "coding", screen: "terminal", label: "iTerm" },
+  ghostty: { accent: "#CFBBF0", category: "coding", screen: "terminal", label: "Ghostty" },
+  warp: { accent: "#6E9FD8", category: "coding", screen: "terminal", label: "Warp" },
+  figma: { accent: "#F0A79E", category: "design", screen: "figma", label: "Figma" },
+  sketch: { accent: "#EFC08A", category: "design", screen: "figma", label: "Sketch" },
+  photoshop: { accent: "#6E9FD8", category: "design", screen: "figma", label: "Photoshop" },
+  illustrator: { accent: "#EFB472", category: "design", screen: "figma", label: "Illustrator" },
+  zoom: { accent: "#6E9FD8", category: "call", screen: "zoom", label: "Zoom" },
+  teams: { accent: "#9E86C8", category: "call", screen: "zoom", label: "Teams" },
+  discord: { accent: "#9E86C8", category: "call", screen: "zoom", label: "Discord" },
+  meet: { accent: "#86CFA6", category: "call", screen: "zoom", label: "Meet" },
+  spotify: { accent: "#86CFA6", category: "music", screen: null, label: "Spotify" },
+  "apple-music": { accent: "#F0A79E", category: "music", screen: null, label: "Apple Music" },
+  notion: { accent: "#59696E", category: "writing", screen: "notion", label: "Notion" },
+  obsidian: { accent: "#9E86C8", category: "writing", screen: "notion", label: "Obsidian" },
+  notes: { accent: "#F8DFA0", category: "writing", screen: "notion", label: "Notes" },
+  word: { accent: "#6E9FD8", category: "writing", screen: "notion", label: "Word" },
+  chrome: { accent: "#6E9FD8", category: "browsing", screen: "chrome", label: "Chrome" },
+  safari: { accent: "#6E9FD8", category: "browsing", screen: "chrome", label: "Safari" },
+  arc: { accent: "#F6BCD1", category: "browsing", screen: "chrome", label: "Arc" },
+  firefox: { accent: "#EFB472", category: "browsing", screen: "chrome", label: "Firefox" },
+  slack: { accent: "#9E86C8", category: "browsing", screen: "slack", label: "Slack" },
+};
+
+// Resolve an actor to its card look: app (tool) first, then category, then agent.
+function cardLook(a) {
+  const t = a && a.tool ? TOOL_CARD[a.tool] : null;
+  const cat = (t && t.category) || (a && a.category) || "agent";
+  const base = CATEGORY_CARD[cat] || CATEGORY_CARD.agent;
+  return {
+    accent: (t && t.accent) || base.accent,
+    screen: base.screen,
+    screenKind: t && t.screen ? t.screen : null,
+    label: (t && t.label) || base.label,
+    category: cat,
+  };
+}
+// back-compat helper used by the headline
+const cardCat = (c) => CATEGORY_CARD[c] || CATEGORY_CARD.agent;
+
 async function loadPublicState(rawSlug) {
   const slug = cleanString(rawSlug, 64).toLowerCase();
   try {
@@ -61,23 +131,33 @@ async function loadPublicState(rawSlug) {
   }
 }
 
+// Stack-shaped headline: the DISTINCT tools/categories currently lit, in order —
+// "this is my stack" instead of a bare status count. Shape-only, never a task.
 function headline(actors) {
-  const working = actors.filter((a) => a.status === "working").length;
-  const blocked = actors.filter((a) => a.status === "blocked").length;
-  const done = actors.filter((a) => a.status === "done").length;
-  const parts = [];
-  if (working) parts.push(`${working} working`);
-  if (blocked) parts.push(`${blocked} blocked`);
-  if (done) parts.push(`${done} done`);
-  if (!parts.length) return "a quiet office right now";
-  return `${actors.length} desk${actors.length === 1 ? "" : "s"} · ${parts.join(" · ")}`;
+  if (!actors.length) return "a quiet office right now";
+  const seen = new Set();
+  const stack = [];
+  for (const a of actors) {
+    const lbl = cardLook(a).label; // specific app name when known
+    if (seen.has(lbl)) continue;
+    seen.add(lbl);
+    stack.push(lbl);
+  }
+  return stack.slice(0, 4).join(" · ");
 }
 
 export default async function Image({ params }) {
   const { slug } = await params;
   const state = await loadPublicState(slug);
-  // shape-only: at most 4 stations rendered, statuses only, no task strings
-  const actors = (state.actors || []).slice(0, 4);
+  const all = state.actors || [];
+  // shape-only: at most 4 stations, chosen for BREADTH (one per distinct
+  // category first, then fill) so the card shows the range of the stack, not
+  // four of the same desk. Statuses/categories only — never a task string.
+  const byCat = [];
+  const seen = new Set();
+  for (const a of all) { const c = a.category || "agent"; if (!seen.has(c)) { seen.add(c); byCat.push(a); } }
+  for (const a of all) { if (byCat.length >= 4) break; if (!byCat.includes(a)) byCat.push(a); }
+  const actors = byCat.slice(0, 4);
   const title = cleanString(slug, 40);
 
   return new ImageResponse(<ShareImage actors={actors} title={title} offline={Boolean(state.offline)} />, size);
@@ -162,13 +242,67 @@ function Pill({ label, ink, ring, left }) {
   );
 }
 
-function Station({ left, look, s, screen }) {
+// Static signature prop per category, mirroring STATION_DRAW in the live engine.
+// Positioned divs only (Satori-safe). Coordinates are relative to the Station's
+// origin, roughly over the desk top. The screen tint + this prop carry the
+// "which tool" read with no animation — which is exactly what the card needs.
+const STATION_PROP_RECTS = {
+  // [left, top, width, height, background, extra?] — relative to the Station.
+  coding: [[-8, 16, 34, 4, "#9BD8B4", { opacity: 0.9 }], [-8, 24, 22, 4, "#4E7D66", { opacity: 0.9 }], [-8, 32, 40, 4, "#9BD8B4", { opacity: 0.9 }]],
+  review: [[-8, 16, 34, 4, "#86CFA6"], [-8, 24, 24, 4, "#F09B90"], [48, 62, 22, 16, "#FFFBF0"], [48, 62, 22, 4, "#CFBBF0"]],
+  design: [
+    [-56, -2, 26, 30, "#F3E9DA"],
+    [-54, 2, 10, 8, "#F4B3A6"], [-42, 2, 10, 8, "#F8DFA0"], [-30, 2, 10, 8, "#9BD8B4"],
+    [-54, 12, 10, 8, "#BEE7F7"], [-42, 12, 10, 8, "#CFBBF0"], [-30, 12, 10, 8, "#F6BCD1"],
+  ],
+  call: [[6, -14, 40, 22, "#FFFBF0"], [12, -8, 26, 4, "#BEE7F7"], [12, -1, 16, 4, "#BEE7F7"], [52, -12, 8, 8, "#86CFA6", { borderRadius: 8 }]],
+  music: [[-40, 52, 60, 30, "#CBA87C"], [-30, 56, 40, 22, "#2A2622", { borderRadius: 20 }], [-14, 64, 8, 6, "#F4B3A6", { borderRadius: 6 }], [14, 52, 4, 16, "#B7C9CB"]],
+  writing: [[44, 40, 4, 16, "#B7C9CB"], [34, 28, 20, 8, "#F8DFA0"], [-36, 60, 30, 20, "#FFFBF0"], [-30, 66, 18, 2, "#59696E", { opacity: 0.7 }], [-30, 72, 22, 2, "#59696E", { opacity: 0.7 }]],
+  browsing: [[-24, 40, 40, 28, "#3A4348"], [-20, 44, 32, 6, "#F4B3A6"], [-20, 52, 32, 12, "#EFE7DA"]],
+  focus: [[46, 62, 12, 10, "#FFFBF0"], [58, 64, 4, 5, "#F4B3A6"]],
+};
+
+// Static signature prop per category, mirroring STATION_DRAW in the live engine.
+// Positioned divs only (Satori-safe); the screen tint + this prop carry the
+// "which tool" read with no animation — exactly what the card needs.
+function StationProp({ category }) {
+  const rects = STATION_PROP_RECTS[category] || STATION_PROP_RECTS.focus;
+  return rects.map(([left, top, width, height, background, extra], i) => (
+    <div key={i} style={{ position: "absolute", left, top, width, height, background, ...(extra || {}) }} />
+  ));
+}
+
+// App-recognizable monitor content, mirroring TOOL_SCREEN in the live engine.
+// Rects are relative to the 76x32 screen box (its top-left is 0,0 here). When a
+// tool paints its own screen we skip the generic white glare so the app art
+// reads cleanly.
+const SCREEN_W = 76, SCREEN_H = 32;
+const TOOL_SCREEN_RECTS = {
+  vscode: [[0, 0, 8, SCREEN_H, "#2C6F9E"], [14, 5, 34, 4, "#4FA5E0"], [14, 12, 22, 4, "#86CFA6"], [22, 19, 30, 4, "#EFC08A"], [14, 26, 38, 4, "#6E7E79"]],
+  terminal: [[0, 0, SCREEN_W, SCREEN_H, "#11161A"], [6, 5, 6, 4, "#9BD8B4"], [16, 5, 24, 4, "#9BD8B4"], [6, 13, 34, 4, "#86CFA6"], [6, 21, 20, 4, "#86CFA6"], [30, 21, 8, 4, "#9BD8B4"]],
+  figma: [[0, 0, SCREEN_W, SCREEN_H, "#F3ECE4"], [10, 5, 14, 14, "#F0A79E"], [28, 5, 14, 14, "#EFB472"], [10, 21, 14, 8, "#86CFA6"], [28, 21, 14, 8, "#6E9FD8"], [46, 10, 16, 16, "#9E86C8"]],
+  zoom: [[0, 0, SCREEN_W, SCREEN_H, "#2C4A6E"], [6, 4, 30, 11, "#8FB8E0"], [40, 4, 30, 11, "#8FB8E0"], [6, 17, 30, 11, "#BEE7F7"], [40, 17, 30, 11, "#BEE7F7"]],
+  chrome: [[0, 0, SCREEN_W, SCREEN_H, "#FFFFFF"], [0, 0, SCREEN_W, 8, "#EDEDED"], [30, 14, 16, 8, "#6E9FD8"], [28, 12, 8, 5, "#F0A79E"], [24, 18, 7, 8, "#86CFA6"], [40, 18, 7, 8, "#EFC08A"]],
+  slack: [[0, 0, SCREEN_W, SCREEN_H, "#3F2A3F"], [6, 5, 8, 8, "#F0A79E"], [16, 5, 8, 8, "#86CFA6"], [6, 15, 8, 8, "#EFC08A"], [16, 15, 8, 8, "#6E9FD8"], [30, 6, 34, 3, "#EADFC7"], [30, 13, 26, 3, "#EADFC7"], [30, 20, 34, 3, "#EADFC7"]],
+  notion: [[0, 0, SCREEN_W, SCREEN_H, "#F7F5F1"], [6, 5, 3, 12, "#2A2622"], [15, 5, 3, 12, "#2A2622"], [8, 6, 8, 3, "#2A2622"], [24, 7, 40, 3, "#9AA3A0"], [6, 17, 58, 3, "#9AA3A0"], [6, 24, 44, 3, "#9AA3A0"]],
+};
+
+function Station({ left, look, s, category, screenKind }) {
+  const screen = cardCat(category).screen;
+  const kindRects = screenKind ? TOOL_SCREEN_RECTS[screenKind] : null;
   return (
     <div style={{ position: "absolute", left, top: 40, display: "flex", width: 14 * s, height: 200 }}>
       <div style={{ position: "absolute", left: -28, top: 0, width: 100, height: 52, background: C.monitor }} />
-      <div style={{ position: "absolute", left: -16, top: 10, width: 76, height: 32, background: screen }} />
-      <div style={{ position: "absolute", left: -8, top: 18, width: 44, height: 5, background: "#FFFFFF", opacity: 0.8 }} />
-      <div style={{ position: "absolute", left: -8, top: 29, width: 26, height: 5, background: "#FFFFFF", opacity: 0.6 }} />
+      <div style={{ position: "absolute", left: -16, top: 10, width: 76, height: 32, background: kindRects ? "#000000" : screen }} />
+      {kindRects
+        ? kindRects.map(([x, y, w, h, bg], i) => (
+            <div key={`sc${i}`} style={{ position: "absolute", left: -16 + x, top: 10 + y, width: w, height: h, background: bg }} />
+          ))
+        : [
+            <div key="g1" style={{ position: "absolute", left: -8, top: 18, width: 44, height: 5, background: "#FFFFFF", opacity: 0.35 }} />,
+            <div key="g2" style={{ position: "absolute", left: -8, top: 29, width: 26, height: 5, background: "#FFFFFF", opacity: 0.25 }} />,
+          ]}
+      <StationProp category={category} />
       <div style={{ position: "absolute", left: -52, top: 58, width: 152, height: 12, background: C.deskTop }} />
       <div style={{ position: "absolute", left: -52, top: 70, width: 152, height: 24, background: C.desk }} />
       <div style={{ position: "absolute", left: -46, top: 94, width: 140, height: 8, borderRadius: 6, background: "#C9AE86", opacity: 0.35 }} />
@@ -188,9 +322,13 @@ function ShareImage({ actors, title, offline }) {
   const stations = offline
     ? []
     : actors.map((a, i) => {
-        const look = LOOKS[i % LOOKS.length];
+        // core identity stays stable (LOOKS[i]); the specific APP only recolours
+        // the sprite accent so the body reads on-tool without a costume swap. The
+        // app screen + prop carry the "which app" read.
+        const cl = cardLook(a);
+        const look = { ...LOOKS[i % LOOKS.length], accent: cl.accent };
         const style = STATUS_STYLE[a.status] || STATUS_STYLE.idle;
-        return { look, status: a.status || "idle", ...style, left: slots[i] || slots[slots.length - 1] };
+        return { look, category: cl.category, screenKind: cl.screenKind, status: a.status || "idle", ...style, left: slots[i] || slots[slots.length - 1] };
       });
   const subhead = offline ? "away · nobody's in right now" : headline(actors);
 
@@ -234,7 +372,7 @@ function ShareImage({ actors, title, offline }) {
         <div style={{ position: "absolute", left: 40, top: 92, width: 1000, height: 4, background: C.carpetEdge }} />
 
         {stations.map((st, i) => (
-          <Station key={i} left={st.left} look={st.look} s={s} screen={st.look.screen} />
+          <Station key={i} left={st.left} look={st.look} s={s} category={st.category} screenKind={st.screenKind} />
         ))}
         {stations.map((st, i) => (
           <Pill key={`p${i}`} label={st.status.toUpperCase()} ink={st.ink} ring={st.ring} left={st.left - 38} />
