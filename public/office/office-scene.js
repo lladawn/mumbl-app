@@ -71,6 +71,22 @@
   const STATUS_COL = { working: 0xEFB472, blocked: 0xF09B90, done: 0x86CFA6, idle: 0xC7D2CE };
   const STATUS_INK = { working: "#9A6516", blocked: "#B0554C", done: "#2E7F5C", idle: "#6E7E79" };
 
+  // category → office object: what a seated actor's desk reads as. The office
+  // self-assembles from the SHAPE the ingest model carries (tool/category/object),
+  // so a GitHub-sourced actor (category 'coding' from a push/PR, 'review' from a
+  // review) reads as a coder at a coding desk. A small glyph tags the desk; the
+  // furniture itself is reused (no asset pipeline). 'object' is a hint — the
+  // renderer owns the final marker, so a source can be re-skinned without a
+  // migration. Unknown/agent categories get no badge (the seated-agent look).
+  const CATEGORY_BADGE = {
+    coding: { glyph: "</>", bg: 0x2A3531, ink: "#9BD8B4" },
+    review: { glyph: "PR", bg: 0x3A2E4A, ink: "#CFBBF0" },
+    design: { glyph: "◑", bg: 0x4A2E3A, ink: "#F6BCD1" },
+    call: { glyph: "☎", bg: 0x2E3A4A, ink: "#BEE7F7" },
+    music: { glyph: "♪", bg: 0x2E4A3A, ink: "#9BD8B4" },
+    writing: { glyph: "✎", bg: 0x4A3A2E, ink: "#F8DFA0" },
+  };
+
   function px(ctx, x, y, w, h, col) { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); }
 
   // stable seat / face across polls — same id always lands the same spot
@@ -271,10 +287,18 @@
         agent.status = a.status;
         agent.currentTask = a.currentTask;
         agent.events = a.events || [];
+        agent.tool = a.tool || null;
+        agent.object = a.object || null;
         const col = STATUS_COL[a.status] || STATUS_COL.idle;
         agent.pillBg.setStrokeStyle(2, col);
         agent.pillTx.setText((a.status || "").toUpperCase()).setColor(STATUS_INK[a.status] || STATUS_INK.idle);
         agent.nameTx.setText(a.name);
+        // the desk re-skins if the actor's category changed (e.g. a GitHub actor
+        // moved from coding a push to reviewing a PR)
+        if ((a.category || null) !== agent.category) {
+          agent.category = a.category || null;
+          if (agent.desk) this.setCategoryBadge(agent, agent.desk);
+        }
       }
 
       removeAgent(agent) {
@@ -284,6 +308,7 @@
         if (this.openAgent === agent) this.closePanel();
         if (this.near === agent) this.near = null;
         if (agent.desk) this.freeDesks.push(agent.desk);
+        if (agent.badge) { agent.badge.bg.destroy(); agent.badge.tx.destroy(); agent.badge = null; }
         [agent.pillBg, agent.pillTx, agent.nameTx, agent.spr, agent.shadow].forEach((o) => o && o.destroy());
       }
 
@@ -890,12 +915,32 @@
 
         const agent = {
           externalId: data.externalId, name: data.name, role: data.role, status,
+          category: data.category || null, tool: data.tool || null, object: data.object || null,
           currentTask: data.currentTask, events: data.events || [],
-          spr, shadow, pillBg, pillTx, nameTx, desk,
+          spr, shadow, pillBg, pillTx, nameTx, desk, badge: null,
         };
+        this.setCategoryBadge(agent, desk);
         spr.on("pointerdown", () => { this.openAgent === agent ? this.closePanel() : this.openPanel(agent); });
         this.agents.push(agent);
         return agent;
+      }
+
+      // The desk's office-object marker: a small glyph pinned to the corner of an
+      // actor's desk that maps their SHAPE category to what the desk reads as (a
+      // coding desk for GitHub coding/review, etc.). Reuses existing text/rect
+      // primitives — no new sprites. Idempotent: recreated when category changes.
+      setCategoryBadge(agent, desk) {
+        const spec = CATEGORY_BADGE[agent.category];
+        if (agent.badge) { agent.badge.bg.destroy(); agent.badge.tx.destroy(); agent.badge = null; }
+        if (!spec) return;
+        const bx = desk.x + 40, by = desk.y - 40;
+        const bg = this.add.rectangle(bx, by, 26, 16, spec.bg, 0.92).setDepth(1202).setStrokeStyle(1, 0xFFF6E4, 0.6);
+        const tx = this.add.text(bx, by, spec.glyph, {
+          fontFamily: "ui-monospace, Menlo, monospace", fontSize: "9px", color: spec.ink,
+        }).setOrigin(0.5).setDepth(1203).setResolution(3);
+        bg.setAlpha(0); tx.setAlpha(0);
+        this.tweens.add({ targets: [bg, tx], alpha: 1, duration: 300 });
+        agent.badge = { bg, tx };
       }
 
       bob(spr) {

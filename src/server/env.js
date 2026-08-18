@@ -29,6 +29,9 @@ export function getServerEnv() {
     officeHistoryEnabled: process.env.MUMBL_OFFICE_HISTORY === "true",
     officeEventTtlMinutes: positiveInteger(process.env.MUMBL_OFFICE_EVENT_TTL_MINUTES, 15),
     officeOfflineMinutes: positiveInteger(process.env.MUMBL_OFFICE_OFFLINE_MINUTES, 5),
+    // GitHub webhook feed (office-sim §7). Secret the repo webhook signs its
+    // payloads with; the receiver verifies X-Hub-Signature-256 against it.
+    githubWebhookSecret: process.env.GITHUB_WEBHOOK_SECRET,
   };
 }
 

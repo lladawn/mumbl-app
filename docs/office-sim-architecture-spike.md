@@ -377,3 +377,46 @@ The office is a thin relay, not a surveillance log. Implemented in Phase 1 (bran
 - **History:** OFF by default. `MUMBL_OFFICE_HISTORY=true` retains events (no TTL/purge) — explicit opt-in only.
 - **Offline:** if the freshest agent hasn't been seen within `MUMBL_OFFICE_OFFLINE_MINUTES` (default 5), the live page + public card render an "away" empty office — never a stale live-looking snapshot.
 - **Fully local option** remains available: if a user never shares, nothing needs to leave their machine (relevant once the desktop helper lands).
+
+---
+
+## GitHub feed (SHIPPED — the third v1 source, branch `feat/office-feed-github`)
+
+The GitHub webhook feed proves the **multi-tool adapter pattern** (§7): a totally different source shape (a server-to-server webhook, zero install) flows through the exact same ingest model — `recordAgentState` — as Claude Code and the desktop helper. A new feed is a new pure function, never a new pipeline.
+
+### Files
+
+- **Receiver:** `app/api/activity/github/route.js` — verifies GitHub's `X-Hub-Signature-256` HMAC over the **raw** body against `GITHUB_WEBHOOK_SECRET` (reject on mismatch, before parsing), resolves the space by ingest token, normalizes via the adapter, and writes through `recordAgentState`.
+- **Adapter (pure, unit-tested):** `src/server/githubAdapter.js` — `verifyGithubSignature(rawBody, header, secret)` (constant-time compare) and `mapGithubEvent(eventName, payload)` → the canonical `{ actor, tool, category, object, status, occurredAt, detail }`. Imports only `node:crypto`, so it runs under plain `node` with no bundler.
+- **Renderer:** `public/office/office-scene.js` — a category→office-object badge (`CATEGORY_BADGE`) tags a seated actor's desk; a GitHub actor (category `coding`/`review`) reads as a **coder at a coding desk**. Reuses existing desk furniture — no asset pipeline.
+- **Tests:** `scripts/github-feed-test.mjs` (`npm run github-feed:test`) — 39 assertions covering the signature gate (valid / wrong-secret / tampered-body / bad-digest / missing-header / missing-secret / non-sha256 / case-insensitive) and the adapter mapping incl. the encrypt-vs-shape split.
+
+### Event → office mapping
+
+| GitHub event | `action` | `category` (SHAPE) | `object` (SHAPE) | `status` | Office object |
+|---|---|---|---|---|---|
+| `push` | — | `coding` | `coding-desk` | `working` | coder at a **coding desk** (`</>` badge) |
+| `pull_request` | opened/reopened/… | `coding` | `coding-desk` | `working` | coding desk |
+| `pull_request` | closed + merged | `coding` | `coding-desk` | `done` | coding desk |
+| `pull_request_review` | — | `review` | `coding-desk` | `working` | **review corner** (`PR` badge) |
+| `issues` | opened/… | `review` | `coding-desk` | `working`/`done` | review corner |
+| anything else (star, fork, ping…) | — | — | — | — | ignored (200 ACK, no write) |
+
+**SHAPE vs CONTENT (the privacy contract):** `tool='github'`, `category`, `object`, `status` are plaintext SHAPE — safe to render and share. Repo `full_name`, branch, PR/issue **titles** are CONTENT: they ride only in `detail`, which `recordAgentState` routes through `encryptContentFields` (encrypted at rest, never decrypted for the public card). A test asserts none of them appear in any shape field. The GitHub actor maps to a **stable agent** keyed `github:<sender.login>` so the same human keeps the same desk/face across events (§4 stable-seat rule).
+
+**Posture #2:** unchanged and reused — events written by this feed carry the same `expires_at` TTL and are swept by the same purge-on-write; `MUMBL_OFFICE_HISTORY=true` retains them. Nothing here regresses the ephemeral-relay posture.
+
+### Required env
+
+- `GITHUB_WEBHOOK_SECRET` — the shared secret the webhook signs payloads with. Without it the route returns 503 (fail closed).
+
+### Pointing a GitHub webhook at it
+
+The space **ingest token** is passed as a query param because GitHub webhooks can't set an `Authorization` header — it's still resolved by the same `hashToken` lookup (`resolveSpaceByIngestToken`) as the Bearer path; no new auth mechanism.
+
+In the repo (or org) settings → **Webhooks → Add webhook**:
+
+- **Payload URL:** `https://<app>/api/activity/github?space=<space-ingest-token>`
+- **Content type:** `application/json`
+- **Secret:** the same value as `GITHUB_WEBHOOK_SECRET`
+- **Events:** "Let me select individual events" → **Pushes**, **Pull requests**, **Issues**, **Pull request reviews** (all other events are ACKed and ignored).
