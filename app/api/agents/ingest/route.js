@@ -58,6 +58,11 @@ export async function POST(request) {
       kind: body.kind,
       detail: body.detail,
       occurredAt: body.occurredAt,
+      // SHAPE fields (plaintext, safe to render/share). Absent from a Claude
+      // Code hook, which is fine: recordAgentState defaults category to 'agent'.
+      tool: body.tool,
+      category: body.category,
+      object: body.object,
     });
 
     return ok({ ok: true, space: space.slug, agent: { id: row.id, name: row.name, status: row.status } });
