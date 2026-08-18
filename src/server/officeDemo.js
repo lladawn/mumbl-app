@@ -136,6 +136,8 @@ export function demoSpaceState(slug = DEMO_SLUG) {
     space: { slug, name: "Demo office" },
     actors,
     generatedAt: new Date().toISOString(),
+    // the seeded cast was "just seen", so the office is live, not away
+    offline: false,
     demo: true,
   };
 }

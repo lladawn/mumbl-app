@@ -23,6 +23,12 @@ export function getServerEnv() {
     slackClientSecret: process.env.SLACK_CLIENT_SECRET,
     slackSigningSecret: process.env.SLACK_SIGNING_SECRET,
     slackTokenEncryptionKey: process.env.MUMBL_SLACK_TOKEN_ENCRYPTION_KEY,
+    // Office-sim privacy posture #2 ("ephemeral relay"). The DB is a thin relay
+    // of the *current* shape of work, not a durable activity log. History is
+    // explicit opt-in; by default events carry a short TTL and are purged.
+    officeHistoryEnabled: process.env.MUMBL_OFFICE_HISTORY === "true",
+    officeEventTtlMinutes: positiveInteger(process.env.MUMBL_OFFICE_EVENT_TTL_MINUTES, 15),
+    officeOfflineMinutes: positiveInteger(process.env.MUMBL_OFFICE_OFFLINE_MINUTES, 5),
   };
 }
 

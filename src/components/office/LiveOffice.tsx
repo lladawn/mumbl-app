@@ -30,6 +30,7 @@ type OfficeActor = {
 type OfficeState = {
   space?: { slug: string; name: string };
   actors: OfficeActor[];
+  offline?: boolean;
   demo?: boolean;
 };
 
@@ -121,10 +122,17 @@ export default function LiveOffice({ slug, initialState }: { slug: string; initi
   }, [wanted]);
 
   const actors = useMemo(() => state.actors || [], [state]);
+  const offline = Boolean(state.offline) && !state.demo;
 
   return (
     <div className={`office-stage-wrap${sceneOn ? " has-scene" : ""}`}>
       <StyleTag />
+
+      {offline ? (
+        <div className="office-offline" role="status">
+          away · this office has been quiet for a while. showing last-known state, not live.
+        </div>
+      ) : null}
 
       {wanted ? (
         <div className="office-stage" ref={stageRef} aria-hidden="true">
@@ -187,6 +195,7 @@ function StyleTag() {
   return (
     <style>{`
       .office-stage-wrap { position: relative; width: 100%; max-width: 960px; margin: 0 auto; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+      .office-offline { margin: 0 0 12px; padding: 8px 14px; border: 2px solid #E3D5BD; border-radius: 8px; background: #FBF4E8; color: #7E8C86; font-size: 12px; letter-spacing: .02em; }
       .office-stage {
         position: relative; width: 100%; aspect-ratio: 960 / 600;
         background: #C7E9E5; border: 3px solid #E2D4BC; border-radius: 10px;

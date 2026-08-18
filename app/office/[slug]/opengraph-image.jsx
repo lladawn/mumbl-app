@@ -80,7 +80,7 @@ export default async function Image({ params }) {
   const actors = (state.actors || []).slice(0, 4);
   const title = cleanString(slug, 40);
 
-  return new ImageResponse(<ShareImage actors={actors} title={title} />, size);
+  return new ImageResponse(<ShareImage actors={actors} title={title} offline={Boolean(state.offline)} />, size);
 }
 
 function personRects(look) {
@@ -179,15 +179,20 @@ function Station({ left, look, s, screen }) {
   );
 }
 
-function ShareImage({ actors, title }) {
+function ShareImage({ actors, title, offline }) {
   const s = 5;
   // spread up to 4 stations across the room band
   const slots = [150, 460, 770, 1000];
-  const stations = actors.map((a, i) => {
-    const look = LOOKS[i % LOOKS.length];
-    const style = STATUS_STYLE[a.status] || STATUS_STYLE.idle;
-    return { look, status: a.status || "idle", ...style, left: slots[i] || slots[slots.length - 1] };
-  });
+  // offline: no cast — we do not paint an absent user's last-known shape as if
+  // it were live. The room shows an empty, lights-low office instead.
+  const stations = offline
+    ? []
+    : actors.map((a, i) => {
+        const look = LOOKS[i % LOOKS.length];
+        const style = STATUS_STYLE[a.status] || STATUS_STYLE.idle;
+        return { look, status: a.status || "idle", ...style, left: slots[i] || slots[slots.length - 1] };
+      });
+  const subhead = offline ? "away · nobody's in right now" : headline(actors);
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: C.paper, color: C.ink, fontFamily: "Arial, Helvetica, sans-serif", padding: "44px 60px 0", position: "relative" }}>
@@ -208,7 +213,7 @@ function ShareImage({ actors, title }) {
           {title}&apos;s office, right now.
         </div>
         <div style={{ marginTop: 16, fontSize: 25, lineHeight: 1.35, color: C.muted, maxWidth: 900 }}>
-          {headline(actors)}
+          {subhead}
         </div>
       </div>
 
@@ -235,8 +240,8 @@ function ShareImage({ actors, title }) {
           <Pill key={`p${i}`} label={st.status.toUpperCase()} ink={st.ink} ring={st.ring} left={st.left - 38} />
         ))}
         {stations.length === 0 ? (
-          <div style={{ position: "absolute", left: 60, top: 150, fontSize: 26, color: C.muted }}>
-            nobody at their desk right now.
+          <div style={{ display: "flex", position: "absolute", left: 60, top: 150, fontSize: 26, color: C.muted }}>
+            {offline ? "the lights are off — this office is away." : "nobody at their desk right now."}
           </div>
         ) : null}
       </div>

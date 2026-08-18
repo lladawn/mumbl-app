@@ -1,4 +1,5 @@
 import { decryptContentFields, encryptContentFields } from "./encryption";
+import { getServerEnv } from "./env";
 import { hashToken } from "./hash";
 import { cleanString } from "./validation";
 
@@ -24,6 +25,22 @@ export const ACTIVITY_CATEGORIES = [
 const EVENTS_PER_ACTOR = 12;
 // Older than this and an actor has "walked out" — the office stops rendering it.
 const STALE_MS = 5 * 60 * 1000;
+
+// Privacy posture #2: the office is an ephemeral relay of the CURRENT shape of
+// work, not a durable log. These knobs come from env (see env.js):
+//   - history OFF (default): events carry a TTL and are purged; reads drop
+//     anything expired.
+//   - history ON (opt-in): events retained, no TTL, no purge.
+//   - offline: if a space's freshest agent hasn't been seen within the offline
+//     window, we render an "away" state instead of a stale live snapshot.
+function officePosture() {
+  const env = getServerEnv();
+  return {
+    historyEnabled: env.officeHistoryEnabled,
+    eventTtlMs: env.officeEventTtlMinutes * 60 * 1000,
+    offlineMs: env.officeOfflineMinutes * 60 * 1000,
+  };
+}
 
 // Hooks fire far more often than a human posts, so the caps here are per space
 // and generous. See rateLimit.js for the enforced numbers.
@@ -120,6 +137,12 @@ export async function recordAgentState(supabase, { spaceId, agent, status, task,
 
   if (upsertError) throw upsertError;
 
+  // Posture #2: default is ephemeral. When history is OFF, the event lapses
+  // after the TTL — invisible to reads immediately, purged shortly after. When
+  // history is ON (opt-in), expires_at stays null and the row is retained.
+  const { historyEnabled, eventTtlMs } = officePosture();
+  const expiresAt = historyEnabled ? null : new Date(Date.now() + eventTtlMs).toISOString();
+
   const { error: eventError } = await supabase.from("agent_events").insert({
     space_id: spaceId,
     agent_id: agentRow.id,
@@ -129,22 +152,49 @@ export async function recordAgentState(supabase, { spaceId, agent, status, task,
     category: cleanCategory,
     object: cleanObject,
     occurred_at: resolveOccurredAt(occurredAt),
+    expires_at: expiresAt,
     encrypted_payload: encryptContentFields("agent_events", { detail: cleanDetail || cleanTask }),
   });
 
   if (eventError) throw eventError;
 
+  // Purge-on-write: this space's own writes sweep its lapsed events, so the DB
+  // stays a thin relay without needing a cron. Best-effort — a failed purge
+  // must not fail the ingest, and reads already exclude expired rows anyway.
+  if (!historyEnabled) {
+    await purgeExpiredEvents(supabase, spaceId).catch(() => {});
+  }
+
   return agentRow;
+}
+
+// Delete this space's lapsed events. Kept narrow (one space) so an ingest only
+// ever pays for its own tenant's cleanup.
+export async function purgeExpiredEvents(supabase, spaceId) {
+  const { error } = await supabase
+    .from("agent_events")
+    .delete()
+    .eq("space_id", spaceId)
+    .not("expires_at", "is", null)
+    .lt("expires_at", new Date().toISOString());
+  if (error) throw error;
 }
 
 /**
  * The owner-scoped read path — the mirror of recordAgentState.
  *
- * Returns each actor's shape (status/name/role/tool/category/object) plus the
- * decrypted current_task and a decrypted activity log ordered by occurred_at
- * (never created_at — hooks land out of order; see 0005). Service-role and
- * server-side: RLS stays closed and the browser never sees keys or ciphertext.
- * The scene adapter turns these rows into seated agents.
+ * The LIVE VIEW is sourced entirely from the `agents` current-state upsert
+ * (last-known shape per collaborator) — the office renders correctly from that
+ * alone. agent_events only enriches the side panel's activity trail, and only
+ * NON-EXPIRED events are ever returned (posture #2: an ephemeral relay, not a
+ * durable log). Returns each actor's shape plus the decrypted current_task and
+ * that short trail, ordered by occurred_at (never created_at — hooks land out
+ * of order; see 0005). Service-role and server-side: RLS stays closed and the
+ * browser never sees keys or ciphertext.
+ *
+ * When the space's freshest agent hasn't been seen within the offline window,
+ * `offline` is set so the caller renders an "away" state rather than a stale
+ * live snapshot.
  */
 export async function readSpaceState(supabase, slug) {
   const cleanSlug = cleanString(slug, 64).toLowerCase();
@@ -167,15 +217,27 @@ export async function readSpaceState(supabase, slug) {
 
   const agents = agentRows || [];
   const generatedAt = new Date().toISOString();
+  const { offlineMs } = officePosture();
 
   if (!agents.length) {
-    return { space: { slug: space.slug, name: space.name }, actors: [], generatedAt };
+    return { space: { slug: space.slug, name: space.name }, actors: [], generatedAt, offline: true };
   }
 
+  // The whole space is offline if even its most-recently-seen agent has gone
+  // quiet past the window. agents are ordered by last_seen_at desc, so [0] is
+  // the freshest.
+  const freshestSeenAt = agents[0].last_seen_at;
+  const offline = Date.now() - new Date(freshestSeenAt).getTime() > offlineMs;
+
+  // Only non-expired events feed the panel. A lapsed row is invisible here the
+  // instant its TTL passes, even before purge-on-write removes it. Null
+  // expires_at = retained (history ON, or legacy rows) and always passes.
+  const nowIso = new Date().toISOString();
   const { data: eventRows, error: eventsError } = await supabase
     .from("agent_events")
     .select("agent_id, kind, status, tool, category, object, occurred_at, encrypted_payload")
     .eq("space_id", space.id)
+    .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
     .order("occurred_at", { ascending: false })
     .limit(EVENTS_PER_ACTOR * agents.length);
   if (eventsError) throw eventsError;
@@ -216,7 +278,7 @@ export async function readSpaceState(supabase, slug) {
     };
   });
 
-  return { space: { slug: space.slug, name: space.name }, actors, generatedAt };
+  return { space: { slug: space.slug, name: space.name }, actors, generatedAt, offline };
 }
 
 /**
@@ -228,7 +290,14 @@ export async function readSpaceState(supabase, slug) {
  * bucket. This is what the OG card and the public page are allowed to see.
  */
 export function redactForPublic(state) {
-  if (!state) return { actors: [], objects: [], generatedAt: new Date().toISOString() };
+  if (!state) return { actors: [], objects: [], offline: true, generatedAt: new Date().toISOString() };
+
+  // Offline guard: never serve a durable-looking snapshot of someone who has
+  // gone away. When offline, the card renders an "away" state with no cast — we
+  // do not expose the last-known shape of an absent user as if it were live.
+  if (state.offline) {
+    return { actors: [], objects: [], offline: true, generatedAt: state.generatedAt || new Date().toISOString() };
+  }
 
   const actors = (state.actors || []).map((a) => ({
     name: cleanString(a.name, 24) || "Someone",
@@ -252,6 +321,7 @@ export function redactForPublic(state) {
   return {
     actors,
     objects: Array.from(counts.values()),
+    offline: false,
     generatedAt: state.generatedAt || new Date().toISOString(),
   };
 }
