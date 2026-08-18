@@ -265,10 +265,20 @@ const STATION_PROP_RECTS = {
 // Static signature prop per category, mirroring STATION_DRAW in the live engine.
 // Positioned divs only (Satori-safe); the screen tint + this prop carry the
 // "which tool" read with no animation — exactly what the card needs.
-function StationProp({ category }) {
+//
+// NOTE: this is deliberately a plain function returning an ARRAY OF ELEMENTS
+// that the caller spreads into its children — NOT a <StationProp /> component.
+// Satori walks the element tree itself and destructures `props` off every node
+// it visits; a function component that returns a bare array hands it an Array
+// as a node, whose `props` is undefined, and the render dies with
+// "Cannot destructure property 'children' of 'p' as it is undefined" — which
+// kills the ImageResponse stream ("failed to pipe response") rather than
+// surfacing as a normal 500. An array in the CHILDREN position is fine, which
+// is how personRects/TOOL_SCREEN_RECTS are already drawn.
+function stationPropRects(category) {
   const rects = STATION_PROP_RECTS[category] || STATION_PROP_RECTS.focus;
   return rects.map(([left, top, width, height, background, extra], i) => (
-    <div key={i} style={{ position: "absolute", left, top, width, height, background, ...(extra || {}) }} />
+    <div key={`prop${i}`} style={{ position: "absolute", left, top, width, height, background, ...(extra || {}) }} />
   ));
 }
 
@@ -302,7 +312,7 @@ function Station({ left, look, s, category, screenKind }) {
             <div key="g1" style={{ position: "absolute", left: -8, top: 18, width: 44, height: 5, background: "#FFFFFF", opacity: 0.35 }} />,
             <div key="g2" style={{ position: "absolute", left: -8, top: 29, width: 26, height: 5, background: "#FFFFFF", opacity: 0.25 }} />,
           ]}
-      <StationProp category={category} />
+      {stationPropRects(category)}
       <div style={{ position: "absolute", left: -52, top: 58, width: 152, height: 12, background: C.deskTop }} />
       <div style={{ position: "absolute", left: -52, top: 70, width: 152, height: 24, background: C.desk }} />
       <div style={{ position: "absolute", left: -46, top: 94, width: 140, height: 8, borderRadius: 6, background: "#C9AE86", opacity: 0.35 }} />
