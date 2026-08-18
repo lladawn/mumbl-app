@@ -87,6 +87,20 @@
     writing: { glyph: "✎", bg: 0x4A3A2E, ink: "#F8DFA0" },
   };
 
+  // --- PROOF-OF-CONCEPT (docs/office-visual-design.md, Phase 1) ------------
+  // Makes a few tools read as DISTINCT CHARACTERS by mapping category → costume
+  // knobs makePerson already supports (outfit/accessory/accent). This is the
+  // smallest change that makes coding/design/call visibly different bodies in
+  // the real engine — no new sprites, no asset pipeline. Categories not listed
+  // here (and agent/unknown) fall through to today's look with no regression.
+  // Non-costume categories can be added later; this slice is deliberately small.
+  const CATEGORY_LOOK = {
+    coding: { outfit: "hoodie", accessory: "headphones", accent: "#9BD8B4" },
+    design: { outfit: "apron", accessory: "scarf", accent: "#F6BCD1" },
+    call: { outfit: "plain", accessory: "headphones", accent: "#BEE7F7" },
+  };
+  // ------------------------------------------------------------------------
+
   function px(ctx, x, y, w, h, col) { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); }
 
   // stable seat / face across polls — same id always lands the same spot
@@ -259,8 +273,13 @@
 
       lookFor(a) {
         // a demo actor carries its own look; a live actor gets a stable one
-        if (a.look) return a.look;
-        return PALETTES[hashString(a.externalId) % PALETTES.length];
+        const base = a.look || PALETTES[hashString(a.externalId) % PALETTES.length];
+        // PROOF-OF-CONCEPT: overlay category costume so different tools read as
+        // different characters (docs/office-visual-design.md §2/Phase 1). The
+        // base palette still supplies the person's identity (hair/skin/build);
+        // only the outfit/accessory/accent shift per category.
+        const costume = CATEGORY_LOOK[a.category];
+        return costume ? { ...base, ...costume } : base;
       }
 
       deskFor(a) {
@@ -275,7 +294,9 @@
       addAgent(a) {
         const desk = this.deskFor(a);
         if (!desk) return; // office is full; overflow is a later phase
-        const key = "actor-" + hashString(a.externalId);
+        // category is part of the texture key so a costume change re-skins the
+        // sprite (makePerson caches by key). PoC: docs/office-visual-design.md.
+        const key = "actor-" + hashString(a.externalId) + "-" + (a.category || "none");
         makePerson(this, key, this.lookFor(a));
         const agent = this.seatAgent(a, key, desk);
         this.byId.set(a.externalId, agent);
@@ -297,6 +318,11 @@
         // moved from coding a push to reviewing a PR)
         if ((a.category || null) !== agent.category) {
           agent.category = a.category || null;
+          // PoC: re-skin the costume when the category changes (a coder who
+          // starts a call swaps to a headset). Reuses makePerson's key cache.
+          const key = "actor-" + hashString(agent.externalId) + "-" + (agent.category || "none");
+          makePerson(this, key, this.lookFor(a));
+          if (agent.spr) agent.spr.setTexture(key);
           if (agent.desk) this.setCategoryBadge(agent, agent.desk);
         }
       }
