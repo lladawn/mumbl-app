@@ -15,11 +15,21 @@
 //!                 apps the user explicitly opted into, plus a shape-only
 //!                 `detail` line. Default posture is share-NOTHING.
 
-mod catalog;
+// NOTE: these modules are exposed `#[doc(hidden)] pub` (rather than private)
+// solely so the throwaway preflight harness in `examples/preflight.rs` can
+// drive the real detection/classification/POST path against a live ingest
+// endpoint. They are NOT a stable public API of the shipping app — nothing in
+// the tray/webview build depends on this visibility. Safe to narrow back to
+// `mod` if the harness is deleted.
+#[doc(hidden)]
+pub mod catalog;
 mod config;
-mod network;
-mod platform;
-mod watcher;
+#[doc(hidden)]
+pub mod network;
+#[doc(hidden)]
+pub mod platform;
+#[doc(hidden)]
+pub mod watcher;
 
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},

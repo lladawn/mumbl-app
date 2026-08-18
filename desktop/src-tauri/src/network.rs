@@ -23,7 +23,7 @@ use crate::watcher::ActivityEvent;
 const TIMEOUT: Duration = Duration::from_secs(4);
 
 #[derive(Serialize)]
-struct Actor {
+struct Agent {
     id: String,
     name: String,
     role: String,
@@ -32,7 +32,10 @@ struct Actor {
 
 #[derive(Serialize)]
 struct Envelope {
-    actor: Actor,
+    // The ingest contract (app/api/agents/ingest/route.js) reads `body.agent`
+    // and 400s with "agent.id is required" if it is missing — it does NOT read
+    // `actor`. Match the canonical envelope in scripts/mumbl-report.mjs.
+    agent: Agent,
     source: String,
     status: String,
     // SHAPE — plaintext, safe to render/share.
@@ -65,7 +68,7 @@ pub async fn deliver(
     };
 
     let envelope = Envelope {
-        actor: Actor {
+        agent: Agent {
             id: format!("desktop:{install_id}"),
             name: display_name.to_string(),
             role: "You".to_string(),
