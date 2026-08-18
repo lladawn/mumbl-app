@@ -1,0 +1,10 @@
+# dependencies
+node_modules/
+
+# rust / tauri build artifacts
+src-tauri/target/
+src-tauri/gen/
+
+# tauri store (local runtime config lives in the OS app-data dir, not the repo,
+# but ignore any stray copy)
+*.log

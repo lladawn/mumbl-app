@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mumbl helper</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="top">
+        <div class="brand">
+          <span class="dot" id="live-dot"></span>
+          <strong>mumbl</strong>
+          <span class="muted">office helper</span>
+        </div>
+        <button id="toggle" class="toggle" type="button">Pause sharing</button>
+      </header>
+
+      <section class="card">
+        <h2>What am I sharing right now?</h2>
+        <div class="receipt" id="receipt">
+          <em class="muted">Nothing sent yet.</em>
+        </div>
+        <p class="fine muted">
+          A live receipt of the last event that left this machine. Only
+          <b>shape</b> ever leaves — app category, never window titles or content.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Connection</h2>
+        <label>
+          Ingest endpoint URL
+          <input id="endpoint" type="url" placeholder="https://mumbl.wtf/api/agents/ingest" />
+        </label>
+        <label>
+          Space slug <span class="muted">(optional, for your reference)</span>
+          <input id="slug" type="text" placeholder="my-space" />
+        </label>
+        <label>
+          Display name <span class="muted">(shown in your office)</span>
+          <input id="name" type="text" placeholder="Disha's Mac" />
+        </label>
+        <label>
+          Ingest token
+          <input id="token" type="password" placeholder="paste your space ingest token" autocomplete="off" />
+        </label>
+        <div class="row">
+          <button id="save" class="primary" type="button">Save</button>
+          <span id="save-status" class="muted"></span>
+        </div>
+        <p class="fine muted">
+          The token is stored in the OS keychain, never in a plaintext file.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Allowlist <span class="muted">(opt-in per app)</span></h2>
+        <p class="fine muted">
+          Nothing is shared by default. Tick the apps you want your office to
+          reflect. Unticked or unknown apps are dropped — they never leave this machine.
+        </p>
+        <div class="allowlist" id="allowlist"></div>
+      </section>
+
+      <footer class="foot muted fine" id="foot"></footer>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
