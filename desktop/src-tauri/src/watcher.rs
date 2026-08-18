@@ -10,9 +10,12 @@
 //!     server's 300/min per-space limit.
 //!   - COALESCE heartbeat: while the same tool stays focused, re-emit at most
 //!     once per ~60s so the office stays "lit" without spamming.
-//!   - OPT-IN + KNOWN ONLY: an app is emitted only if it's on the user's
-//!     allowlist AND in the classification table. Unknown/unticked → dropped.
-//!   - PAUSED / UNCONFIGURED → nothing leaves the machine at all.
+//!   - SHARE-ALL (default, opt-OUT): every frontmost app is emitted except ones
+//!     the user muted. Catalogued apps use their mapping; unknown apps get a
+//!     fixed GENERIC shape (`other`/`focus`) — SHAPE ONLY, no app name leaves.
+//!   - OPT-IN mode (share_all == false): an app is emitted only if it's on the
+//!     user's allowlist AND in the classification table. Else dropped.
+//!   - PAUSED (enabled == false) → nothing leaves the machine at all.
 
 use std::time::Duration;
 
@@ -168,21 +171,43 @@ impl ActivityEvent {
 }
 
 /// Classify + gate a bundle id into an emittable event, or None if it should be
-/// dropped (unknown app, or known-but-not-allowlisted).
+/// dropped.
+///
+/// Two postures (see config.rs):
+///   - share_all == true  (default, opt-OUT): emit for EVERY frontmost app
+///     EXCEPT ones the user muted. Catalogued apps use their mapping; unknown
+///     apps get a fixed GENERIC shape (`other`/`focus`) so they still light up
+///     the office — SHAPE ONLY, the raw app name never leaves.
+///   - share_all == false (opt-IN): only apps ticked in the allowlist AND in
+///     the catalog are emitted; everything else is dropped (classic posture).
 fn resolve(app: &AppHandle, bundle_id: &str) -> Option<ActivityEvent> {
     let config = app.state::<ConfigState>().snapshot();
     if !config.enabled {
         return None;
     }
-    // opt-in gate: must be explicitly ticked
-    if !config.allowlist.get(bundle_id).copied().unwrap_or(false) {
-        return None;
-    }
-    let mapping = classify(bundle_id)?;
+
+    let mapping = if config.share_all {
+        // opt-out gate: dropped only if the user explicitly muted this app.
+        if config.muted.get(bundle_id).copied().unwrap_or(false) {
+            return None;
+        }
+        // catalogued → real shape; unknown → fixed generic shape.
+        match classify(bundle_id) {
+            Some(m) => m.to_classification(),
+            None => crate::catalog::generic_classification(),
+        }
+    } else {
+        // opt-in gate: must be explicitly ticked AND known.
+        if !config.allowlist.get(bundle_id).copied().unwrap_or(false) {
+            return None;
+        }
+        classify(bundle_id)?.to_classification()
+    };
+
     Some(ActivityEvent {
-        tool: mapping.tool.to_string(),
-        category: mapping.category.to_string(),
-        object: mapping.object.to_string(),
+        tool: mapping.tool,
+        category: mapping.category,
+        object: mapping.object,
         // A held foreground app is, by definition, active work.
         status: "working".to_string(),
         occurred_at: String::new(), // stamped at send
@@ -190,7 +215,8 @@ fn resolve(app: &AppHandle, bundle_id: &str) -> Option<ActivityEvent> {
 }
 
 /// Reverse lookup: which bundle id maps to a tool (for heartbeat re-resolution).
-/// Cheap linear scan over the small catalog.
+/// Cheap linear scan over the small catalog. Unknown/generic tools have no
+/// reverse mapping — callers fall back to re-emitting the current tool directly.
 fn current_bundle_for_tool(_app: &AppHandle, tool: &str) -> Option<String> {
     crate::catalog::DEFAULT_CATALOG
         .iter()

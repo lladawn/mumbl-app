@@ -45,10 +45,11 @@
         <label>
           Ingest token
           <input id="token" type="password" placeholder="paste your space ingest token" autocomplete="off" />
+          <span id="token-cue" class="token-cue"></span>
         </label>
         <div class="row">
           <button id="save" class="primary" type="button">Save</button>
-          <span id="save-status" class="muted"></span>
+          <span id="save-status" class="save-status"></span>
         </div>
         <p class="fine muted">
           The token is stored in the OS keychain, never in a plaintext file.
@@ -56,10 +57,19 @@
       </section>
 
       <section class="card">
-        <h2>Allowlist <span class="muted">(opt-in per app)</span></h2>
-        <p class="fine muted">
-          Nothing is shared by default. Tick the apps you want your office to
-          reflect. Unticked or unknown apps are dropped — they never leave this machine.
+        <h2>Apps</h2>
+        <div class="share-all">
+          <label class="switch" for="share-all">
+            <input id="share-all" type="checkbox" />
+            <span><b>Share all my apps</b></span>
+          </label>
+          <p id="share-all-help" class="fine muted">
+            Everything you use shows up; untick individual apps below to hide them.
+          </p>
+        </div>
+        <p class="fine muted" id="privacy-copy">
+          All your apps are shared as shapes by default — untick any you want to
+          keep private. Only the app category ever leaves, never titles or content.
         </p>
         <div class="allowlist" id="allowlist"></div>
       </section>

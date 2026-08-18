@@ -19,6 +19,10 @@ const KEYRING_ACCOUNT: &str = "ingest-token";
 
 pub const DEFAULT_ENDPOINT: &str = "https://mumbl.wtf/api/agents/ingest";
 
+fn default_true() -> bool {
+    true
+}
+
 /// Non-secret config, serialized to the plugin-store JSON.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -27,13 +31,26 @@ pub struct Config {
     pub slug: Option<String>,
     #[serde(default)]
     pub name: Option<String>,
+    /// Global sharing switch. Defaults to ON (opt-out posture). Missing in an
+    /// older stored config → treated as the new default (true).
+    #[serde(default = "default_true")]
     pub enabled: bool,
     /// Stable per-install id, used in the actor id (`desktop:<install_id>`).
     #[serde(rename = "installId")]
     pub install_id: String,
-    /// Opt-in map: bundle_id -> allowed. Absent/false == dropped.
+    /// Sharing mode. `true` (default) = SHARE ALL apps, opt OUT specific ones
+    /// via `muted`. `false` = classic opt-IN, only apps ticked in `allowlist`.
+    /// Missing in an older stored config → treated as the new default (true).
+    #[serde(rename = "shareAll", default = "default_true")]
+    pub share_all: bool,
+    /// Opt-IN map (used when `share_all` is false): bundle_id -> allowed.
+    /// Absent/false == dropped.
     #[serde(default)]
     pub allowlist: BTreeMap<String, bool>,
+    /// Opt-OUT set (used when `share_all` is true): bundle_id -> muted.
+    /// A bundle id mapped to `true` here is hidden even though share-all is on.
+    #[serde(default)]
+    pub muted: BTreeMap<String, bool>,
 }
 
 impl Default for Config {
@@ -42,10 +59,13 @@ impl Default for Config {
             endpoint: DEFAULT_ENDPOINT.to_string(),
             slug: None,
             name: None,
-            // default posture: sharing is OFF until the user configures + enables.
-            enabled: false,
+            // default posture: SHARE ALL (opt-out). Sharing is ON by default;
+            // every detected app is shared as shape unless the user mutes it.
+            enabled: true,
             install_id: uuid::Uuid::new_v4().to_string(),
+            share_all: true,
             allowlist: BTreeMap::new(),
+            muted: BTreeMap::new(),
         }
     }
 }
@@ -157,6 +177,25 @@ pub fn set_allow(app: &AppHandle, bundle_id: String, allowed: bool) -> Result<Co
     let state = app.state::<ConfigState>();
     let mut config = state.inner.lock().unwrap();
     config.allowlist.insert(bundle_id, allowed);
+    persist(app, &config)?;
+    Ok(config.clone())
+}
+
+/// Toggle the share-all (opt-out) vs opt-in posture.
+pub fn set_share_all(app: &AppHandle, share_all: bool) -> Result<Config, String> {
+    let state = app.state::<ConfigState>();
+    let mut config = state.inner.lock().unwrap();
+    config.share_all = share_all;
+    persist(app, &config)?;
+    Ok(config.clone())
+}
+
+/// Mute (opt out) or unmute a specific app while share-all is on.
+/// `muted == true` hides the app; `false` shares it again.
+pub fn set_muted(app: &AppHandle, bundle_id: String, muted: bool) -> Result<Config, String> {
+    let state = app.state::<ConfigState>();
+    let mut config = state.inner.lock().unwrap();
+    config.muted.insert(bundle_id, muted);
     persist(app, &config)?;
     Ok(config.clone())
 }

@@ -62,7 +62,84 @@ input {
 }
 input:focus { outline: 2px solid rgba(107, 143, 113, 0.35); border-color: var(--accent); }
 
+/* Custom checkbox. The generic `input` rule above (background/border/padding)
+   suppresses WKWebView's native checked glyph — it renders as a blank white
+   square that never visibly ticks. We draw our own box + checkmark so the
+   checked state is unmistakable regardless of the native control. */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  position: relative;
+  cursor: pointer;
+  vertical-align: middle;
+}
+input[type="checkbox"]:checked,
+input[type="checkbox"].is-checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+input[type="checkbox"]:checked::after,
+input[type="checkbox"].is-checked::after {
+  content: "";
+  position: absolute;
+  left: 4.5px;
+  top: 1.5px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+input[type="checkbox"]:focus { outline: 2px solid rgba(107, 143, 113, 0.35); }
+
 .row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+
+/* Transient Save confirmation next to the Save button. */
+.save-status {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  color: var(--muted);
+}
+.save-status.show { opacity: 1; }
+.save-status.ok { color: var(--accent); }
+.save-status.err {
+  color: var(--danger);
+  font-weight: 500;
+  opacity: 1; /* errors stay visible */
+}
+
+/* Saved-state cue under the token field. */
+.token-cue {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.token-cue.ok { color: var(--accent); }
+
+/* Master "Share all my apps" toggle. */
+.share-all { margin-bottom: 8px; }
+.share-all .switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+.share-all .switch input[type="checkbox"] { width: auto; margin: 0; }
+.share-all p { margin: 4px 0 0; }
 
 button {
   border: 1px solid var(--line);

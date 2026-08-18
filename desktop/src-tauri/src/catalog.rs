@@ -6,9 +6,10 @@
 //! server enforces (`ACTIVITY_CATEGORIES` in src/server/agentPresence.js):
 //!   coding | design | writing | call | music | review | browsing | focus | agent
 //!
-//! An app not in this table is UNKNOWN and is dropped — the helper never leaks
-//! a raw app name. Being *in* this table is not enough either: the user must
-//! also opt the app into their allowlist (see config.rs). Opt-in only.
+//! An app not in this table is UNKNOWN. In share-all (opt-out) mode it still
+//! lights up the office via a fixed GENERIC shape (`other`/`focus`) — the raw
+//! app name / bundle id never leaves the machine. In opt-in mode an unknown app
+//! is dropped. Either way the helper never leaks a raw app name.
 
 use serde::Serialize;
 
@@ -81,7 +82,47 @@ const fn m(
 }
 
 /// Look up a mapping by bundle id. Returns None for unknown apps (which are
-/// dropped, never sent).
+/// dropped in the opt-in path, never sent).
 pub fn classify(bundle_id: &str) -> Option<&'static AppMapping> {
     DEFAULT_CATALOG.iter().find(|a| a.bundle_id == bundle_id)
+}
+
+/// The owned, shape-only classification a resolver produces for a bundle id.
+/// Same SHAPE vocabulary as `AppMapping`, but owned so it can carry a generic
+/// fallback for apps NOT in the catalog.
+#[derive(Clone, Debug)]
+pub struct Classification {
+    /// SHAPE — a coarse, generic tool token. For unknown apps this is the
+    /// generic `"other"` — never the raw app name / bundle id.
+    pub tool: String,
+    /// SHAPE — one of the fixed category vocabulary.
+    pub category: String,
+    /// SHAPE — office-object hint.
+    pub object: String,
+}
+
+/// Generic, shape-only classification for an app NOT in the catalog. Used only
+/// in share-all (opt-out) mode so unknown apps still light up the office as a
+/// neutral "focus" desk. Deliberately carries NO app-identifying data — the
+/// bundle id never leaves; only this fixed generic shape does.
+pub const GENERIC_TOOL: &str = "other";
+pub const GENERIC_CATEGORY: &str = "focus";
+pub const GENERIC_OBJECT: &str = "focus-desk";
+
+pub fn generic_classification() -> Classification {
+    Classification {
+        tool: GENERIC_TOOL.to_string(),
+        category: GENERIC_CATEGORY.to_string(),
+        object: GENERIC_OBJECT.to_string(),
+    }
+}
+
+impl AppMapping {
+    pub fn to_classification(&self) -> Classification {
+        Classification {
+            tool: self.tool.to_string(),
+            category: self.category.to_string(),
+            object: self.object.to_string(),
+        }
+    }
 }

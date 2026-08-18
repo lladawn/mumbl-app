@@ -24,16 +24,26 @@ That bundle id is classified locally into a fixed vocabulary (`tool` / `category
 - File contents, message bodies, document text.
 - **Window titles or URLs** (not even the bare domain — that's a deliberately
   deferred, separate opt-in that would require Accessibility; v1 does not).
-- Raw app names of anything you haven't opted in to.
+- **Raw app names.** Catalogued apps leave only their classified shape; apps not
+  in the catalog leave only a fixed generic `focus` shape — never the app name
+  or bundle id.
 
 **No Accessibility permission is requested or required in v1.** The only signal used
 is the public `NSWorkspace` app-activation notification, which needs no special
 permission. (Enabling window-title / domain disambiguation later is a distinct,
 scary opt-in — see the architecture spike §2 / risk #2.)
 
-**Default posture: share nothing.** Sharing starts OFF. Nothing leaves the machine
-until you (1) enter your ingest token, (2) tick specific apps into the allowlist,
-and (3) enable sharing. Unknown or unticked apps are **dropped**, never sent.
+**Default posture: share all (opt-out), shape-only, ephemeral.** Sharing is ON by
+default with **"Share all my apps"** enabled: every app you bring to the front is
+shared as a **shape** (its category/object), not its name. Catalogued apps use
+their mapping; apps not in the catalog show up as a neutral generic `focus` shape
+— still no app name. Untick any individual app to **mute** (opt out) that one. You
+can flip **"Share all my apps"** OFF to switch to classic **opt-in**: then only the
+apps you tick, and only catalogued ones, are shared; everything else is dropped.
+
+Once your ingest token is set, focused apps emit automatically. Events are
+**ephemeral** — a failed POST is dropped, never queued; nothing is stored locally
+beyond the last live receipt.
 
 The `detail` field in the envelope is just the shape restated (`"Figma · design"`);
 it is encrypted at rest server-side and never contains a title, URL, or content.
@@ -100,8 +110,9 @@ cd desktop/src-tauri && cargo check
    - **Display name** — how you appear in the office (e.g. "Disha's Mac").
    - **Ingest token** — your space's ingest token (the same value
      `MUMBL_INGEST_TOKEN` uses). Stored in the keychain. Click **Save**.
-3. **Allowlist** — tick the apps you want your office to reflect. Everything is
-   opt-in; nothing is shared until you tick it.
+3. **Apps** — **"Share all my apps"** is ON by default: every app is shared as a
+   shape. Untick any app to mute (hide) it. Flip the master toggle OFF to switch
+   to opt-in, where only ticked (and catalogued) apps are shared.
 4. Click **Pause sharing / Resume sharing** (tray menu or the header button) to
    toggle. The **"What am I sharing right now?"** panel shows a live receipt of the
    last event that left the machine.

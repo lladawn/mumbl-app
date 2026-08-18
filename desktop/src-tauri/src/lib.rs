@@ -12,8 +12,10 @@
 //!                 bodies, window titles, URLs. No Accessibility permission is
 //!                 requested or used.
 //!   Leaves box  : only the classified SHAPE (tool/category/object/status) of
-//!                 apps the user explicitly opted into, plus a shape-only
-//!                 `detail` line. Default posture is share-NOTHING.
+//!                 the frontmost app, plus a shape-only `detail` line. Default
+//!                 posture is share-ALL / opt-OUT: every app is shared as shape
+//!                 unless the user mutes it (unknown apps → a generic `focus`
+//!                 shape, still no app name). Switchable to opt-IN (allowlist).
 
 // NOTE: these modules are exposed `#[doc(hidden)] pub` (rather than private)
 // solely so the throwaway preflight harness in `examples/preflight.rs` can
@@ -72,6 +74,18 @@ fn set_enabled(app: AppHandle, enabled: bool) -> Result<Config, String> {
 #[tauri::command]
 fn set_allow(app: AppHandle, bundle_id: String, allowed: bool) -> Result<Config, String> {
     config::set_allow(&app, bundle_id, allowed)
+}
+
+#[tauri::command]
+fn set_share_all(app: AppHandle, share_all: bool) -> Result<Config, String> {
+    let config = config::set_share_all(&app, share_all)?;
+    let _ = app.emit("config-changed", ());
+    Ok(config)
+}
+
+#[tauri::command]
+fn set_muted(app: AppHandle, bundle_id: String, muted: bool) -> Result<Config, String> {
+    config::set_muted(&app, bundle_id, muted)
 }
 
 #[tauri::command]
@@ -146,6 +160,8 @@ pub fn run() {
             save_config,
             set_enabled,
             set_allow,
+            set_share_all,
+            set_muted,
             get_last_receipt,
         ])
         .build(tauri::generate_context!())

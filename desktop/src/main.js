@@ -5,7 +5,7 @@ const $ = (id) => document.getElementById(id);
 
 // ---- state ----------------------------------------------------------------
 
-let config = null; // { endpoint, slug, name, enabled, allowlist: {bundleId:bool}, hasToken }
+let config = null; // { endpoint, slug, name, enabled, shareAll, allowlist:{id:bool}, muted:{id:bool}, hasToken }
 let catalog = []; // default classification table [{bundleId, tool, category, object, label}]
 
 // ---- boot -----------------------------------------------------------------
@@ -15,6 +15,7 @@ async function boot() {
   config = await invoke("get_config");
 
   renderConfig();
+  renderShareAll();
   renderAllowlist();
   renderToggle();
   await refreshReceipt();
@@ -26,6 +27,7 @@ async function boot() {
   await listen("config-changed", async () => {
     config = await invoke("get_config");
     renderConfig();
+    renderShareAll();
     renderAllowlist();
     renderToggle();
   });
@@ -41,7 +43,48 @@ function renderConfig() {
   $("token").placeholder = config.hasToken
     ? "•••••••• (stored in keychain)"
     : "paste your space ingest token";
+  const cue = $("token-cue");
+  if (cue) {
+    if (config.hasToken) {
+      cue.textContent = "token stored in keychain ✓";
+      cue.classList.add("ok");
+    } else {
+      cue.textContent = "";
+      cue.classList.remove("ok");
+    }
+  }
   $("foot").textContent = `install id ${config.installId?.slice(0, 8) || "—"}`;
+}
+
+// Sync a checkbox's checked state. WKWebView with a custom (appearance:none)
+// checkbox can fail to recalc the `:checked` style when only the .checked
+// PROPERTY is set programmatically before first paint; mirroring the ATTRIBUTE
+// forces the pseudo-class to match. Set both.
+function setChecked(el, on) {
+  el.checked = on;
+  el.toggleAttribute("checked", on);
+  // WebKit doesn't reliably repaint the `:checked` style for a custom
+  // (appearance:none) checkbox set programmatically before first paint, so we
+  // also drive an explicit `is-checked` class we style directly. Keep it in
+  // sync with real user toggles too.
+  el.classList.toggle("is-checked", on);
+  if (!el.dataset.checkSync) {
+    el.dataset.checkSync = "1";
+    el.addEventListener("change", () => el.classList.toggle("is-checked", el.checked));
+  }
+}
+
+// The master "Share all my apps" toggle + its helper/privacy copy.
+function renderShareAll() {
+  const shareAll = config.shareAll !== false; // default ON
+  setChecked($("share-all"), shareAll);
+  $("share-all-help").textContent = shareAll
+    ? "Everything you use shows up; untick individual apps below to hide them."
+    : "Only the apps you tick below are shared. Nothing else leaves this machine.";
+  $("privacy-copy").textContent = shareAll
+    ? "All your apps are shared as shapes by default — untick any you want to keep private. Only the app category ever leaves, never titles or content."
+    : "Only ticked apps are shared, as shapes. Only the app category ever leaves, never titles or content.";
+  document.body.classList.toggle("opt-in", !shareAll);
 }
 
 function renderToggle() {
@@ -61,15 +104,24 @@ function renderToggle() {
 function renderAllowlist() {
   const host = $("allowlist");
   host.innerHTML = "";
+  const shareAll = config.shareAll !== false;
   const allow = config.allowlist || {};
+  const muted = config.muted || {};
   for (const app of catalog) {
     const item = document.createElement("div");
     item.className = "item";
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.id = `al-${app.bundleId}`;
-    cb.checked = !!allow[app.bundleId];
-    cb.addEventListener("change", () => setAllow(app.bundleId, cb.checked));
+    if (shareAll) {
+      // opt-OUT: ticked = shared (default). Unticking mutes the app.
+      setChecked(cb, !muted[app.bundleId]);
+      cb.addEventListener("change", () => setMuted(app.bundleId, !cb.checked));
+    } else {
+      // opt-IN: ticked = included. Default off.
+      setChecked(cb, !!allow[app.bundleId]);
+      cb.addEventListener("change", () => setAllow(app.bundleId, cb.checked));
+    }
     const label = document.createElement("label");
     label.htmlFor = cb.id;
     label.innerHTML = `${escapeHtml(app.label)} <span class="cat">${escapeHtml(app.category)}</span>`;
@@ -105,10 +157,20 @@ function wire() {
     renderToggle();
   });
 
+  $("share-all").addEventListener("change", async (e) => {
+    config = await invoke("set_share_all", { shareAll: e.target.checked });
+    renderShareAll();
+    renderAllowlist();
+  });
+
   $("save").addEventListener("click", async () => {
     const status = $("save-status");
+    const btn = $("save");
+    status.className = "save-status";
     status.textContent = "saving…";
+    btn.disabled = true;
     try {
+      // Await the async IPC result and reflect it into local state.
       config = await invoke("save_config", {
         patch: {
           endpoint: $("endpoint").value.trim() || null,
@@ -118,17 +180,29 @@ function wire() {
           token: $("token").value.trim() || null,
         },
       });
-      renderConfig();
-      status.textContent = "saved";
-      setTimeout(() => (status.textContent = ""), 1500);
+      renderConfig(); // repaints token cue → "token stored in keychain ✓"
+      // Clear, transient green confirmation next to Save, then fade out.
+      status.className = "save-status ok show";
+      status.textContent = "Saved ✓";
+      setTimeout(() => {
+        status.classList.remove("show");
+      }, 1800);
     } catch (err) {
+      // On failure surface the error text (persists until next save).
+      status.className = "save-status err show";
       status.textContent = String(err);
+    } finally {
+      btn.disabled = false;
     }
   });
 }
 
 async function setAllow(bundleId, on) {
   config = await invoke("set_allow", { bundleId, allowed: on });
+}
+
+async function setMuted(bundleId, muted) {
+  config = await invoke("set_muted", { bundleId, muted });
 }
 
 // ---- utils ----------------------------------------------------------------
