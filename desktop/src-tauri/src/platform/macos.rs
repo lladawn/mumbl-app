@@ -72,6 +72,19 @@ where
         .expect("spawn focus watcher thread");
 }
 
+/// True when this NSRunningApplication is US.
+///
+/// The helper shows and focuses its own Settings window on launch, so without
+/// this it observes ITSELF as the frontmost app and posts a station for the
+/// helper — an `other`/"Heads-down" desk in the user's office that represents no
+/// work at all. Comparing PROCESS IDs rather than bundle ids is deliberate: a
+/// dev build run straight from `target/debug` has no bundle identifier, so a
+/// bundle-id comparison would silently fail to match in exactly the build we
+/// develop against.
+unsafe fn is_self(app: &NSRunningApplication) -> bool {
+    app.processIdentifier() == std::process::id() as i32
+}
+
 /// Pull the activated app's bundle id out of the notification's userInfo.
 /// The key is `NSWorkspaceApplicationKey`, whose value is an NSRunningApplication.
 unsafe fn bundle_id_from_notification(notif: &NSNotification) -> Option<String> {
@@ -80,6 +93,9 @@ unsafe fn bundle_id_from_notification(notif: &NSNotification) -> Option<String> 
     let value: Retained<AnyObject> = user_info.objectForKey(key)?;
     // The value is an NSRunningApplication; reinterpret the retained pointer.
     let app: &NSRunningApplication = &*(Retained::as_ptr(&value) as *const NSRunningApplication);
+    if is_self(app) {
+        return None;
+    }
     bundle_id_of(app)
 }
 
@@ -87,6 +103,9 @@ unsafe fn bundle_id_from_notification(notif: &NSNotification) -> Option<String> 
 unsafe fn frontmost_bundle_id() -> Option<String> {
     let workspace = NSWorkspace::sharedWorkspace();
     let app = workspace.frontmostApplication()?;
+    if is_self(&app) {
+        return None;
+    }
     bundle_id_of(&app)
 }
 
