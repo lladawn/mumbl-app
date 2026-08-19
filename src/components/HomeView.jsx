@@ -260,6 +260,27 @@ export default function HomeView() {
           </div>
         </section>
 
+        {/* mumbl office — second product, alongside Slack */}
+        <section className="landing-section" aria-labelledby="office-heading">
+          <div className="office-home-card">
+            <p className="eyebrow">also: mumbl office · private beta</p>
+            <h2 id="office-heading">your workday, drawn live.</h2>
+            <p>
+              A tiny macOS menubar app notices which apps you&apos;re focused on — Figma, VS Code, a Zoom call —
+              and a pixel office assembles itself from the shape of your real day. One click makes a shareable card.
+              Shape, not content: never a window title, URL, or keystroke.
+            </p>
+            <div className="office-home-card-actions">
+              <Link className="solid-button button-link" href="/office" onClick={() => trackPublicCta("office_landing", { source: "home_card" })}>
+                see how it works
+              </Link>
+              <Link className="ghost-button button-link" href="/office/demo" onClick={() => trackPublicCta("office_demo", { source: "home_card" })}>
+                open the demo
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/*
           Hidden until the new Slack-native demo is ready. The old web-flow video
           made the landing page feel less current than the Slack beta story.
