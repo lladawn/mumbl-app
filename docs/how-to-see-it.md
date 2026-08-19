@@ -13,7 +13,11 @@ Wait ~3 seconds for the Phaser canvas to load ("opening the office…" disappear
 
 ## What you should see at /office/demo
 
-The demo cast exercises every set-piece added in commits d11e8ea, a9823cf, 44f6318:
+The room is a loose **scatter of work booths** — not a grid of desks. Each booth
+rides its own soft coloured mat (mint / sky / blush / lilac / oat) at a staggered
+position, with the warm plank floor flowing between them, so the office reads as
+"different kinds of work happening in their own corners" rather than a cubicle
+farm. The demo cast exercises every set-piece added in commits d11e8ea, a9823cf, 44f6318:
 
 | Actor    | Tool       | Category | Set-piece                                                        |
 |----------|------------|----------|------------------------------------------------------------------|

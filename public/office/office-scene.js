@@ -40,20 +40,38 @@
   const ZONES = [
     { x: 245, y: 120, label: "meeting room" },
     { x: 1205, y: 120, label: "lounge" },
-    { x: 720, y: 160, label: "agent bullpen" },
+    { x: 700, y: 128, label: "the studio" },
     { x: 245, y: 650, label: "café" },
     { x: 1205, y: 630, label: "rec room" },
     { x: 720, y: 838, label: "reception" },
   ];
 
-  // 9-desk bullpen (3 rows of 3) — handles a typical 6-10 app stack without
-  // hitting the overflow "+N more" cap on a normal busy day. A person running
-  // editor + terminal + browser + Slack + Zoom + Spotify fills 6 of these easily.
+  // SCATTERED WORK BOOTHS — not a desk farm. Instead of 3 tidy rows of identical
+  // desks, the middle of the room is a loose scatter of little work nooks, each
+  // with its own mat + booth, so the room reads as "different kinds of work
+  // happening in their own corners" rather than a call-centre bullpen. The
+  // positions are deliberately staggered (no shared x columns, no shared y rows)
+  // and each carries a `tone` that tints its mat, so every booth feels distinct.
+  // Seat count (9) still absorbs a typical 6-10 app stack before "+N more".
   const DESKS = [
-    { x: 520, y: 220 }, { x: 720, y: 220 }, { x: 920, y: 220 },
-    { x: 520, y: 370 }, { x: 720, y: 370 }, { x: 920, y: 370 },
-    { x: 520, y: 500 }, { x: 720, y: 500 }, { x: 920, y: 500 },
+    { x: 560, y: 210, tone: "mint" },
+    { x: 780, y: 176, tone: "sky" },
+    { x: 960, y: 236, tone: "blush" },
+    { x: 500, y: 330, tone: "oat" },
+    { x: 700, y: 300, tone: "lilac" },
+    { x: 920, y: 388, tone: "sky" },
+    { x: 560, y: 470, tone: "blush" },
+    { x: 800, y: 452, tone: "mint" },
+    { x: 1010, y: 512, tone: "oat" },
   ];
+  // mat tints keyed by booth tone — a soft rug pool under each nook
+  const BOOTH_MAT = {
+    mint:  { fill: 0xBFE8DC, edge: 0x8FCBB8 },
+    sky:   { fill: 0xC4E4F2, edge: 0x9ECBE0 },
+    blush: { fill: 0xF6C7BC, edge: 0xE2A79A },
+    lilac: { fill: 0xD6C4F2, edge: 0xB49EDC },
+    oat:   { fill: 0xEADFC6, edge: 0xCFBE9E },
+  };
   const DOOR = { x: 720, y: 916 };
 
   // Whoever walks through the door next should look like someone you have not
@@ -1018,6 +1036,79 @@
         this.solid(x, y + 4, 104, 44);
       }
 
+      // A single scattered WORK BOOTH — a self-contained little nook, not a row
+      // desk. Each booth gets: a soft coloured MAT pooled under it (so it reads
+      // as its own space on the floor), a compact desk surface with a monitor,
+      // and a low L-shaped back/side panel that frames the seat like a corner —
+      // giving the "different kinds of work in their own corners" feel without
+      // the cubicle-farm dividers. The station prop (STATION_DRAW) is drawn on
+      // top per actor, so a booth becomes an IDE nook / turntable / easel / etc.
+      boothUnit(x, y, seat, tone) {
+        // ---- the mat under the booth (drawn low so everything sits on it)
+        const mat = this.layer(y - 40);
+        const t = BOOTH_MAT[tone] || BOOTH_MAT.oat;
+        mat.fillStyle(t.fill, 0.7); this.roundRect(mat, x - 82, y - 34, 164, 118, 14);
+        mat.fillStyle(t.edge, 0.55); this.roundRectStroke(mat, x - 82, y - 34, 164, 118, 14, 3);
+        // a couple of soft flecks so the mat has texture
+        mat.fillStyle(t.edge, 0.3);
+        mat.fillRect(x - 60, y + 54, 8, 8); mat.fillRect(x + 44, y - 18, 8, 8);
+
+        const g = this.layer(y + 30);
+        this.shadow(x, y + 22, 110, 22);
+        // ---- low L-shaped booth back panel framing the seat (a corner nook)
+        const bp = this.layer(y - 8);
+        bp.fillStyle(C.partition, 1);
+        this.roundRect(bp, x - 62, y - 44, 124, 14, 6);      // back panel
+        this.roundRect(bp, x - 62, y - 44, 12, 66, 6);        // left return
+        bp.fillStyle(C.partitionTop, 1);
+        bp.fillRect(x - 60, y - 44, 120, 3); bp.fillRect(x - 62, y - 44, 12, 3);
+        bp.fillStyle(0xFFFFFF, 0.14); bp.fillRect(x - 58, y - 40, 116, 4);
+        // a little personal pin on the back panel (varies by seat)
+        bp.fillStyle(CONFETTI[seat % CONFETTI.length], 0.95); bp.fillRect(x + 40, y - 40, 10, 10);
+        bp.fillStyle(CONFETTI[(seat + 2) % CONFETTI.length], 0.9); bp.fillRect(x - 54, y - 40, 8, 8);
+
+        // ---- compact desk surface (smaller than the old row desk)
+        g.fillStyle(0xA87A50, 1); g.fillRect(x - 40, y + 18, 7, 8); g.fillRect(x + 33, y + 18, 7, 8); // legs
+        g.fillStyle(C.desk, 1); g.fillRect(x - 46, y - 6, 92, 26);        // front face
+        g.fillStyle(C.deskTop, 1); g.fillRect(x - 46, y - 14, 92, 10);     // top face
+        g.fillStyle(0xC08A52, 0.6); g.fillRect(x - 46, y - 14, 92, 2);     // top edge highlight
+        g.fillStyle(0xA07840, 0.3); g.fillRect(x + 44, y - 12, 2, 24);     // right side shadow
+        // ---- monitor (default screen; overridden by paintScreen/STATION_DRAW)
+        g.fillStyle(0x8A9EA8, 1); g.fillRect(x - 29, y - 52, 58, 36);      // outer bezel
+        g.fillStyle(C.monitor, 1); g.fillRect(x - 27, y - 50, 54, 32);     // face
+        g.fillStyle(0xD0E0EA, 0.6); g.fillRect(x - 27, y - 50, 54, 3);     // gloss
+        g.fillStyle([0xBBDCF0, 0x9BD8B4, 0xCFBBF0, 0xF8DFA0, 0xF4B3A6, 0xBEE7F7][seat % 6], 1);
+        g.fillRect(x - 23, y - 46, 46, 26);
+        g.fillStyle(0xFFFFFF, 0.55);
+        g.fillRect(x - 19, y - 42, 22, 3); g.fillRect(x - 19, y - 36, 32, 3); g.fillRect(x - 19, y - 30, 16, 3);
+        g.fillStyle(0x6E8896, 1); g.fillRect(x - 14, y - 16, 28, 2);        // stand arm
+        g.fillStyle(0x7A9AA8, 1); g.fillRect(x - 16, y - 14, 32, 6);        // stand body
+        // small desk items + mouse pad
+        g.fillStyle(C.cream, 1); g.fillRect(x + 22, y - 13, 8, 8);
+        g.fillStyle(C.ochre, 1); g.fillRect(x + 29, y - 11, 3, 4);
+        g.fillStyle(0xE0D0B8, 0.85); g.fillRect(x - 40, y - 12, 15, 9);
+        this.deskProp(g, x - 34, y - 14, seat);
+        g.fillStyle(0xBBDCF0, 0.13); g.fillEllipse(x, y - 6, 108, 26);
+        // ---- little swivel chair backing under the seat
+        const cg = this.layer(y + 44);
+        cg.fillStyle(C.metalDark, 1); cg.fillRect(x - 14, y + 30, 28, 8);
+        cg.fillStyle(C.metal, 1); cg.fillRect(x - 16, y + 36, 32, 12);
+        cg.fillStyle(0xC8D8DA, 1); cg.fillRect(x - 14, y + 38, 28, 3);
+        this.solid(x, y + 2, 92, 40);
+      }
+
+      // rounded-rect helpers so booth mats/panels read as soft nooks, not boxes
+      roundRect(g, x, y, w, h, r) {
+        g.fillRect(x + r, y, w - 2 * r, h);
+        g.fillRect(x, y + r, w, h - 2 * r);
+        g.fillCircle(x + r, y + r, r); g.fillCircle(x + w - r, y + r, r);
+        g.fillCircle(x + r, y + h - r, r); g.fillCircle(x + w - r, y + h - r, r);
+      }
+      roundRectStroke(g, x, y, w, h, r, t) {
+        g.fillRect(x + r, y, w - 2 * r, t); g.fillRect(x + r, y + h - t, w - 2 * r, t);
+        g.fillRect(x, y + r, t, h - 2 * r); g.fillRect(x + w - t, y + r, t, h - 2 * r);
+      }
+
       deskProp(g, x, y, seat) {
         switch (seat % 6) {
           case 0:
@@ -1343,7 +1434,9 @@
         this.shadowLayer = this.layer(-70);
 
         this.plankFloor(g, 0, 96, W, H - 96);
-        this.carpetFloor(g, 470, 130, 510, 520);
+        // No single big bullpen carpet any more — the scattered booths each ride
+        // their own coloured mat, so the warm plank floor flows between them and
+        // the room reads as separate work corners, not one uniform desk zone.
         this.carpetFloor(g, 1010, 96, W - 1010, 320, "oat");
         this.tileFloor(g, 24, 620, 406, 300);
         this.carpetFloor(g, 56, 96, 380, 300, "oat");
@@ -1419,15 +1512,18 @@
         this.plant(1370, 372);
         this.arcade(1330, 660);
 
-        DESKS.forEach((dd, i) => this.deskUnit(dd.x, dd.y, i));
-        // Cubicle dividers: row 1 (y≈220), row 2 (y≈370), row 3 (y≈500)
-        this.cubicleDivider(620, 228, 100); this.cubicleDivider(820, 228, 100);
-        this.cubicleDivider(620, 378, 100); this.cubicleDivider(820, 378, 100);
-        this.cubicleDivider(620, 508, 100); this.cubicleDivider(820, 508, 100);
-        this.serverRack(950, 620);
-        this.printer(506, 610);
-        this.waterCooler(824, 440);
-        this.plant(950, 170);
+        // Scattered work booths instead of a desk grid: each is its own nook
+        // (mat + booth back + compact desk), so the room reads as different
+        // kinds of work happening in their own corners, not a cubicle farm.
+        DESKS.forEach((dd, i) => this.boothUnit(dd.x, dd.y, i, dd.tone));
+        // a couple of plants tucked between booths break up the floor so the
+        // scatter feels like a lived-in room, not a grid with the lines removed.
+        this.plant(1120, 300);
+        this.plant(640, 400);
+        this.serverRack(1110, 470);
+        this.printer(440, 470);
+        this.waterCooler(700, 560);
+        this.plant(950, 150);
 
         this.counter(70, 760, 92, 250);
         this.coffeeMachine(84, 690);

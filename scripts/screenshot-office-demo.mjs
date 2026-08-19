@@ -29,7 +29,9 @@ const URL = "http://127.0.0.1:3000/office/demo";
 
 const FORCE_HEADLESS = process.argv.includes("--headless");
 const CANVAS_TIMEOUT = 18000; // ms to wait for Phaser canvas to appear
-const RENDER_SETTLE = 3500;   // ms after canvas appears to let WebGL render
+const RENDER_SETTLE = 6500;   // ms after canvas appears: actors walk in (~1.6s
+                              // each) + station props paint, so give them time
+                              // to sit at their booths before the shot.
 
 const SWIFTSHADER_FLAGS = [
   "--use-gl=angle",
@@ -56,8 +58,24 @@ async function waitForCanvasAndRender(page, timeoutMs) {
     console.log("  ⚠  loading text still present — proceeding anyway");
   }
 
-  // Give the WebGL scene extra time to draw set-pieces
+  // Let the actors walk in and take their booths.
   await page.waitForTimeout(RENDER_SETTLE);
+
+  // Walk the player UP into the booth cluster so the camera pans off reception
+  // and frames the scattered work booths (the whole point of the shot). The
+  // canvas is aria-hidden, so drive it via held ArrowUp keydowns on the body.
+  try {
+    const canvas = await page.$(".office-stage canvas");
+    if (canvas) {
+      await canvas.click({ position: { x: 480, y: 40 } }).catch(() => {});
+    }
+    await page.keyboard.down("ArrowUp");
+    await page.waitForTimeout(1400);
+    await page.keyboard.up("ArrowUp");
+    await page.waitForTimeout(1200); // let the camera settle + bob animations run
+  } catch {
+    // panning is best-effort; the booths are visible from reception anyway
+  }
 }
 
 async function capture(headless) {
