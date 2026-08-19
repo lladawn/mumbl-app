@@ -77,8 +77,10 @@ pub fn spawn(app: AppHandle) -> FocusSender {
 async fn run(app: AppHandle, mut rx: mpsc::UnboundedReceiver<FocusChange>) {
     // The candidate app we're waiting to see held for DEBOUNCE.
     let mut pending: Option<PendingFocus> = None;
-    // The app we've most recently emitted for (for coalescing heartbeats).
-    let mut current_tool: Option<String> = None;
+    // The app we've most recently emitted for (for coalescing heartbeats). We
+    // keep its BUNDLE ID, not just its tool: the heartbeat re-resolves from the
+    // bundle id, which works for catalogued and uncatalogued apps alike.
+    let mut current: Option<CurrentFocus> = None;
     let mut next_heartbeat: Option<Instant> = None;
 
     // Poll a short tick so we can act on the debounce/heartbeat timers even
@@ -96,12 +98,14 @@ async fn run(app: AppHandle, mut rx: mpsc::UnboundedReceiver<FocusChange>) {
                         let mapped = resolve(&app, &change.bundle_id);
                         match mapped {
                             Some(event) => {
-                                let same = current_tool.as_deref() == Some(event.tool.as_str());
+                                let same = current.as_ref().map(|c| c.tool.as_str())
+                                    == Some(event.tool.as_str());
                                 if same {
                                     // still on the same tool; nothing to debounce
                                     pending = None;
                                 } else {
                                     pending = Some(PendingFocus {
+                                        bundle_id: change.bundle_id.clone(),
                                         event,
                                         fire_at: Instant::now() + DEBOUNCE,
                                     });
@@ -111,7 +115,7 @@ async fn run(app: AppHandle, mut rx: mpsc::UnboundedReceiver<FocusChange>) {
                                 // switched to an unknown / unticked app — stop
                                 // heartbeating the old one (it's no longer front).
                                 pending = None;
-                                current_tool = None;
+                                current = None;
                                 next_heartbeat = None;
                             }
                         }
@@ -127,30 +131,38 @@ async fn run(app: AppHandle, mut rx: mpsc::UnboundedReceiver<FocusChange>) {
                     if now >= p.fire_at {
                         let event = p.event.now();
                         deliver_and_report(&app, &event).await;
-                        current_tool = Some(event.tool.clone());
+                        current = Some(CurrentFocus {
+                            bundle_id: p.bundle_id.clone(),
+                            tool: event.tool.clone(),
+                        });
                         next_heartbeat = Some(now + HEARTBEAT);
                     } else {
                         pending = Some(p); // not yet
                     }
                 }
 
-                // Heartbeat coalescing → keep the office lit for the held tool.
-                if let (Some(tool), Some(hb)) = (current_tool.clone(), next_heartbeat) {
+                // Heartbeat coalescing → keep the office lit for the held app.
+                //
+                // This re-resolves from the BUNDLE ID we recorded when the app
+                // became current. The previous version looked the bundle id back
+                // up FROM THE TOOL by scanning the catalog, which silently broke
+                // share-all: an uncatalogued app emits the generic tool `other`,
+                // no catalog row has that tool, so the lookup failed and the
+                // branch reset the timer WITHOUT emitting. An unknown app the
+                // user sat in went stale after STALE_MS and its station walked
+                // out of the office while they were still working in it.
+                if let (Some(cur), Some(hb)) = (current.clone(), next_heartbeat) {
                     if now >= hb {
-                        // Re-resolve to honor a config change (e.g. app just
-                        // got un-ticked → stop emitting).
-                        if let Some(bundle) = current_bundle_for_tool(&app, &tool) {
-                            if let Some(event) = resolve(&app, &bundle) {
-                                let event = event.now();
-                                deliver_and_report(&app, &event).await;
-                                next_heartbeat = Some(now + HEARTBEAT);
-                            } else {
-                                current_tool = None;
-                                next_heartbeat = None;
-                            }
-                        } else {
-                            // no reverse lookup available; just re-emit the tool
+                        // Re-resolving (rather than replaying the old event) is
+                        // what honours a config change — muting the app or
+                        // pausing sharing makes this return None and stops it.
+                        if let Some(event) = resolve(&app, &cur.bundle_id) {
+                            let event = event.now();
+                            deliver_and_report(&app, &event).await;
                             next_heartbeat = Some(now + HEARTBEAT);
+                        } else {
+                            current = None;
+                            next_heartbeat = None;
                         }
                     }
                 }
@@ -160,8 +172,17 @@ async fn run(app: AppHandle, mut rx: mpsc::UnboundedReceiver<FocusChange>) {
 }
 
 struct PendingFocus {
+    /// Kept so the heartbeat can re-resolve this exact app later.
+    bundle_id: String,
     event: ActivityEvent,
     fire_at: Instant,
+}
+
+/// The app we are currently heartbeating for.
+#[derive(Clone)]
+struct CurrentFocus {
+    bundle_id: String,
+    tool: String,
 }
 
 impl ActivityEvent {
@@ -218,15 +239,6 @@ fn resolve(app: &AppHandle, bundle_id: &str) -> Option<ActivityEvent> {
     })
 }
 
-/// Reverse lookup: which bundle id maps to a tool (for heartbeat re-resolution).
-/// Cheap linear scan over the small catalog. Unknown/generic tools have no
-/// reverse mapping — callers fall back to re-emitting the current tool directly.
-fn current_bundle_for_tool(_app: &AppHandle, tool: &str) -> Option<String> {
-    crate::catalog::DEFAULT_CATALOG
-        .iter()
-        .find(|m| m.tool == tool)
-        .map(|m| m.bundle_id.to_string())
-}
 
 async fn deliver_and_report(app: &AppHandle, event: &ActivityEvent) {
     let config = app.state::<ConfigState>().snapshot();
