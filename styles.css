@@ -275,6 +275,17 @@ a {
   max-width: 540px;
 }
 
+.office-lead-quote {
+  max-width: 680px;
+  margin: 4px 0 0;
+  padding-left: 18px;
+  border-left: 3px solid var(--accent, var(--ink));
+  font-size: clamp(1.1rem, 2.6vw, 1.45rem);
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--ink);
+}
+
 .office-hero-actions {
   display: flex;
   flex-wrap: wrap;

@@ -34,7 +34,7 @@ const steps = [
   {
     num: "03",
     title: "your office fills in",
-    body: "A pixel office assembles itself from those pings. A coding desk appears because you're coding. A record player spins because Spotify's on. A meeting room lights up because you're on a call. Nobody designs it — it just shows up, shaped like your actual day.",
+    body: "Each ping lands a station in the room, live. Screenshot it or grab a share card in one click.",
   },
 ];
 
@@ -89,6 +89,11 @@ export default function OfficePage() {
             Spotify — so what you share is honest without being exposing. Shape, not content. Your day, not your diary.
           </p>
         </div>
+        <p className="office-lead-quote">
+          A pixel office assembles itself from those pings. A coding desk appears because you&apos;re coding.
+          A record player spins because Spotify&apos;s on. A meeting room lights up because you&apos;re on a call.
+          Nobody designs it — it just shows up, shaped like your actual day.
+        </p>
         <div className="office-hero-actions">
           <Link className="solid-button button-link" href="/office/demo">
             see a live office
