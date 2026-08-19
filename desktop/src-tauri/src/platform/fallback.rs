@@ -12,3 +12,8 @@ where
 {
     log::warn!("focus watcher not implemented on this platform yet — no events will be emitted");
 }
+
+/// No notch to report off macOS.
+pub fn menubar_report() -> Option<String> {
+    None
+}

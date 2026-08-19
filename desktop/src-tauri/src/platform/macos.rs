@@ -18,7 +18,7 @@ use std::sync::Arc;
 use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
-use objc2_app_kit::{NSRunningApplication, NSWorkspace};
+use objc2_app_kit::{NSRunningApplication, NSScreen, NSWorkspace};
 use objc2_foundation::{ns_string, NSNotification, NSRunLoop, NSString};
 
 use super::FocusChange;
@@ -93,4 +93,35 @@ unsafe fn frontmost_bundle_id() -> Option<String> {
 unsafe fn bundle_id_of(app: &NSRunningApplication) -> Option<String> {
     let bundle: Retained<NSString> = app.bundleIdentifier()?;
     Some(bundle.to_string())
+}
+
+/// Describe the menubar's usable geometry on the main display.
+///
+/// Why this exists: "the tray icon isn't showing" has recurred, and the icon
+/// itself was healthy every time. On a notched MacBook the status-item strip is
+/// split in two — `auxiliaryTopRightArea` is the only part that holds icons, and
+/// macOS fills it RIGHT TO LEFT, so the newest item (us) lands hard against the
+/// notch and is the first thing hidden when the bar fills up. Logging the real
+/// numbers at boot makes that diagnosable from the log instead of by guesswork.
+pub fn menubar_report() -> Option<String> {
+    // NSScreen is main-thread-only; MainThreadMarker::new() returns None off it.
+    let mtm = objc2_foundation::MainThreadMarker::new()?;
+    let screen = NSScreen::mainScreen(mtm)?;
+    // SAFETY: plain geometry reads on the main thread (guaranteed by `mtm`).
+    let notch_inset = unsafe { screen.safeAreaInsets() }.top;
+    if notch_inset <= 0.0 {
+        return Some("menubar: no notch on the main display — the whole bar holds status icons".into());
+    }
+    // objc2-app-kit maps this as a plain CGRect (zero-rect when there is no
+    // split bar), not an Option — the no-notch case already returned above.
+    let right = unsafe { screen.auxiliaryTopRightArea() };
+    Some(format!(
+        "menubar: THIS DISPLAY HAS A NOTCH (safe-area top {notch_inset:.0}pt). \
+Status icons only fit in x={:.0}..{:.0}; anything pushed left of {:.0} is hidden UNDER THE NOTCH. \
+macOS fills that strip right-to-left and the newest item goes leftmost, so a crowded bar hides \
+this one first — Cmd-drag it rightward to give it a stable slot.",
+        right.origin.x,
+        right.origin.x + right.size.width,
+        right.origin.x,
+    ))
 }

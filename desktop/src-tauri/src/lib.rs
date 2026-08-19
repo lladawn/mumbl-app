@@ -214,6 +214,9 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         })
         .build(app)?;
     log::info!("tray built (menubar icon installed)");
+    if let Some(report) = platform::menubar_report() {
+        log::info!("{report}");
+    }
     Ok(())
 }
 
