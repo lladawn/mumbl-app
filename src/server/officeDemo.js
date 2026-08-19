@@ -8,9 +8,16 @@
  * returns, so the scene adapter can't tell the difference. Real data supersedes
  * it the moment a live space with that slug exists.
  *
- * The cast, statuses, tasks and per-agent look are lifted from the SEED const in
- * public/demo/index.html on purpose: the demo office and the live office should
- * read as the same place.
+ * CAST — one actor per set-piece so /office/demo showcases every category:
+ *   coding  → VS Code (IDE nook: dual monitors, terminal slab, code-green glow)
+ *   terminal → Terminal (server rack: blinking LEDs, ops rack, green caret)
+ *   design  → Figma   (design studio: easel, swatch tray, artboard)
+ *   call    → Zoom    (meeting room: wall display, participant tiles, ON AIR)
+ *   music   → Spotify (turntable console: vinyl, tonearm, VU bars, rising notes)
+ *   writing → Notion  (library nook: gooseneck lamp, manuscript, book stack)
+ *   browsing→ Chrome  (reading perch: laptop, article cards, scrolling feed)
+ *   review  → GitHub  (inspection station: diff screen, corkboard, magnifier)
+ *   focus   → other   (quiet nook: plant, mug, soft breathing glow)
  */
 
 export const DEMO_SLUG = "demo";
@@ -23,89 +30,219 @@ function minutesAgo(minutes) {
 
 export function demoSpaceState(slug = DEMO_SLUG) {
   const seed = [
+    // ── coding: VS Code — IDE nook (dual monitor + terminal slab + code-green glow)
     {
-      externalId: "demo:scout",
-      name: "Scout",
-      role: "Research",
+      externalId: "demo:marisol",
+      name: "Marisol",
+      role: "Engineering",
       status: "working",
-      source: "claude-code",
-      category: "agent",
-      task: "Pulling pricing pages for 6 competitors",
+      source: "desktop",
+      tool: "vscode",
+      category: "coding",
+      task: "Refactoring the auth token refresh flow",
       seenMinutes: 0,
       look: {
         hair: "#4A382C", skin: "#E3B48D", shirt: "#5FCBBC", pants: "#6E7E96", glow: "#C6F5EC",
-        hairStyle: "curly", outfit: "stripes", accessory: "glasses", accent: "#FFF8EC", build: "slim",
+        hairStyle: "curly", outfit: "hoodie", accessory: "headphones", accent: "#4FA5E0", build: "slim",
       },
       log: [
-        "fetch gather.town/pricing → ok (4 tiers)",
-        "fetch sowork.com/pricing → ok",
-        "fetch kumospace.com/pricing → 403, retrying",
-        "retry via cache → ok",
-        "normalising per-seat vs flat…",
-        "4 of 6 complete",
+        "opened src/server/auth.js",
+        "extracted refreshToken() → auth/refresh.js",
+        "updated 9 call sites",
+        "running test suite…",
+        "42 passing, 0 failing ✓",
       ],
     },
+
+    // ── terminal: Terminal — server rack (blinking LEDs, ops prompt, network blip)
     {
-      externalId: "demo:scribe",
-      name: "Scribe",
-      role: "Writing",
-      status: "done",
-      source: "claude-code",
-      category: "agent",
-      task: "Drafting the changelog for v2.1",
+      externalId: "demo:riku",
+      name: "Riku",
+      role: "DevOps",
+      status: "working",
+      source: "desktop",
+      tool: "terminal",
+      category: "coding",
+      task: "Watching the deploy pipeline roll out to prod",
       seenMinutes: 1,
       look: {
-        hair: "#6B4426", skin: "#F0D2AC", shirt: "#F3CE79", pants: "#8A7358", glow: "#FFF1CC",
-        hairStyle: "bun", outfit: "collar", accessory: "earrings", accent: "#C7913F",
+        hair: "#2E2A26", skin: "#8A5F3C", shirt: "#F8DFA0", pants: "#5E6E86", glow: "#FFF1CC",
+        hairStyle: "cap", outfit: "vest", accessory: "none", accent: "#9BD8B4",
       },
       log: [
-        "read 24 merged PRs since v2.0",
-        "grouped into 5 themes",
-        "drafted 340 words",
-        "flagged 2 breaking changes",
-        "done — waiting for your review",
+        "$ git push origin main",
+        "CI build triggered → 3m12s",
+        "health checks: 3/3 ✓",
+        "watching pod rollout…",
+        "2/3 replicas ready",
       ],
     },
+
+    // ── design: Figma — design studio (easel, artboard, swatch tray, floating chip)
     {
-      externalId: "demo:auditor",
-      name: "Auditor",
-      role: "Review",
-      status: "blocked",
-      source: "claude-code",
-      category: "agent",
-      task: "Weekly funnel check",
-      seenMinutes: 2,
-      look: {
-        hair: "#3A322C", skin: "#C89370", shirt: "#F29C8D", pants: "#7A7189", glow: "#FFD2CA",
-        hairStyle: "beanie", outfit: "vest", accessory: "lanyard", accent: "#CFBBF0", build: "broad",
-      },
-      log: [
-        "connected to warehouse → ok",
-        "query signups_daily → ok",
-        "query activation_events → PERMISSION DENIED",
-        "retried 3× — same",
-        "BLOCKED: needs analytics dashboard access",
-      ],
-    },
-    {
-      externalId: "demo:builder",
-      name: "Builder",
-      role: "Engineering",
+      externalId: "demo:petra",
+      name: "Petra",
+      role: "Design",
       status: "working",
-      source: "claude-code",
-      category: "agent",
-      task: "Refactoring the auth module",
+      source: "desktop",
+      tool: "figma",
+      category: "design",
+      task: "Mocking up the new onboarding flow — three screens left",
       seenMinutes: 0,
       look: {
-        hair: "#332C26", skin: "#A0714B", shirt: "#94CDEE", pants: "#6E7E96", glow: "#D8EEFF",
-        hairStyle: "cap", outfit: "hoodie", accessory: "headphones", accent: "#6E9FD8",
+        hair: "#6B4426", skin: "#F0D2AC", shirt: "#F6BCD1", pants: "#7A7189", glow: "#FFE3EC",
+        hairStyle: "bun", outfit: "apron", accessory: "scarf", accent: "#F0A79E", build: "slim",
       },
       log: [
-        "read src/auth/*.ts (7 files)",
-        "extracted session logic → session.ts",
-        "updated 12 call sites",
-        "running test suite…",
-        "38 passing, 2 failing — investigating",
+        "opened onboarding.fig",
+        "screen 1/5: welcome — done ✓",
+        "screen 2/5: connect workspace — done ✓",
+        "screen 3/5: first office — in progress",
+        "dropped a comment on the invite card",
+      ],
+    },
+
+    // ── call: Zoom — meeting room (wall display, camera tiles, ON AIR, speaker hop)
+    {
+      externalId: "demo:theo",
+      name: "Theo",
+      role: "Product",
+      status: "working",
+      source: "desktop",
+      tool: "zoom",
+      category: "call",
+      task: "Sprint planning — estimating the Q3 roadmap with the team",
+      seenMinutes: 0,
+      look: {
+        hair: "#403830", skin: "#C89370", shirt: "#94CDEE", pants: "#6E7E96", glow: "#D8EEFF",
+        hairStyle: "short", outfit: "collar", accessory: "headphones", accent: "#6E9FD8", build: "broad",
+      },
+      log: [
+        "joined sprint-planning call",
+        "screensharing the Notion roadmap",
+        "voting on auth overhaul: 3 pts",
+        "voting on onboarding redesign: 5 pts",
+        "next: API rate-limit milestone",
+      ],
+    },
+
+    // ── music: Spotify — turntable console (vinyl, tonearm, VU bars, rising notes)
+    {
+      externalId: "demo:yuki",
+      name: "Yuki",
+      role: "Data",
+      status: "working",
+      source: "desktop",
+      tool: "spotify",
+      category: "music",
+      task: "Running the weekly cohort analysis — Lo-fi on in the background",
+      seenMinutes: 2,
+      look: {
+        hair: "#332C26", skin: "#A0714B", shirt: "#9BD8B4", pants: "#7A7189", glow: "#CCF3DC",
+        hairStyle: "beanie", outfit: "stripes", accessory: "headphones", accent: "#86CFA6",
+      },
+      log: [
+        "connected to warehouse",
+        "query: signups_by_cohort → 4 200 rows",
+        "D7 retention: 38% (prev 33%) ↑",
+        "D30 retention: 19% — flagging",
+        "drafting chart for the weekly digest",
+      ],
+    },
+
+    // ── writing: Notion — library nook (lamp, manuscript, book stack, coffee, ink line)
+    {
+      externalId: "demo:clem",
+      name: "Clem",
+      role: "Content",
+      status: "working",
+      source: "desktop",
+      tool: "notion",
+      category: "writing",
+      task: "Drafting the v2.2 changelog — 400 words, almost done",
+      seenMinutes: 1,
+      look: {
+        hair: "#7A4A22", skin: "#F0D2AC", shirt: "#C6B0EC", pants: "#8A7358", glow: "#E8DBFF",
+        hairStyle: "long", outfit: "overalls", accessory: "glasses", accent: "#59696E", build: "slim",
+      },
+      log: [
+        "opened v2.2 changelog in Notion",
+        "read 18 merged PRs",
+        "grouped: Auth, Onboarding, Performance",
+        "drafted 400 words — almost final",
+        "flagged: breaking change in token API",
+      ],
+    },
+
+    // ── browsing: Chrome — reading perch (laptop, article cards, scrolling feed)
+    {
+      externalId: "demo:soren",
+      name: "Soren",
+      role: "Marketing",
+      status: "working",
+      source: "desktop",
+      tool: "chrome",
+      category: "browsing",
+      task: "Competitor research — reading pricing pages for the pitch deck",
+      seenMinutes: 3,
+      look: {
+        hair: "#3A322C", skin: "#B5835B", shirt: "#F29C8D", pants: "#7A7189", glow: "#FFD2CA",
+        hairStyle: "short", outfit: "collar", accessory: "none", accent: "#6E9FD8", build: "regular",
+      },
+      log: [
+        "opened gather.town/pricing → 3 tiers",
+        "opened whereby.com/pricing → per-seat",
+        "opened kumospace.com/pricing → 403, cached copy",
+        "building comparison table in a tab",
+        "4 of 6 competitors done",
+      ],
+    },
+
+    // ── review: GitHub — inspection station (diff screen, corkboard, magnifier)
+    {
+      externalId: "demo:anya",
+      name: "Anya",
+      role: "Engineering",
+      status: "working",
+      source: "desktop",
+      tool: "github",
+      category: "review",
+      task: "Reviewing PR #214 — auth refresh refactor from Marisol",
+      seenMinutes: 1,
+      look: {
+        hair: "#4A382C", skin: "#D9A277", shirt: "#CFBBF0", pants: "#6E7E96", glow: "#E8DBFF",
+        hairStyle: "bun", outfit: "vest", accessory: "glasses", accent: "#CFBBF0",
+      },
+      log: [
+        "opened PR #214: auth token refresh refactor",
+        "read 7 changed files",
+        "left 2 inline comments",
+        "approved refreshToken() extraction ✓",
+        "waiting on: test coverage for edge case",
+      ],
+    },
+
+    // ── focus: other — quiet nook (plant, mug, soft breathing glow)
+    {
+      externalId: "demo:felix",
+      name: "Felix",
+      role: "Engineering",
+      status: "done",
+      source: "desktop",
+      tool: "other",
+      category: "other",
+      task: "Heads-down on the rate-limiter — no notifications until 3pm",
+      seenMinutes: 8,
+      look: {
+        hair: "#332C26", skin: "#A0714B", shirt: "#EAD9C4", pants: "#5E6E86", glow: "#F5EEDE",
+        hairStyle: "short", outfit: "plain", accessory: "none", accent: "#C7D2CE",
+      },
+      log: [
+        "closed all tabs",
+        "focus mode on",
+        "reading RFC: sliding-window rate limiter",
+        "wrote prototype — 80 lines",
+        "done for today · handing off to Riku",
       ],
     },
   ];
@@ -116,7 +253,7 @@ export function demoSpaceState(slug = DEMO_SLUG) {
     role: a.role,
     status: a.status,
     source: a.source,
-    tool: "claude-code",
+    tool: a.tool,
     category: a.category,
     object: null,
     currentTask: a.task,
