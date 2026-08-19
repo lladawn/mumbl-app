@@ -128,37 +128,55 @@ export const blogPosts = [
     ],
   },
   {
-    slug: "a-room-not-a-dashboard",
-    title: "a room, not a dashboard",
-    dek: "the research on workplace monitoring is consistent: watched people don't work better, they just get better at looking watched.",
-    date: "2026-08-19",
+    slug: "forty-seven-seconds",
+    title: "forty-seven seconds",
+    dek: "in 2004, the average person could hold attention on one task for two and a half minutes. a researcher has been timing us with a stopwatch ever since.",
+    date: "2026-08-20",
     author: "Disha Agarwalla",
     body: [
       {
         type: "p",
-        text: "In 2023 and 2024, a strange arms race broke out in corporate offices. Companies rolled out monitoring software to check whether hybrid employees were actually at their keyboards. Employees responded with mouse jigglers — small devices, some shaped like a USB stick with a tiny motor inside, whose entire job is to nudge a cursor just enough to keep a status light green. One major US bank fired more than a dozen people for using them. It made international news, which tells you roughly how many people were doing it.",
+        text: "In 1973, a historian named Charles Weiner sat with Richard Feynman going through boxes of the physicist's old working notebooks — pages of half-finished equations, dead ends, ideas crossed out mid-line. Trying to pay a compliment, Weiner called them a wonderful record of how Feynman thought. Feynman shut that down immediately.",
+      },
+      {
+        type: "quote",
+        text: "They aren't a record of my thinking process. They are my thinking process.",
+        cite: "Richard Feynman, to Charles Weiner, 1973 — quoted in James Gleick's Genius",
       },
       {
         type: "p",
-        text: "The instinct behind the monitoring software is understandable. If you can't see the work, how do you know it's happening? But a study covered by Harvard Business Review on the actual effect of covert monitoring found close to the opposite of what employers hoped: employees who were secretly monitored were more likely to take unapproved breaks, ignore instructions, damage equipment, and deliberately slow down. Watching people doesn't make them work better. It makes them start managing how they look, which is a different job from the one they were hired for.",
+        text: "Weiner pushed back, reasonably — surely the actual thinking happened in his head, and the notebook just kept score afterward. Feynman wouldn't give him that either. \"No, it's not a record, not really,\" he said. \"It's working. You have to work on paper, and this is the paper.\"",
       },
       {
         type: "p",
-        text: "We kept coming back to that while building the part of mumbl that shows what your agents — and eventually your team — are actually doing. The easy version of that feature is a dashboard: rows, statuses, uptime, a productivity number ticking somewhere in the corner. It's also the version that turns into exactly the thing people spend their energy quietly defeating.",
+        text: "Most of us treat a rough draft as scaffolding — something you clear away once the real, finished thing exists underneath it. Feynman is telling Weiner there was no finished thing hiding behind the scratch marks, waiting patiently to be copied out clean. The scratch marks were the whole event. Take away the paper and the thinking doesn't relocate somewhere else and happen anyway. It just doesn't happen.",
       },
       {
         type: "p",
-        text: "So we didn't build a dashboard. We built a room. The difference sounds cosmetic and isn't. A dashboard exists to be watched — that's its whole design brief, optimized for the watcher. A room exists to be inhabited — its whole design brief is what it's like from inside. You can glance into a room the same way you'd glance up from your desk to see who's around, and just as easily not. Nothing in a room is trying to compress you into a metric, because rooms don't have metrics. They have people in them, doing things.",
+        text: "A century earlier, a very different kind of mind arrived at almost the same place from the opposite direction. Charles Darwin ran his working life on a schedule so exact that his son Francis eventually wrote it down like a liturgy: up by seven, in the study by eight for ninety minutes, then the morning's letters, then back to real work until noon — at which point Darwin would announce, \"I've done a good day's work,\" and leave for a long walk. Add it up and it's about four hours of actual work a day. Four hours produced On the Origin of Species. Darwin wasn't lazy, and by every account he wasn't especially quick. He seems to have understood, from the structure side of things, exactly what Feynman understood from the paper side: that the kind of thinking which actually moves an idea forward shows up in a narrow, protected, unhurried window, and that window is in short supply. You don't get more of it by demanding more hours. You get more of it by guarding the ones you have.",
       },
       {
         type: "p",
-        text: "Practically, that meant real constraints, not just a coat of paint: what's visible is shape, not content — that someone's on a call, not what's being said in it. Activity that isn't actively happening doesn't get remembered forever by default. And the moment any of this starts reading as \"quietly measuring people,\" it stops being what we're building.",
+        text: "It's worth knowing what's happened to that window since Darwin's day. In 2004, a researcher named Gloria Mark — now a Chancellor's Professor at UC Irvine — started literally timing people with a stopwatch: how long, on average, could someone stay on one task before switching to something else? Two and a half minutes. She kept measuring, year after year, study after study. By 2012 it was 75 seconds. Her most recent field data puts it at 47 seconds. Not because attention itself got worse — because almost everything in a knowledge worker's environment is now built, on purpose, to interrupt it before the 47 seconds are up.",
+      },
+      {
+        type: "p",
+        text: "And the cost isn't the interruption itself. It's what comes after. Mark's research found that once you're pulled out of a task, it takes an average of 23 minutes and 15 seconds to return to the depth of focus you were at before — not to reopen the file, to actually get your thinking back to where it was. Set that next to a 47-second attention span and the arithmetic simply stops closing. There isn't enough day left for the state Darwin built his entire schedule around protecting, or the one Feynman needed a blank page to enter.",
+      },
+      {
+        type: "p",
+        text: "This is the thing we're actually trying to protect. Not productivity — Darwin worked four hours and it was enough. Not focus as a virtue in itself — Feynman wasn't disciplined, he was just honest about where his physics actually lived. What we're building is a place for the version of a thought that exists in the 47 seconds before something interrupts it: the half-sentence, the wrong equation, the thing you'd never put in a ticket because it isn't finished yet and might be wrong. Almost every tool we use waits for you to clean that up first. In a world that charges 23 minutes and 15 seconds to get back to where you were, waiting is how most of it quietly disappears before it's ever written down.",
+      },
+      {
+        type: "p",
+        text: "Feynman kept notebooks until the year he died, and nobody made him. He wasn't archiving himself for a historian — Weiner had to talk his way into even seeing them. He kept them because that was genuinely where the physics happened, and even a person doing some of the most important thinking of the twentieth century still needed somewhere to put the parts of it that weren't finished. That's a strange thing for a genius to need. It's probably exactly what the rest of us need too.",
       },
     ],
-    closing: "surveillance and visibility get confused constantly. we're trying to build the second one.",
+    closing: "no number in this one is invented. sources below.",
     furtherReading: [
-      { text: "Bosses are striking back at workers who use mouse jigglers — CNN Opinion", href: "https://www.cnn.com/2024/06/26/opinions/bossware-wells-fargo-mouse-jiggler-yang" },
-      { text: "Hybrid work hack: mouse jigglers fool employee monitoring software — South China Morning Post", href: "https://www.scmp.com/lifestyle/gadgets/article/3267209/hybrid-work-hack-mouse-jigglers-fool-employee-monitoring-software-bosses-fight-back" },
+      { text: "The Feynman Notebook Method — Cal Newport", href: "https://calnewport.com/the-feynman-notebook-method/" },
+      { text: "Darwin's Daily Routine — Maria Popova, The Marginalian", href: "https://www.themarginalian.org/2013/05/10/charles-darwin-daily-routine/" },
+      { text: "Attention Span — Gloria Mark", href: "https://gloriamark.com/attention-span/" },
     ],
   },
   {
@@ -194,70 +212,6 @@ export const blogPosts = [
       },
     ],
     closing: "a dashboard tells you what happened. an office lets you feel like you were there.",
-  },
-  {
-    slug: "shape-not-content",
-    title: "shape, not content",
-    dek: "we could show your coworkers exactly what you typed today. we decided not to, and the product got better because of it, not worse.",
-    date: "2026-08-19",
-    author: "Disha Agarwalla",
-    body: [
-      {
-        type: "p",
-        text: "We could build a version of this that shows your coworkers exactly what you typed today — which tabs you had open, how many minutes you lost to Twitter before getting back to work. Plenty of software already does exactly that, and companies buy it. I think it's a mistake before you even get to the ethics of it. It makes worse software.",
-      },
-      {
-        type: "p",
-        text: "The rule we set for ourselves early was: capture shape, never content. The office knows you're \"in Figma.\" It doesn't know what's on the canvas. It knows you're \"on a call.\" It doesn't know who with or what about. There's one function in the codebase — `redactForPublic` — and every byte of data that's ever shown to another person has to pass through it. Its entire job is refusing to let a task description, a file name, or a URL anywhere near a card someone else can see.",
-      },
-      {
-        type: "p",
-        text: "The obvious objection is that this makes the product weaker. Less \"insight.\" Less useful to a manager who actually wants to know what happened. I used to half-believe that myself. Then I paid attention to what happens on teams that ship the content version of this: people start managing how their activity looks instead of doing the work. They fake presence. Mouse jigglers exist as a whole product category for exactly this reason. The manager ends up with a very precise picture of nothing real, because everyone in it is optimizing for the picture.",
-      },
-      {
-        type: "p",
-        text: "Shape doesn't have that failure mode, because there's nothing in it worth gaming. You can't fake \"coding\" into looking like \"coding, but more impressively\" — there's no score, just a room that's lit or it isn't. That's the part I didn't expect going in: the privacy constraint wasn't a tax we paid to feel good about the product. It's the reason the product doesn't collapse into the thing everyone already hates.",
-      },
-      {
-        type: "p",
-        text: "The same logic runs all the way down the stack. Events expire after fifteen minutes by default — the office shows you now, not a permanent record someone could screenshot and hold against you six months later. History is opt-in and off unless you explicitly turn it on. None of this is because we're precious about privacy as a brand value. It's because the second this starts remembering everything, it stops being a room you walk into and starts being a room you're careful in. Those are two different products, and only one of them was worth building.",
-      },
-    ],
-    closing: "if this constraint ever starts feeling like a limitation instead of the point, we've built it wrong.",
-  },
-  {
-    slug: "the-browser-extension-we-didnt-build",
-    title: "the browser extension we didn't build",
-    dek: "everyone's first idea for this is a browser extension. mine too. it's also wrong, and it took me embarrassingly long to admit that.",
-    date: "2026-08-19",
-    author: "Disha Agarwalla",
-    body: [
-      {
-        type: "p",
-        text: "Everyone's first idea for this is a browser extension, including mine. It's the easy answer — extensions are simple to ship, people already trust the install flow, and a big chunk of \"what tool am I using\" happens inside a browser tab anyway.",
-      },
-      {
-        type: "p",
-        text: "It's also wrong for what we're building, and it took me embarrassingly long to admit that. A browser extension can see your tabs. It cannot see that you switched to Figma, or opened VS Code, or picked up a Zoom call — the actual moments that make up someone's day happen outside the browser about as often as inside it. Ship a browser extension and you've built a very good tracker for the forty percent of work that happens to run in Chrome. The other sixty percent just doesn't exist to your product.",
-      },
-      {
-        type: "p",
-        text: "The thing that can actually see across all of that is the operating system, not the browser. So the right shape for this is a small app that lives quietly in the menu bar and asks the OS exactly one question: which app just got focus? On a Mac that's a single system notification — `NSWorkspace.didActivateApplicationNotification` — and nothing scarier than that. No Accessibility permission, no reading window titles, no keystrokes. v1 doesn't even ask for the permission that would let it see more. That's on purpose, not a limitation we're apologizing for.",
-      },
-      {
-        type: "p",
-        text: "I looked hard at Electron before ruling it out, mostly because I already know it and shipping fast is a stronger pull than any architecture opinion. But this thing has to idle in your menu bar all day, every day, for as long as your laptop's open, and Electron's memory footprint for that job is indefensible — you'd be running an entire Chromium instance to notice that you alt-tabbed. Tauri gets almost the same web UI I'd have written for Electron anyway, wrapped around maybe a hundred lines of actual Rust doing the OS polling. Ten megabytes instead of a hundred and fifty, for a job that's ninety-five percent \"sit quietly and watch one system event.\"",
-      },
-      {
-        type: "p",
-        text: "The token that authenticates the helper lives in the OS keychain, not a config file sitting on disk, and it's the exact same ingest token the rest of the product already uses — no new auth system invented just for this one piece. Nothing leaves the machine until you've explicitly picked which apps you're willing to share. The default on install is silence.",
-      },
-      {
-        type: "p",
-        text: "It's sitting in the repo right now, compiling clean, not in anyone's hands yet. Shipping a menu-bar app that watches app-switching means Apple wants it signed and notarized before Gatekeeper lets a stranger run it, and that's a developer account and a process, not a code problem. It's the most boring blocker in the entire project, and also the only thing standing between \"it works on my machine\" and you actually being able to install it.",
-      },
-    ],
-    closing: "the interesting engineering was already done by the time we got to the part everyone assumes is the hard part.",
   },
 ];
 
