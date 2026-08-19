@@ -29,6 +29,7 @@
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "playwright": "^1.62.1",
     "supabase": "^2.98.2",
     "typescript": "^6.0.3"
   }

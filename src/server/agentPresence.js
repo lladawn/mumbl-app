@@ -2,6 +2,7 @@ import { decryptContentFields, encryptContentFields } from "./encryption";
 import { getServerEnv } from "./env";
 import { hashToken } from "./hash";
 import { cleanString } from "./validation";
+import { incrementDailyTotal } from "./dayRecap";
 
 export const AGENT_STATUSES = ["idle", "working", "blocked", "done"];
 
@@ -96,6 +97,11 @@ function resolveCategory(value, source) {
   return source === "claude-code" ? "agent" : "focus";
 }
 
+// Maximum seconds we credit per event gap. Caps gaps caused by the helper
+// being paused, a machine sleeping, or very infrequent hooks. Anything longer
+// than this looks like "away", not continuous focus.
+const DAILY_TOTAL_MAX_GAP_SEC = 10 * 60; // 10 minutes
+
 export async function recordAgentState(supabase, { spaceId, agent, status, task, kind, detail, occurredAt, tool, category, object }) {
   const externalId = cleanString(agent.externalId, 200);
   if (!externalId) {
@@ -113,6 +119,26 @@ export async function recordAgentState(supabase, { spaceId, agent, status, task,
   const cleanTool = cleanString(tool, 40) || (source === "claude-code" ? "claude-code" : null);
   const cleanCategory = resolveCategory(category, source);
   const cleanObject = cleanString(object, 40) || null;
+
+  // ── Daily aggregate: capture previous state BEFORE the upsert so we can
+  //    compute elapsed seconds since the actor's last event. This is a PK
+  //    lookup (space_id, external_id) so it's cheap. If the actor is new, the
+  //    row won't exist and delta = 0 (first session bump only).
+  const nowMs = Date.now();
+  let prevLastSeenAt = null;
+  let prevTool = null;
+  let prevCategory = null;
+  const { data: prevRow } = await supabase
+    .from("agents")
+    .select("last_seen_at, tool, category")
+    .eq("space_id", spaceId)
+    .eq("external_id", externalId)
+    .maybeSingle();
+  if (prevRow) {
+    prevLastSeenAt = prevRow.last_seen_at;
+    prevTool = prevRow.tool;
+    prevCategory = prevRow.category;
+  }
 
   const { data: agentRow, error: upsertError } = await supabase
     .from("agents")
@@ -157,6 +183,42 @@ export async function recordAgentState(supabase, { spaceId, agent, status, task,
   });
 
   if (eventError) throw eventError;
+
+  // ── Durable day-aggregate increment (best-effort — never fails ingest) ──
+  //
+  // Credit the elapsed seconds since the actor's last event to the PREVIOUS
+  // tool+category (what they were doing in that window). Cap at
+  // DAILY_TOTAL_MAX_GAP_SEC so a machine sleep or long pause doesn't inflate
+  // the total. A new actor (no prevRow) gets a session bump with 0 seconds.
+  //
+  // Shape-only: we only write tool + category, never task/detail/object.
+  await (async () => {
+    // Determine which (tool, category) to credit the elapsed time to.
+    // Use the PREVIOUS tool+category (the one active during the elapsed gap),
+    // falling back to the current event's shape if this is a new actor.
+    const creditTool = prevTool || cleanTool;
+    const creditCategory = prevCategory || cleanCategory;
+    if (!creditTool || !creditCategory) return;
+
+    const rawDeltaSec = prevLastSeenAt
+      ? Math.round((nowMs - new Date(prevLastSeenAt).getTime()) / 1000)
+      : 0;
+    const deltaSec = Math.min(Math.max(0, rawDeltaSec), DAILY_TOTAL_MAX_GAP_SEC);
+
+    // isNewSession: true on the very first event of the day for this actor+tool
+    // combination, or when the actor switches to a different tool. This gives
+    // a rough "session" count (number of distinct focus blocks).
+    const isNewSession = !prevLastSeenAt || prevTool !== cleanTool;
+
+    await incrementDailyTotal(supabase, {
+      spaceId,
+      actorExternalId: externalId,
+      tool: creditTool,
+      category: creditCategory,
+      deltaSec,
+      isNewSession,
+    }).catch(() => {}); // best-effort: a failed aggregate must not fail ingest
+  })();
 
   // Purge-on-write: this space's own writes sweep its lapsed events, so the DB
   // stays a thin relay without needing a cron. Best-effort — a failed purge

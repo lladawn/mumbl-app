@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og";
 import { cleanString } from "../../../../src/server/validation";
+import { getSupabaseAdmin } from "../../../../src/server/supabase";
+import { readDayRecap } from "../../../../src/server/dayRecap";
 
 export const alt = "A recap of my workday, in the mumbl office.";
 export const size = { width: 1200, height: 630 };
@@ -603,15 +605,41 @@ function heroStationElements(category, screenKind, look, s) {
   return els;
 }
 
+// ── Demo slug — always renders mock sample data, never real aggregate.
+const DEMO_SLUG = "demo";
+
 // ── Route handler
 export default async function Image({ params }) {
   const { slug } = await params;
   const title = cleanString(slug, 40) || "you";
+
   // For demo/testing: if slug starts with "demo-v" use that variant index.
   // Otherwise always use variant 0 (the default shape).
   const variantMatch = slug?.match(/^demo-v(\d)$/);
   const variant = variantMatch ? parseInt(variantMatch[1]) : 0;
-  const recap = mockToRecap(recapMock(variant));
+
+  // ── DATA SOURCE SWITCH ────────────────────────────────────────────────────
+  // "demo" slug (and demo-vN) → always mock, so the public example is stable.
+  // Any other slug → attempt to read today's real daily_app_totals aggregate.
+  //   Falls back to mock when: no real data yet, table not migrated, or any
+  //   error — so the card always renders something useful.
+  let agg = null;
+  const isDemo = slug === DEMO_SLUG || variantMatch;
+
+  if (!isDemo) {
+    try {
+      const supabase = getSupabaseAdmin();
+      // Aggregate ALL actors in the space for today — covers the single-person
+      // case (desktop helper sends separate actor rows per app) as well as team
+      // spaces. Falls back to null (→ mock) when no rows exist yet.
+      agg = await readDayRecap(supabase, slug);
+    } catch {
+      // Any error (missing table, network, bad slug) → fall back to mock.
+      agg = null;
+    }
+  }
+
+  const recap = mockToRecap(agg || recapMock(variant));
   const arch = pickArchetype(recap);
   return new ImageResponse(<RecapCard title={title} r={recap} arch={arch} />, size);
 }
