@@ -46,9 +46,13 @@
     { x: 720, y: 838, label: "reception" },
   ];
 
+  // 9-desk bullpen (3 rows of 3) — handles a typical 6-10 app stack without
+  // hitting the overflow "+N more" cap on a normal busy day. A person running
+  // editor + terminal + browser + Slack + Zoom + Spotify fills 6 of these easily.
   const DESKS = [
-    { x: 520, y: 260 }, { x: 720, y: 260 }, { x: 920, y: 260 },
-    { x: 520, y: 480 }, { x: 720, y: 480 }, { x: 920, y: 480 },
+    { x: 520, y: 220 }, { x: 720, y: 220 }, { x: 920, y: 220 },
+    { x: 520, y: 370 }, { x: 720, y: 370 }, { x: 920, y: 370 },
+    { x: 520, y: 500 }, { x: 720, y: 500 }, { x: 920, y: 500 },
   ];
   const DOOR = { x: 720, y: 916 };
 
@@ -176,21 +180,28 @@
     // MUSIC — record player on the desk: spinning vinyl + rising ♪ notes. This is
     // the "why does theirs have a record player" hook. Reads even with no body.
     music(scene, g, x, y, objs) {
-      g.fillStyle(S.wood, 1); g.fillRect(x - 20, y - 14, 34, 18);
-      g.fillStyle(S.vinyl, 1); g.fillEllipse(x - 3, y - 5, 22, 14);
-      g.fillStyle(S.coral, 1); g.fillEllipse(x - 3, y - 5, 6, 4);
-      g.fillStyle(0xF0E2C8, 1); g.fillRect(x - 4, y - 6, 2, 2);
-      // tonearm
-      g.fillStyle(S.metal, 1); g.fillRect(x + 8, y - 12, 2, 9);
-      // spinning highlight
-      const spin = scene.add.rectangle(x - 3, y - 9, 3, 3, 0x6E7E79).setDepth(y + 32);
-      scene.tweens.add({ targets: spin, angle: 360, duration: 1400, repeat: -1, ease: "Linear",
-        onUpdate: (tw) => { const a = spin.angle * Math.PI / 180; spin.setPosition(x - 3 + Math.cos(a) * 7, y - 5 + Math.sin(a) * 4); } });
+      // Wood chassis — slightly larger + darker rim for depth
+      g.fillStyle(0x9E7A52, 1); g.fillRect(x - 24, y - 16, 42, 20);  // shadow/rim
+      g.fillStyle(S.wood, 1); g.fillRect(x - 22, y - 14, 38, 17);    // main chassis
+      g.fillStyle(0xD4A86A, 1); g.fillRect(x - 22, y - 14, 38, 3);   // wood highlight
+      // Vinyl disc — two ellipses for a sense of thickness + spinning groove
+      g.fillStyle(S.vinyl, 1); g.fillEllipse(x - 3, y - 5, 26, 17);
+      g.fillStyle(0x3A3430, 1); g.fillEllipse(x - 3, y - 5, 20, 13); // inner groove
+      g.fillStyle(S.coral, 1); g.fillEllipse(x - 3, y - 5, 7, 5);    // centre label
+      g.fillStyle(0xFFECE0, 1); g.fillRect(x - 4, y - 6, 2, 2);      // spindle highlight
+      // Tonearm — angled from top-right to vinyl
+      g.fillStyle(0xB7C9CB, 1); g.fillRect(x + 10, y - 14, 3, 10);   // arm vertical
+      g.fillStyle(S.metal, 1); g.fillRect(x + 6, y - 8, 6, 2);       // arm horizontal
+      g.fillStyle(0x8A8A8A, 1); g.fillRect(x + 5, y - 9, 3, 3);      // cartridge head
+      // Spinning groove highlight (rotates around vinyl)
+      const spin = scene.add.rectangle(x - 3, y - 9, 4, 2, 0x5E6870).setDepth(y + 32);
+      scene.tweens.add({ targets: spin, angle: 360, duration: 1600, repeat: -1, ease: "Linear",
+        onUpdate: () => { const a = spin.angle * Math.PI / 180; spin.setPosition(x - 3 + Math.cos(a) * 9, y - 5 + Math.sin(a) * 5); } });
       objs.push(spin);
-      // rising notes
-      [0, 1].forEach((i) => {
-        const note = scene.add.text(x + 12 + i * 6, y - 10, "♪", { fontFamily: "monospace", fontSize: "10px", color: "#9BD8B4" }).setDepth(y + 33);
-        scene.tweens.add({ targets: note, y: y - 30, alpha: 0, duration: 1800, delay: i * 600, repeat: -1, ease: "Sine.easeOut" });
+      // rising ♪ notes with stagger
+      [0, 1, 2].forEach((i) => {
+        const note = scene.add.text(x + 14 + i * 5, y - 8, "♪", { fontFamily: "monospace", fontSize: "10px", color: "#9BD8B4" }).setDepth(y + 33);
+        scene.tweens.add({ targets: note, y: y - 32, alpha: 0, duration: 2000, delay: i * 500, repeat: -1, ease: "Sine.easeOut" });
         objs.push(note);
       });
     },
@@ -208,14 +219,22 @@
       scene.tweens.add({ targets: inkline, scaleX: 6, duration: 1500, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
       objs.push(inkline);
     },
-    // BROWSING — a tablet propped on the desk with scrolling lines.
+    // BROWSING — a tablet propped on the desk with scrolling content.
     browsing(scene, g, x, y, objs) {
-      g.fillStyle(0x3A4348, 1); g.fillRect(x - 14, y - 16, 22, 15);
-      g.fillStyle(S.coral, 1); g.fillRect(x - 12, y - 14, 18, 3);
-      g.fillStyle(0xEFE7DA, 1); g.fillRect(x - 12, y - 10, 18, 8);
+      // Tablet: dark frame with a slight bezel inset on all sides
+      g.fillStyle(0x2E3438, 1); g.fillRect(x - 16, y - 20, 28, 20); // outer tablet frame
+      g.fillStyle(S.coral, 1); g.fillRect(x - 14, y - 18, 24, 4);   // header/chrome bar
+      g.fillStyle(0xF0E8DA, 1); g.fillRect(x - 14, y - 13, 24, 12); // screen content area
+      g.fillStyle(0x6E7E79, 0.8); g.fillRect(x - 6, y - 4, 8, 2);   // home bar hint
+      // Content lines (text rows)
+      g.fillStyle(S.ink, 0.5); g.fillRect(x - 12, y - 11, 18, 2); g.fillRect(x - 12, y - 7, 14, 2); g.fillRect(x - 12, y - 3, 16, 2);
+      // Scrolling animation — the content rows move up slightly
       const rows = [];
-      for (let i = 0; i < 3; i++) { const r = scene.add.rectangle(x - 11, y - 8 + i * 3, 14, 1, S.ink, 0.6).setOrigin(0, 0.5).setDepth(y + 32); rows.push(r); objs.push(r); }
-      scene.tweens.add({ targets: rows, y: "-=2", duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      for (let i = 0; i < 3; i++) {
+        const r = scene.add.rectangle(x - 12, y - 11 + i * 4, 18, 2, S.ink, 0.55).setOrigin(0, 0.5).setDepth(y + 32);
+        rows.push(r); objs.push(r);
+      }
+      scene.tweens.add({ targets: rows, y: "-=3", duration: 1100, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
     },
     // FOCUS / OTHER — deliberately quiet: a dim desk, a coffee cup, no signature.
     focus(scene, g, x, y, objs) {
@@ -353,7 +372,9 @@
 
   function makePerson(scene, key, opts) {
     if (scene.textures.exists(key)) return;
-    const w = 14, h = 20;
+    // 16×22 canvas for more room: extra 2px width gives shoulder flare,
+    // extra 2px height gives a proper shoe row + breathing room at top.
+    const w = 16, h = 22;
     const tex = scene.textures.createCanvas(key, w, h);
     const ctx = tex.getContext();
     ctx.clearRect(0, 0, w, h);
@@ -362,78 +383,131 @@
       hairStyle = "short", outfit = "plain", accessory = "none",
       accent = "#FFF8EC", build = "regular",
     } = opts;
-    const LINE = "#59696E", SHOE = "#8A7358";
+    const LINE = "#59696E", SHOE = "#6E5A44";
+    // Derived skin shadow for depth (slightly darker than skin)
+    const skinShadow = skin;  // we'll apply globalAlpha overlay trick instead
 
-    if (glow) { ctx.globalAlpha = 0.22; px(ctx, 1, 1, 12, 18, glow); ctx.globalAlpha = 1; }
+    if (glow) { ctx.globalAlpha = 0.20; px(ctx, 1, 2, 14, 20, glow); ctx.globalAlpha = 1; }
 
-    const tx = build === "slim" ? 4 : 3;
-    const tw = build === "slim" ? 6 : build === "broad" ? 9 : 8;
-    const legL = tx + 1, legR = tx + tw - (tw >= 8 ? 3 : 2);
+    // Body geometry: slim/regular/broad torso widths, centred in 16px canvas
+    const tx = build === "slim" ? 4 : build === "broad" ? 2 : 3;
+    const tw = build === "slim" ? 8 : build === "broad" ? 12 : 10;
+    const shoulderW = tw + (build === "broad" ? 2 : 2);  // shoulder flare = 2px wider than torso
+    const shoulderX = tx - 1;
+    const legL = tx + 1, legR = tx + tw - 3;
 
+    // ---- HAIR & HEAD ----
+    // Head: 8 wide, centred. Softer silhouette with 1px corner cuts.
+    // The face (skin) is 6 wide (rows 3-6), indented 1px each side.
     if (hairStyle === "hood") {
-      px(ctx, 2, 1, 10, 8, shirt); px(ctx, 3, 2, 8, 2, hair);
+      // Hood covers most of head
+      px(ctx, 3, 1, 10, 8, shirt); px(ctx, 4, 2, 8, 2, hair);
+      px(ctx, 4, 1, 8, 3, hair);   // hood brim
     } else if (hairStyle === "curly") {
-      px(ctx, 3, 0, 8, 5, hair);
-      px(ctx, 2, 2, 1, 4, hair); px(ctx, 11, 2, 1, 4, hair);
-      px(ctx, 4, 0, 2, 1, hair);
+      // Curly cloud — wider, taller
+      px(ctx, 4, 0, 8, 6, hair);
+      px(ctx, 3, 1, 1, 4, hair); px(ctx, 12, 1, 1, 4, hair);  // side puffs
+      px(ctx, 5, 0, 6, 1, hair);  // top puff
     } else if (hairStyle === "long") {
-      px(ctx, 4, 1, 6, 3, hair); px(ctx, 3, 2, 8, 4, hair);
-      px(ctx, 2, 3, 1, 9, hair); px(ctx, 11, 3, 1, 9, hair);
+      // Long flow: top cap + side curtains
+      px(ctx, 5, 1, 6, 3, hair); px(ctx, 4, 2, 8, 4, hair);
+      px(ctx, 3, 3, 1, 10, hair); px(ctx, 12, 3, 1, 10, hair);  // long side strands
+      px(ctx, 4, 12, 1, 4, hair); px(ctx, 11, 12, 1, 4, hair);  // tapered ends
     } else if (hairStyle === "bun") {
-      px(ctx, 5, 0, 4, 2, hair);
-      px(ctx, 4, 1, 6, 3, hair); px(ctx, 3, 2, 8, 4, hair);
+      px(ctx, 6, 0, 4, 2, hair);   // bun knot
+      px(ctx, 5, 1, 6, 3, hair); px(ctx, 4, 2, 8, 4, hair);
     } else if (hairStyle === "cap") {
-      px(ctx, 4, 1, 6, 3, hair); px(ctx, 3, 2, 8, 4, hair);
-      px(ctx, 3, 1, 8, 2, accent); px(ctx, 2, 3, 5, 1, accent); px(ctx, 3, 3, 8, 1, LINE);
+      px(ctx, 5, 1, 6, 3, hair); px(ctx, 4, 2, 8, 4, hair);
+      px(ctx, 4, 1, 8, 2, accent); px(ctx, 3, 3, 5, 1, accent); px(ctx, 4, 3, 8, 1, LINE); // brim
     } else if (hairStyle === "beanie") {
-      px(ctx, 3, 2, 8, 4, hair);
-      px(ctx, 3, 1, 8, 3, accent); px(ctx, 3, 3, 8, 1, LINE); px(ctx, 6, 0, 2, 1, accent);
+      px(ctx, 4, 2, 8, 4, hair);
+      px(ctx, 4, 1, 8, 3, accent); px(ctx, 4, 3, 8, 1, LINE); px(ctx, 7, 0, 2, 1, accent);
     } else {
-      px(ctx, 4, 1, 6, 3, hair); px(ctx, 3, 2, 8, 4, hair);
+      // short default
+      px(ctx, 5, 1, 6, 3, hair); px(ctx, 4, 2, 8, 4, hair);
     }
 
-    px(ctx, 4, 4, 6, 4, skin);
-    if (hairStyle === "short" || hairStyle === "long" || hairStyle === "bun") px(ctx, 4, 3, 6, 1, hair);
-    px(ctx, 5, 6, 1, 1, LINE); px(ctx, 8, 6, 1, 1, LINE);
+    // ---- FACE ----
+    // Face is 6 wide (x 5-10), 4 tall (y 4-7). Corner pixels trimmed for roundness.
+    px(ctx, 5, 3, 6, 1, hair);  // hairline connector row
+    px(ctx, 5, 4, 6, 4, skin);  // main face block
+    // Rounded corners: overwrite face corners with transparency (no-op in canvas =
+    // we just don't draw them, achieved by slightly narrowing at corners)
+    // Right-side face shadow for depth
+    ctx.globalAlpha = 0.18; px(ctx, 10, 4, 1, 4, "#3A2010"); ctx.globalAlpha = 1;
+    // Eyes: 2px apart, with tiny highlight
+    px(ctx, 6, 6, 1, 1, LINE); px(ctx, 9, 6, 1, 1, LINE);
+    // Subtle mouth
+    ctx.globalAlpha = 0.5; px(ctx, 7, 8, 2, 1, LINE); ctx.globalAlpha = 1;
 
-    px(ctx, tx, 8, tw, 7, shirt);
-    px(ctx, tx - 1, 9, 1, 5, shirt); px(ctx, tx + tw, 9, 1, 5, shirt);
-    px(ctx, tx - 1, 13, 1, 2, skin); px(ctx, tx + tw, 13, 1, 2, skin);
+    // Neck: 2px wide connecting face to torso
+    px(ctx, 7, 8, 2, 1, skin);
 
+    // ---- TORSO ----
+    // Shoulders (1 row) wider than torso for shape
+    px(ctx, shoulderX, 9, shoulderW, 1, shirt);
+    // Main torso body (rows 10-14)
+    px(ctx, tx, 10, tw, 5, shirt);
+    // Arms: hang from shoulder row, 2px wide
+    px(ctx, tx - 1, 10, 1, 5, shirt); px(ctx, tx + tw, 10, 1, 5, shirt);
+    // Forearms (skin-coloured, shorter)
+    px(ctx, tx - 1, 14, 1, 2, skin); px(ctx, tx + tw, 14, 1, 2, skin);
+    // Right-side torso shadow for depth
+    ctx.globalAlpha = 0.15; px(ctx, tx + tw - 1, 10, 1, 5, "#2A1810"); ctx.globalAlpha = 1;
+
+    // ---- OUTFIT DETAILS ----
     if (outfit === "hoodie") {
-      px(ctx, tx, 8, tw, 2, accent);
-      px(ctx, 6, 10, 1, 2, accent); px(ctx, 8, 10, 1, 2, accent);
-      px(ctx, tx + 1, 12, tw - 2, 2, LINE);
+      px(ctx, tx, 10, tw, 2, accent);        // hood collar band
+      px(ctx, 7, 12, 1, 2, accent); px(ctx, 9, 12, 1, 2, accent);  // drawstrings
+      px(ctx, tx + 1, 13, tw - 2, 2, LINE);  // front pocket seam
     } else if (outfit === "collar") {
-      px(ctx, tx, 8, 2, 7, accent); px(ctx, tx + tw - 2, 8, 2, 7, accent);
-      px(ctx, 6, 8, 2, 1, "#FFF8EC"); px(ctx, 6, 9, 2, 4, pants);
+      // Open collar: accent lapels + visible white undershirt + tie
+      px(ctx, tx, 10, 2, 5, accent); px(ctx, tx + tw - 2, 10, 2, 5, accent);
+      px(ctx, 7, 10, 2, 1, "#FFF8EC"); px(ctx, 7, 11, 2, 4, pants);  // tie
     } else if (outfit === "stripes") {
-      for (let y = 9; y < 15; y += 2) px(ctx, tx, y, tw, 1, accent);
+      for (let y = 11; y < 15; y += 2) px(ctx, tx, y, tw, 1, accent);
     } else if (outfit === "overalls") {
-      px(ctx, tx + 1, 8, 1, 3, pants); px(ctx, tx + tw - 2, 8, 1, 3, pants);
-      px(ctx, tx + 1, 10, tw - 2, 5, pants); px(ctx, tx + 3, 12, 2, 2, accent);
+      px(ctx, tx + 1, 10, 1, 4, pants); px(ctx, tx + tw - 2, 10, 1, 4, pants);  // straps
+      px(ctx, tx + 1, 12, tw - 2, 3, pants);  // bib body
+      px(ctx, tx + 3, 13, 2, 2, accent);       // bib pocket
     } else if (outfit === "vest") {
-      px(ctx, tx, 8, 2, 7, accent); px(ctx, tx + tw - 2, 8, 2, 7, accent);
-      px(ctx, tx + 2, 8, tw - 4, 1, "#FFF8EC");
+      px(ctx, tx, 10, 2, 5, accent); px(ctx, tx + tw - 2, 10, 2, 5, accent);
+      px(ctx, tx + 2, 10, tw - 4, 1, "#FFF8EC");  // vest neckline
     } else if (outfit === "apron") {
-      px(ctx, tx + 1, 9, tw - 2, 6, accent);
-      px(ctx, tx + 2, 8, 1, 2, accent); px(ctx, tx + tw - 3, 8, 1, 2, accent);
+      px(ctx, tx + 1, 11, tw - 2, 4, accent);                // apron body
+      px(ctx, tx + 2, 10, 1, 2, accent); px(ctx, tx + tw - 3, 10, 1, 2, accent);  // ties
     }
 
-    px(ctx, legL, 15, 2, 4, pants); px(ctx, legR, 15, 2, 4, pants);
-    px(ctx, legL - 1, 19, 3, 1, SHOE); px(ctx, legR, 19, 3, 1, SHOE);
+    // ---- LEGS ----
+    px(ctx, legL, 16, 2, 4, pants); px(ctx, legR, 16, 2, 4, pants);
+    // Shoes: 3px wide, 1px tall, slightly darker
+    px(ctx, legL - 1, 20, 3, 1, SHOE); px(ctx, legR, 20, 3, 1, SHOE);
+    // Shoe highlight
+    ctx.globalAlpha = 0.3; px(ctx, legL, 20, 1, 1, "#B09A7A"); px(ctx, legR + 1, 20, 1, 1, "#B09A7A"); ctx.globalAlpha = 1;
 
+    // ---- ACCESSORIES ----
     if (accessory === "glasses") {
-      px(ctx, 4, 5, 6, 1, LINE); px(ctx, 3, 5, 1, 2, LINE); px(ctx, 10, 5, 1, 2, LINE);
+      // Rounded frames: two 2-px circles connected by bridge
+      px(ctx, 5, 5, 3, 2, LINE); px(ctx, 8, 5, 3, 2, LINE); px(ctx, 7, 5, 2, 1, LINE); // bridge
+      px(ctx, 4, 5, 1, 2, LINE); px(ctx, 11, 5, 1, 2, LINE); // temples
+      // Lens tint (very subtle)
+      ctx.globalAlpha = 0.12; px(ctx, 5, 5, 3, 2, "#BEE7F7"); px(ctx, 8, 5, 3, 2, "#BEE7F7"); ctx.globalAlpha = 1;
     } else if (accessory === "headphones") {
-      px(ctx, 3, 0, 8, 1, LINE); px(ctx, 2, 3, 2, 3, LINE); px(ctx, 10, 3, 2, 3, LINE);
-      px(ctx, 2, 4, 1, 1, accent); px(ctx, 11, 4, 1, 1, accent);
+      // Headband arc over top of head
+      px(ctx, 4, 1, 8, 1, LINE);
+      // Ear cups — 2×3 blocks on sides
+      px(ctx, 3, 3, 2, 4, LINE); px(ctx, 11, 3, 2, 4, LINE);
+      // Accent pads inside cups
+      px(ctx, 3, 4, 1, 2, accent); px(ctx, 12, 4, 1, 2, accent);
     } else if (accessory === "scarf") {
-      px(ctx, tx + 1, 7, tw - 2, 2, accent); px(ctx, tx + tw - 3, 9, 2, 3, accent);
+      // Scarf loop around neck: 2 rows at neck/shoulder junction
+      px(ctx, tx + 1, 8, tw - 2, 2, accent);
+      px(ctx, tx + tw - 2, 10, 2, 3, accent);  // scarf tail drape
     } else if (accessory === "earrings") {
-      px(ctx, 3, 6, 1, 1, accent); px(ctx, 10, 6, 1, 1, accent);
+      px(ctx, 4, 7, 1, 1, accent); px(ctx, 11, 7, 1, 1, accent);  // dangling earrings
     } else if (accessory === "lanyard") {
-      px(ctx, 6, 8, 1, 4, LINE); px(ctx, 8, 8, 1, 4, LINE); px(ctx, 6, 11, 3, 3, accent);
+      px(ctx, 7, 10, 1, 4, LINE); px(ctx, 9, 10, 1, 4, LINE);  // cord
+      px(ctx, 7, 13, 3, 3, accent);  // ID card
     }
     tex.refresh();
   }
@@ -470,7 +544,7 @@
 
         this.player = this.physics.add.sprite(720, 620, "player").setScale(3);
         this.playerShadow = this.footShadow(720, 620);
-        this.player.body.setSize(10, 8).setOffset(2, 12);
+        this.player.body.setSize(10, 8).setOffset(3, 14);
         this.physics.add.collider(this.player, this.solids);
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keys = this.input.keyboard.addKeys("W,A,S,D,E");
@@ -700,25 +774,41 @@
       deskUnit(x, y, seat = 0) {
         const g = this.layer(y + 30);
         this.shadow(x, y + 26, 124, 26);
-        g.fillStyle(C.deskLeg, 1); g.fillRect(x - 48, y + 22, 8, 8); g.fillRect(x + 40, y + 22, 8, 8);
-        g.fillStyle(C.desk, 1); g.fillRect(x - 52, y - 6, 104, 30);
-        g.fillStyle(C.deskTop, 1); g.fillRect(x - 52, y - 14, 104, 10);
-        g.fillStyle(0xC08A52, 0.5); g.fillRect(x - 52, y - 14, 104, 2);
-        g.fillStyle(C.metalDark, 1); g.fillRect(x - 3, y - 18, 6, 6);
-        g.fillStyle(C.monitor, 1); g.fillRect(x - 27, y - 50, 54, 34);
+        // Desk legs with toe caps
+        g.fillStyle(0xA87A50, 1); g.fillRect(x - 48, y + 22, 8, 8); g.fillRect(x + 40, y + 22, 8, 8);
+        g.fillStyle(0x8A6038, 1); g.fillRect(x - 48, y + 28, 8, 2); g.fillRect(x + 40, y + 28, 8, 2);
+        // Desk body: main + front face + top face (3 distinct shades = isometric feel)
+        g.fillStyle(C.desk, 1); g.fillRect(x - 52, y - 6, 104, 30);           // front face
+        g.fillStyle(C.deskTop, 1); g.fillRect(x - 52, y - 16, 104, 12);        // top face (lighter)
+        g.fillStyle(0xC08A52, 0.6); g.fillRect(x - 52, y - 16, 104, 2);        // top edge highlight
+        g.fillStyle(0xA07840, 0.3); g.fillRect(x + 50, y - 14, 2, 28);         // right side shadow
+        // Cable management / back strip
+        g.fillStyle(C.metalDark, 1); g.fillRect(x - 3, y - 20, 6, 6);
+        // Monitor: outer bezel + inner screen
+        g.fillStyle(0x8A9EA8, 1); g.fillRect(x - 29, y - 52, 58, 36);          // dark outer bezel
+        g.fillStyle(C.monitor, 1); g.fillRect(x - 27, y - 50, 54, 32);         // monitor face
+        g.fillStyle(0xD0E0EA, 0.6); g.fillRect(x - 27, y - 50, 54, 3);         // bezel top gloss
+        // Screen content (default; overridden by paintScreen for live actors)
         g.fillStyle([0xBBDCF0, 0x9BD8B4, 0xCFBBF0, 0xF8DFA0, 0xF4B3A6, 0xBEE7F7][seat % 6], 1);
         g.fillRect(x - 23, y - 46, 46, 26);
-        g.fillStyle(0xFFFFFF, 0.75);
+        // Generic screen placeholder lines (overridden by STATION_DRAW for live actors)
+        g.fillStyle(0xFFFFFF, 0.55);
         g.fillRect(x - 19, y - 42, 22, 3); g.fillRect(x - 19, y - 36, 32, 3); g.fillRect(x - 19, y - 30, 16, 3);
-        g.fillStyle(0x2A3531, 1); g.fillRect(x - 14, y - 12, 28, 7);
-        g.fillStyle(C.cream, 1); g.fillRect(x + 22, y - 13, 8, 8);
-        g.fillStyle(C.ochre, 1); g.fillRect(x + 29, y - 11, 3, 4);
-        g.fillStyle(0xE8DCC4, 0.85); g.fillRect(x - 44, y - 12, 16, 10);
+        // Monitor stand
+        g.fillStyle(0x6E8896, 1); g.fillRect(x - 14, y - 14, 28, 2);           // stand arm
+        g.fillStyle(0x7A9AA8, 1); g.fillRect(x - 16, y - 12, 32, 6);           // stand body
+        // Desk surface items
+        g.fillStyle(C.cream, 1); g.fillRect(x + 22, y - 13, 8, 8);            // note block
+        g.fillStyle(C.ochre, 1); g.fillRect(x + 29, y - 11, 3, 4);            // pen
+        g.fillStyle(0xE0D0B8, 0.85); g.fillRect(x - 44, y - 12, 16, 10);      // mouse pad
         this.deskProp(g, x - 38, y - 14, seat);
-        g.fillStyle(0xBBDCF0, 0.18); g.fillEllipse(x, y - 6, 120, 30);
+        // Subtle ambient glow under monitor
+        g.fillStyle(0xBBDCF0, 0.13); g.fillEllipse(x, y - 6, 120, 28);
+        // Chair backing/drawer unit
         const cg = this.layer(y + 44);
         cg.fillStyle(C.metalDark, 1); cg.fillRect(x - 16, y + 30, 32, 8);
         cg.fillStyle(C.metal, 1); cg.fillRect(x - 18, y + 36, 36, 14);
+        cg.fillStyle(0xC8D8DA, 1); cg.fillRect(x - 16, y + 38, 32, 3);       // drawer seam
         this.solid(x, y + 4, 104, 44);
       }
 
@@ -1124,13 +1214,13 @@
         this.arcade(1330, 660);
 
         DESKS.forEach((dd, i) => this.deskUnit(dd.x, dd.y, i));
-        this.cubicleDivider(620, 268, 116);
-        this.cubicleDivider(820, 268, 116);
-        this.cubicleDivider(620, 488, 116);
-        this.cubicleDivider(820, 488, 116);
+        // Cubicle dividers: row 1 (y≈220), row 2 (y≈370), row 3 (y≈500)
+        this.cubicleDivider(620, 228, 100); this.cubicleDivider(820, 228, 100);
+        this.cubicleDivider(620, 378, 100); this.cubicleDivider(820, 378, 100);
+        this.cubicleDivider(620, 508, 100); this.cubicleDivider(820, 508, 100);
         this.serverRack(950, 620);
         this.printer(506, 610);
-        this.waterCooler(824, 378);
+        this.waterCooler(824, 440);
         this.plant(950, 170);
 
         this.counter(70, 760, 92, 250);

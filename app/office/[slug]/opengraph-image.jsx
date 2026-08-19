@@ -164,71 +164,116 @@ export default async function Image({ params }) {
 }
 
 function personRects(look) {
+  // Mirrors the upgraded 16×22 makePerson in public/office/office-scene.js.
+  // Same geometry: wider canvas, shoulder flare, shaped head, proper shading
+  // expressed as extra tinted rects (no globalAlpha in satori — use hex with
+  // baked-in opacity approximation).
   const hairStyle = look.hairStyle || "short";
   const outfit = look.outfit || "plain";
   const accessory = look.accessory || "none";
   const accent = look.accent || "#FFF8EC";
-  const tx = look.build === "slim" ? 4 : 3;
-  const tw = look.build === "slim" ? 6 : look.build === "broad" ? 9 : 8;
+  // Body geometry — mirrors makePerson
+  const tx = look.build === "slim" ? 4 : look.build === "broad" ? 2 : 3;
+  const tw = look.build === "slim" ? 8 : look.build === "broad" ? 12 : 10;
+  const shoulderX = tx - 1;
+  const shoulderW = tw + 2;
   const legL = tx + 1;
-  const legR = tx + tw - (tw >= 8 ? 3 : 2);
+  const legR = tx + tw - 3;
   const r = [];
-  const put = (x, y, w, h, fill) => r.push([x, y, w, h, fill]);
+  const put = (x, y, w, h, fill, extra) => r.push([x, y, w, h, fill, extra]);
 
+  // ---- HAIR ----
   if (hairStyle === "curly") {
-    put(3, 0, 8, 5, look.hair); put(2, 2, 1, 4, look.hair); put(11, 2, 1, 4, look.hair);
+    put(4, 0, 8, 6, look.hair); put(3, 1, 1, 4, look.hair); put(12, 1, 1, 4, look.hair);
+    put(5, 0, 6, 1, look.hair);
   } else if (hairStyle === "bun") {
-    put(5, 0, 4, 2, look.hair); put(4, 1, 6, 3, look.hair); put(3, 2, 8, 4, look.hair);
+    put(6, 0, 4, 2, look.hair); // bun knot
+    put(5, 1, 6, 3, look.hair); put(4, 2, 8, 4, look.hair);
   } else if (hairStyle === "cap") {
-    put(4, 1, 6, 3, look.hair); put(3, 2, 8, 4, look.hair);
-    put(3, 1, 8, 2, accent); put(2, 3, 5, 1, accent); put(3, 3, 8, 1, C.line);
+    put(5, 1, 6, 3, look.hair); put(4, 2, 8, 4, look.hair);
+    put(4, 1, 8, 2, accent); put(3, 3, 5, 1, accent); put(4, 3, 8, 1, C.line);
   } else if (hairStyle === "beanie") {
-    put(3, 2, 8, 4, look.hair); put(3, 1, 8, 3, accent); put(3, 3, 8, 1, C.line); put(6, 0, 2, 1, accent);
+    put(4, 2, 8, 4, look.hair);
+    put(4, 1, 8, 3, accent); put(4, 3, 8, 1, C.line); put(7, 0, 2, 1, accent);
   } else if (hairStyle === "long") {
-    put(4, 1, 6, 3, look.hair); put(3, 2, 8, 4, look.hair); put(2, 3, 1, 9, look.hair); put(11, 3, 1, 9, look.hair);
+    put(5, 1, 6, 3, look.hair); put(4, 2, 8, 4, look.hair);
+    put(3, 3, 1, 10, look.hair); put(12, 3, 1, 10, look.hair); // side curtains
+    put(4, 12, 1, 4, look.hair); put(11, 12, 1, 4, look.hair); // tapered ends
   } else {
-    put(4, 1, 6, 3, look.hair); put(3, 2, 8, 4, look.hair);
+    // short default
+    put(5, 1, 6, 3, look.hair); put(4, 2, 8, 4, look.hair);
   }
 
-  put(4, 4, 6, 4, look.skin);
-  if (hairStyle === "short" || hairStyle === "long" || hairStyle === "bun") put(4, 3, 6, 1, look.hair);
-  put(5, 6, 1, 1, C.line); put(8, 6, 1, 1, C.line);
+  // ---- FACE ----
+  put(5, 3, 6, 1, look.hair); // hairline connector
+  put(5, 4, 6, 4, look.skin); // main face block (6 wide, slightly indented → rounder feel)
+  // Eyes
+  put(6, 6, 1, 1, C.line); put(9, 6, 1, 1, C.line);
+  // Neck
+  put(7, 8, 2, 1, look.skin);
 
-  put(tx, 8, tw, 7, look.shirt);
-  put(tx - 1, 9, 1, 5, look.shirt); put(tx + tw, 9, 1, 5, look.shirt);
-  put(tx - 1, 13, 1, 2, look.skin); put(tx + tw, 13, 1, 2, look.skin);
+  // ---- TORSO ----
+  put(shoulderX, 9, shoulderW, 1, look.shirt); // shoulder row (wider = shoulder flare)
+  put(tx, 10, tw, 5, look.shirt);              // main torso
+  put(tx - 1, 10, 1, 5, look.shirt); put(tx + tw, 10, 1, 5, look.shirt); // arms
+  put(tx - 1, 14, 1, 2, look.skin); put(tx + tw, 14, 1, 2, look.skin);  // hands
 
+  // ---- OUTFIT ----
   if (outfit === "hoodie") {
-    put(tx, 8, tw, 2, accent); put(6, 10, 1, 2, accent); put(8, 10, 1, 2, accent); put(tx + 1, 12, tw - 2, 2, C.line);
+    put(tx, 10, tw, 2, accent);
+    put(7, 12, 1, 2, accent); put(9, 12, 1, 2, accent); // drawstrings
+    put(tx + 1, 13, tw - 2, 2, C.line); // pocket seam
   } else if (outfit === "collar") {
-    put(tx, 8, 2, 7, accent); put(tx + tw - 2, 8, 2, 7, accent); put(6, 8, 2, 1, "#FFF8EC"); put(6, 9, 2, 4, look.pants);
+    put(tx, 10, 2, 5, accent); put(tx + tw - 2, 10, 2, 5, accent);
+    put(7, 10, 2, 1, "#FFF8EC"); put(7, 11, 2, 4, look.pants);
   } else if (outfit === "stripes") {
-    [9, 11, 13].forEach((y) => put(tx, y, tw, 1, accent));
+    [11, 13].forEach((y) => put(tx, y, tw, 1, accent));
   } else if (outfit === "vest") {
-    put(tx, 8, 2, 7, accent); put(tx + tw - 2, 8, 2, 7, accent); put(tx + 2, 8, tw - 4, 1, "#FFF8EC");
+    put(tx, 10, 2, 5, accent); put(tx + tw - 2, 10, 2, 5, accent);
+    put(tx + 2, 10, tw - 4, 1, "#FFF8EC");
+  } else if (outfit === "overalls") {
+    put(tx + 1, 10, 1, 4, look.pants); put(tx + tw - 2, 10, 1, 4, look.pants);
+    put(tx + 1, 12, tw - 2, 3, look.pants);
+    put(tx + 3, 13, 2, 2, accent);
+  } else if (outfit === "apron") {
+    put(tx + 1, 11, tw - 2, 4, accent);
+    put(tx + 2, 10, 1, 2, accent); put(tx + tw - 3, 10, 1, 2, accent);
   }
 
-  put(legL, 15, 2, 4, look.pants); put(legR, 15, 2, 4, look.pants);
-  put(legL - 1, 19, 3, 1, C.shoe); put(legR, 19, 3, 1, C.shoe);
+  // ---- LEGS ----
+  put(legL, 16, 2, 4, look.pants); put(legR, 16, 2, 4, look.pants);
+  put(legL - 1, 20, 3, 1, C.shoe); put(legR, 20, 3, 1, C.shoe);
 
+  // ---- ACCESSORIES ----
   if (accessory === "glasses") {
-    put(4, 5, 6, 1, C.line); put(3, 5, 1, 2, C.line); put(10, 5, 1, 2, C.line);
+    // Two lens blocks + bridge + temples
+    put(5, 5, 3, 2, C.line); put(8, 5, 3, 2, C.line);
+    put(7, 5, 2, 1, C.line); // bridge
+    put(4, 5, 1, 2, C.line); put(11, 5, 1, 2, C.line); // temples
   } else if (accessory === "headphones") {
-    put(3, 0, 8, 1, C.line); put(2, 3, 2, 3, C.line); put(10, 3, 2, 3, C.line);
+    put(4, 1, 8, 1, C.line); // headband arc over top
+    put(3, 3, 2, 4, C.line); put(11, 3, 2, 4, C.line); // ear cups
+  } else if (accessory === "scarf") {
+    put(tx + 1, 8, tw - 2, 2, accent);
+    put(tx + tw - 2, 10, 2, 3, accent); // drape
+  } else if (accessory === "earrings") {
+    put(4, 7, 1, 1, accent); put(11, 7, 1, 1, accent);
   } else if (accessory === "lanyard") {
-    put(6, 8, 1, 4, C.line); put(8, 8, 1, 4, C.line); put(6, 11, 3, 3, accent);
+    put(7, 10, 1, 4, C.line); put(9, 10, 1, 4, C.line);
+    put(7, 13, 3, 3, accent);
   }
   return r;
 }
 
 function Person({ look, s }) {
+  // 16×22 canvas to match the upgraded makePerson in office-scene.js
   return (
-    <div style={{ display: "flex", position: "relative", width: 14 * s, height: 20 * s }}>
+    <div style={{ display: "flex", position: "relative", width: 16 * s, height: 22 * s }}>
       {look.glow ? (
-        <div style={{ position: "absolute", left: 1 * s, top: 0, width: 12 * s, height: 20 * s, background: look.glow, opacity: 0.22 }} />
+        <div style={{ position: "absolute", left: 1 * s, top: 2 * s, width: 14 * s, height: 20 * s, background: look.glow, opacity: 0.22 }} />
       ) : null}
-      {personRects(look).map(([x, y, w, h, fill], i) => (
-        <div key={i} style={{ position: "absolute", left: x * s, top: y * s, width: w * s, height: h * s, background: fill }} />
+      {personRects(look).map(([x, y, w, h, fill, extra], i) => (
+        <div key={i} style={{ position: "absolute", left: x * s, top: y * s, width: w * s, height: h * s, background: fill, ...(extra || {}) }} />
       ))}
     </div>
   );
@@ -244,22 +289,74 @@ function Pill({ label, ink, ring, left }) {
 
 // Static signature prop per category, mirroring STATION_DRAW in the live engine.
 // Positioned divs only (Satori-safe). Coordinates are relative to the Station's
-// origin, roughly over the desk top. The screen tint + this prop carry the
-// "which tool" read with no animation — which is exactly what the card needs.
+// origin. The screen tint + this prop carry the "which tool" read with no
+// animation — exactly what the card needs.
+//
+// These are drawn AFTER the desk surface divs (top:58/70) so props that sit ON
+// the desk are visible above it. Props at negative top are against the wall/monitor
+// area and also remain visible (they're above the monitor, which ends at top:52).
 const STATION_PROP_RECTS = {
-  // [left, top, width, height, background, extra?] — relative to the Station.
-  coding: [[-8, 16, 34, 4, "#9BD8B4", { opacity: 0.9 }], [-8, 24, 22, 4, "#4E7D66", { opacity: 0.9 }], [-8, 32, 40, 4, "#9BD8B4", { opacity: 0.9 }]],
-  review: [[-8, 16, 34, 4, "#86CFA6"], [-8, 24, 24, 4, "#F09B90"], [48, 62, 22, 16, "#FFFBF0"], [48, 62, 22, 4, "#CFBBF0"]],
+  // [left, top, width, height, background, extra?] — relative to the Station div.
+  // CODING — green/dim code lines on the monitor (live: drawn in the screen layer)
+  coding: [
+    [-8, 16, 34, 4, "#9BD8B4", { opacity: 0.9 }],
+    [-8, 24, 22, 4, "#4E7D66", { opacity: 0.9 }],
+    [-8, 32, 40, 4, "#9BD8B4", { opacity: 0.9 }],
+  ],
+  // REVIEW — diff lines + PR ticket pinned on the desk
+  review: [
+    [-8, 16, 34, 4, "#86CFA6"],
+    [-8, 24, 24, 4, "#F09B90"],
+    [48, 74, 22, 16, "#FFFBF0"],   // PR ticket — now at top:74 (on desk surface)
+    [48, 74, 22, 4, "#CFBBF0"],    // ticket header strip
+  ],
+  // DESIGN — 2x3 mood-board swatches on the wall behind monitor
   design: [
-    [-56, -2, 26, 30, "#F3E9DA"],
+    [-56, -2, 26, 30, "#F3E9DA"],   // board backing
     [-54, 2, 10, 8, "#F4B3A6"], [-42, 2, 10, 8, "#F8DFA0"], [-30, 2, 10, 8, "#9BD8B4"],
     [-54, 12, 10, 8, "#BEE7F7"], [-42, 12, 10, 8, "#CFBBF0"], [-30, 12, 10, 8, "#F6BCD1"],
   ],
-  call: [[6, -14, 40, 22, "#FFFBF0"], [12, -8, 26, 4, "#BEE7F7"], [12, -1, 16, 4, "#BEE7F7"], [52, -12, 8, 8, "#86CFA6", { borderRadius: 8 }]],
-  music: [[-40, 52, 60, 30, "#CBA87C"], [-30, 56, 40, 22, "#2A2622", { borderRadius: 20 }], [-14, 64, 8, 6, "#F4B3A6", { borderRadius: 6 }], [14, 52, 4, 16, "#B7C9CB"]],
-  writing: [[44, 40, 4, 16, "#B7C9CB"], [34, 28, 20, 8, "#F8DFA0"], [-36, 60, 30, 20, "#FFFBF0"], [-30, 66, 18, 2, "#59696E", { opacity: 0.7 }], [-30, 72, 22, 2, "#59696E", { opacity: 0.7 }]],
-  browsing: [[-24, 40, 40, 28, "#3A4348"], [-20, 44, 32, 6, "#F4B3A6"], [-20, 52, 32, 12, "#EFE7DA"]],
-  focus: [[46, 62, 12, 10, "#FFFBF0"], [58, 64, 4, 5, "#F4B3A6"]],
+  // CALL — speech bubble floating above desk + live-dot
+  call: [
+    [6, -14, 40, 22, "#FFFBF0"],    // bubble body
+    [12, -8, 26, 4, "#BEE7F7"],     // bubble lines
+    [12, -1, 16, 4, "#BEE7F7"],
+    [52, -12, 8, 8, "#86CFA6", { borderRadius: 8 }],  // live dot
+  ],
+  // MUSIC — record player on desk surface: wood base + vinyl + tonearm + label.
+  // top:64 = on desk (desk surface is top:58, body top:70 — so 64 is deskTop band).
+  // Drawn after desk divs, so fully visible now (og-prop-zorder fix).
+  music: [
+    [-44, 64, 68, 26, "#CBA87C"],                        // wood platter base
+    [-32, 68, 44, 18, "#2A2622", { borderRadius: 22 }],  // vinyl disc (rounded)
+    [-14, 72, 8, 8, "#F4B3A6", { borderRadius: 8 }],     // centre label
+    [12, 64, 4, 14, "#B7C9CB"],                          // tonearm
+    [-4, 70, 2, 2, "#FFFBF0"],                           // highlight on vinyl
+  ],
+  // WRITING — warm lamp + notebook on desk surface
+  writing: [
+    [44, 62, 4, 18, "#B7C9CB"],     // lamp pole
+    [32, 54, 20, 8, "#F8DFA0"],     // lamp shade
+    [-38, 68, 30, 20, "#FFFBF0"],   // notebook page
+    [-32, 74, 18, 2, "#59696E", { opacity: 0.7 }],   // text lines
+    [-32, 79, 22, 2, "#59696E", { opacity: 0.7 }],
+  ],
+  // BROWSING — tablet propped on desk, scrollable content visible
+  // top:66 = on desk surface (above desk body at top:70 — minor overlap is fine,
+  // prop is above desk div in DOM order now).
+  browsing: [
+    [-26, 60, 42, 30, "#3A4348"],   // tablet body
+    [-22, 64, 34, 6, "#F4B3A6"],    // header bar
+    [-22, 72, 34, 14, "#EFE7DA"],   // content area
+    [-18, 75, 20, 2, "#9AA3A0"],    // content line
+    [-18, 80, 26, 2, "#9AA3A0"],    // content line
+  ],
+  // FOCUS / OTHER — coffee cup, deliberately quiet
+  focus: [
+    [46, 72, 12, 10, "#FFFBF0"],    // coffee cup body
+    [58, 74, 4, 5, "#F4B3A6"],      // cup handle
+    [48, 68, 8, 4, "#9FB3BE", { opacity: 0.4 }],  // steam wisp
+  ],
 };
 
 // Static signature prop per category, mirroring STATION_DRAW in the live engine.
@@ -300,8 +397,12 @@ const TOOL_SCREEN_RECTS = {
 function Station({ left, look, s, category, screenKind }) {
   const screen = cardCat(category).screen;
   const kindRects = screenKind ? TOOL_SCREEN_RECTS[screenKind] : null;
+  // Station geometry: monitor at top, then desk surface, then person sitting in front.
+  // stationPropRects are drawn AFTER the desk divs so props with top >= 58 (music
+  // record player, browsing tablet, etc.) render above the desk surface and are
+  // visible — the og-prop-zorder fix.
   return (
-    <div style={{ position: "absolute", left, top: 40, display: "flex", width: 14 * s, height: 200 }}>
+    <div style={{ position: "absolute", left, top: 40, display: "flex", width: 16 * s, height: 200 }}>
       <div style={{ position: "absolute", left: -28, top: 0, width: 100, height: 52, background: C.monitor }} />
       <div style={{ position: "absolute", left: -16, top: 10, width: 76, height: 32, background: kindRects ? "#000000" : screen }} />
       {kindRects
@@ -312,10 +413,10 @@ function Station({ left, look, s, category, screenKind }) {
             <div key="g1" style={{ position: "absolute", left: -8, top: 18, width: 44, height: 5, background: "#FFFFFF", opacity: 0.35 }} />,
             <div key="g2" style={{ position: "absolute", left: -8, top: 29, width: 26, height: 5, background: "#FFFFFF", opacity: 0.25 }} />,
           ]}
-      {stationPropRects(category)}
       <div style={{ position: "absolute", left: -52, top: 58, width: 152, height: 12, background: C.deskTop }} />
       <div style={{ position: "absolute", left: -52, top: 70, width: 152, height: 24, background: C.desk }} />
       <div style={{ position: "absolute", left: -46, top: 94, width: 140, height: 8, borderRadius: 6, background: "#C9AE86", opacity: 0.35 }} />
+      {stationPropRects(category)}
       <div style={{ position: "absolute", left: 0, top: 96, display: "flex" }}>
         <Person look={look} s={s} />
       </div>
