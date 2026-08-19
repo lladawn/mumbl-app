@@ -53,16 +53,23 @@
   // positions are deliberately staggered (no shared x columns, no shared y rows)
   // and each carries a `tone` that tints its mat, so every booth feels distinct.
   // Seat count (9) still absorbs a typical 6-10 app stack before "+N more".
+  // Booth spots live in the OPEN CENTRAL FLOOR (the perimeter is meeting room /
+  // lounge / café / rec room / reception). Vignettes reach ~120px above the
+  // anchor (easel / screen / corkboard), so no anchor sits above y≈280, and the
+  // three rows are staggered left↔right so a tall prop never overlaps the actor
+  // in the row behind it. Assigned so the WIDE scenes (easel, huddle, corkboard,
+  // turntable, server rack) get the roomy spots and compact ones (kiosk,
+  // reading chair, beanbag, cushion) tuck between them.
   const DESKS = [
-    { x: 560, y: 210, tone: "mint" },
-    { x: 780, y: 176, tone: "sky" },
-    { x: 960, y: 236, tone: "blush" },
-    { x: 500, y: 330, tone: "oat" },
-    { x: 700, y: 300, tone: "lilac" },
-    { x: 920, y: 388, tone: "sky" },
-    { x: 560, y: 470, tone: "blush" },
-    { x: 800, y: 452, tone: "mint" },
-    { x: 1010, y: 512, tone: "oat" },
+    { x: 560, y: 300, tone: "mint"  }, // back row
+    { x: 780, y: 288, tone: "sky"   },
+    { x: 990, y: 300, tone: "blush" },
+    { x: 520, y: 460, tone: "oat"   }, // middle row (offset)
+    { x: 760, y: 452, tone: "lilac" },
+    { x: 980, y: 462, tone: "sky"   },
+    { x: 620, y: 610, tone: "blush" }, // front row (offset, above reception)
+    { x: 850, y: 600, tone: "mint"  },
+    { x: 1050, y: 600, tone: "oat"  },
   ];
   // mat tints keyed by booth tone — a soft rug pool under each nook
   const BOOTH_MAT = {
@@ -467,6 +474,394 @@
     },
   };
   STATION_DRAW.other = STATION_DRAW.focus;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // VIGNETTES — the physical IDEA of each kind of work, not a desk.
+  //
+  // Founder direction: nobody should read as "a person parked behind a
+  // monitor." Each category is a small PHYSICAL SCENE the actor acts *inside*:
+  // a designer stands at an easel and paints, a caller presents at a huddle
+  // screen, a DJ spins a turntable, a writer curls up in a reading armchair, a
+  // reviewer pins tickets to a corkboard wall, an ops engineer tends a real
+  // server rack, a browser reclines in a beanbag with a tablet, a focus person
+  // sits cross-legged in a little zen corner. Only CODING keeps a screen — a
+  // compact standing code kiosk in the corner, per the "coding only" note.
+  //
+  // Signature: draw(scene, x, y, objs) → returns { px, py, sit } where (px,py)
+  // is where the ACTOR's feet go inside the scene, and `sit` lowers the sprite
+  // a touch (chair / floor cushion). Everything is procedural fillRect/ellipse
+  // (no assets). Static shapes carry the read; tweens only reinforce. `objs`
+  // collects every created object so the whole scene is torn down together.
+  // ═══════════════════════════════════════════════════════════════════════
+  const V = {
+    wood: 0xCBA87C, woodDk: 0x9E7A52, woodLt: 0xE0CBA6,
+    metal: 0xB7C9CB, metalDk: 0x8A9EA8, chrome: 0xDCE7E8,
+    paper: 0xFFFBF0, ink: 0x59696E, cork: 0xD8B681, corkDk: 0xC7A16A,
+    green: 0x9BD8B4, greenDk: 0x4E7D66, amber: 0xF8DFA0, coral: 0xF4B3A6,
+    violet: 0xCFBBF0, sky: 0xBEE7F7, pink: 0xF6BCD1, cushion: 0xE8A78E,
+    screenDk: 0x1E262B, leaf: 0x9BD3A8, leafLt: 0xC0E8C4, water: 0xBEE7F7,
+  };
+  // small helper: a soft foot shadow rectangle-ellipse for props
+  function propShadow(scene, x, y, w, h, objs) {
+    const s = scene.add.ellipse(x, y, w, h, 0x8A7B66, 0.16).setDepth(y - 2);
+    objs.push(s); return s;
+  }
+
+  const VIGNETTE = {
+    // ── DESIGN: a standing ARTIST'S EASEL studio. A tall wooden easel holds a
+    // bright canvas with a composition-in-progress; a palette + brushes rest on
+    // a stool; paint splashes on a drop cloth; the actor stands at the canvas,
+    // brush in hand. Reads as "someone is painting," not "someone at Figma."
+    design(scene, x, y, objs) {
+      propShadow(scene, x - 30, y + 30, 120, 30, objs);
+      const g = scene.add.graphics(); objs.push(g);
+      // drop cloth on the floor with paint splashes
+      g.fillStyle(0xF0E9DA, 0.9); g.fillEllipse(x - 20, y + 26, 150, 54);
+      [[x - 62, y + 20, V.coral], [x + 30, y + 34, V.sky], [x - 10, y + 40, V.amber], [x + 50, y + 14, V.violet]]
+        .forEach(([sx, sy, c]) => { g.fillStyle(c, 0.7); g.fillEllipse(sx, sy, 14, 8); });
+      // EASEL — two front legs + a back leg, tilted board
+      const ex = x - 34, etop = y - 118;
+      g.fillStyle(V.woodDk, 1);
+      g.fillRect(ex - 20, etop + 10, 6, 150);            // left leg
+      g.fillRect(ex + 40, etop + 10, 6, 150);            // right leg
+      g.fillRect(ex + 8, etop + 40, 6, 130);             // back leg
+      g.fillRect(ex - 22, y + 12, 70, 6);                // tray ledge
+      // the canvas board (bright, like a lit artboard)
+      const bw = 74, bh = 92, bx = ex - 14, by = etop + 4;
+      g.fillStyle(V.wood, 1); g.fillRect(bx - 4, by - 4, bw + 8, bh + 8);   // frame
+      g.fillStyle(0xFCF8F0, 1); g.fillRect(bx, by, bw, bh);                  // canvas
+      // a composition in progress on the canvas
+      g.fillStyle(V.violet, 1); g.fillRect(bx + 10, by + 12, 30, 22);
+      g.fillStyle(V.sky, 1); g.fillRect(bx + 44, by + 8, 22, 18);
+      g.fillStyle(V.coral, 1); g.fillEllipse(bx + 30, by + 58, 34, 26);
+      g.fillStyle(V.amber, 1); g.fillRect(bx + 12, by + 70, 40, 8);
+      g.fillStyle(V.ink, 0.4); g.fillRect(bx + 10, by + 84, 44, 3);
+      // palette on a small stool beside the easel
+      g.fillStyle(V.woodDk, 1); g.fillRect(x + 44, y + 6, 22, 20);          // stool
+      g.fillStyle(V.woodLt, 1); g.fillRect(x + 42, y + 2, 26, 6);
+      g.fillStyle(0xEAD9BE, 1); g.fillEllipse(x + 55, y - 4, 30, 16);        // palette
+      [V.coral, V.amber, V.green, V.sky, V.violet].forEach((c, i) => {
+        g.fillStyle(c, 1); g.fillEllipse(x + 46 + i * 5, y - 6, 5, 5); });
+      // a selection frame pulsing on the canvas accent shape
+      const sel = scene.add.rectangle(bx + 25, by + 23, 38, 30).setStrokeStyle(2, V.pink, 0.9).setDepth(by + bh);
+      scene.tweens.add({ targets: sel, alpha: 0.3, duration: 1000, yoyo: true, repeat: -1 }); objs.push(sel);
+      // a paint chip drifting up off the palette
+      const chip = scene.add.rectangle(x + 55, y - 6, 5, 5, V.coral).setDepth(y + 40);
+      scene.tweens.add({ targets: chip, y: y - 34, alpha: 0, duration: 2200, repeat: -1, ease: "Sine.easeOut" }); objs.push(chip);
+      // actor stands to the RIGHT of the canvas, facing it (brush arm toward it)
+      return { px: x + 24, py: y + 20, sit: false, flip: true };
+    },
+
+    // ── CALL: a HUDDLE / phone booth. A round rug, a big presentation screen on
+    // a floor stand tiled with participant cameras, an "● ON AIR" bar, a couple
+    // of tub chairs. The actor stands presenting beside the screen. Reads as "a
+    // meeting is happening here," not "someone on a laptop."
+    call(scene, x, y, objs) {
+      const g = scene.add.graphics(); objs.push(g);
+      // round huddle rug
+      g.fillStyle(V.sky, 0.5); g.fillEllipse(x, y + 20, 200, 90);
+      g.fillStyle(0x9ECBE0, 0.5); g.fillEllipse(x, y + 20, 200, 90);
+      g.fillStyle(0xFFFFFF, 0.25); g.fillEllipse(x, y + 18, 150, 66);
+      // cool "room lights up" wash
+      const wash = scene.add.ellipse(x - 40, y - 40, 120, 90, V.sky, 0.22).setDepth(y - 70);
+      scene.tweens.add({ targets: wash, alpha: 0.36, duration: 1600, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }); objs.push(wash);
+      // presentation screen on a floor stand (left of centre so actor stands right)
+      const sx = x - 44, sTop = y - 120, sw = 96, sh = 66;
+      g.fillStyle(V.metalDk, 1); g.fillRect(sx + sw / 2 - 4, sTop + sh, 8, 118);  // stand pole
+      g.fillStyle(V.metalDk, 1); g.fillRect(sx + sw / 2 - 24, y + 20, 48, 6);      // stand foot
+      g.fillStyle(0x24333F, 1); g.fillRect(sx - 3, sTop - 3, sw + 6, sh + 6);      // bezel
+      g.fillStyle(0x1B2732, 1); g.fillRect(sx, sTop, sw, sh);                       // screen
+      // 2×3 participant camera tiles with head+shoulder silhouettes
+      const tileCols = [0x6E9FD8, 0x86CFA6, 0xF0A79E, 0xEFC08A, 0x9E86C8, V.sky];
+      const cells = [];
+      for (let i = 0; i < 6; i++) {
+        const cx = sx + 5 + (i % 3) * 30, cy = sTop + 5 + Math.floor(i / 3) * 30;
+        g.fillStyle(tileCols[i], 0.85); g.fillRect(cx, cy, 27, 26);
+        g.fillStyle(0x2E3A44, 0.9); g.fillRect(cx + 9, cy + 15, 9, 11); g.fillRect(cx + 11, cy + 6, 5, 6);
+        cells.push({ cx: cx + 13, cy: cy + 13 });
+      }
+      // ON AIR bar
+      g.fillStyle(0x7A2E2E, 1); g.fillRect(sx + 20, sTop - 12, 56, 10);
+      g.fillStyle(0xFFE3DC, 0.9); g.fillRect(sx + 34, sTop - 9, 36, 4);
+      const dot = scene.add.rectangle(sx + 27, sTop - 7, 5, 5, 0xF0605A).setDepth(sTop);
+      scene.tweens.add({ targets: dot, alpha: 0.25, duration: 650, yoyo: true, repeat: -1 }); objs.push(dot);
+      // active-speaker highlight hops tile → tile
+      const ring = scene.add.rectangle(cells[0].cx, cells[0].cy, 29, 28).setStrokeStyle(2, 0xFFF6E4, 0.9).setDepth(sTop + 10);
+      objs.push(ring);
+      let hop = 0;
+      const speaker = scene.time.addEvent({ delay: 1400, loop: true, callback: () => {
+        hop = (hop + 1 + Math.floor(Math.random() * 2)) % cells.length; ring.setPosition(cells[hop].cx, cells[hop].cy); } });
+      objs.push({ destroy: () => speaker.remove() });
+      // a tub chair to the side (empty — the room seats more than one)
+      g.fillStyle(V.coral, 1); g.fillRect(x + 40, y + 6, 28, 18); g.fillStyle(0xE59E90, 1); g.fillRect(x + 38, y - 6, 32, 14);
+      // actor STANDS presenting, right of the screen
+      return { px: x + 26, py: y + 14, sit: false, flip: true };
+    },
+
+    // ── MUSIC: a DJ TURNTABLE console on a stand + a tall speaker. Wide wood
+    // cabinet, spinning vinyl, chrome tonearm, a VU strip, notes rising. The
+    // actor stands at the decks. Reads as "someone is DJing / making the vibe."
+    music(scene, x, y, objs) {
+      propShadow(scene, x, y + 26, 130, 30, objs);
+      const g = scene.add.graphics(); objs.push(g);
+      // warm glow pooling under the decks
+      const glow = scene.add.ellipse(x - 6, y + 2, 130, 46, V.amber, 0.22).setDepth(y - 70);
+      scene.tweens.add({ targets: glow, alpha: 0.34, duration: 1900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }); objs.push(glow);
+      // DJ table legs + top (a real console the actor stands behind)
+      g.fillStyle(V.woodDk, 1); g.fillRect(x - 56, y - 4, 6, 30); g.fillRect(x + 44, y - 4, 6, 30);
+      g.fillStyle(V.wood, 1); g.fillRect(x - 60, y - 24, 110, 22);      // deck top
+      g.fillStyle(0xD4A86A, 1); g.fillRect(x - 60, y - 24, 110, 3);
+      // TWO turntables side by side
+      [-30, 22].forEach((dx, k) => {
+        g.fillStyle(0x3A342E, 1); g.fillEllipse(x + dx, y - 12, 34, 22);   // platter
+        g.fillStyle(0x211E1B, 1); g.fillEllipse(x + dx, y - 12, 28, 18);
+        g.fillStyle(0x3A3430, 1); g.fillEllipse(x + dx, y - 12, 16, 10);
+        g.fillStyle(k ? V.sky : V.coral, 1); g.fillEllipse(x + dx, y - 12, 8, 5);  // label
+        g.fillStyle(V.metal, 1); g.fillRect(x + dx + 14, y - 20, 3, 12);   // tonearm post
+        g.fillStyle(V.metalDk, 1); g.fillRect(x + dx + 4, y - 12, 12, 2);  // arm
+        const spin = scene.add.rectangle(x + dx, y - 16, 5, 2, 0x6E6A64).setDepth(y + 33);
+        scene.tweens.add({ targets: spin, angle: 360, duration: 1500 + k * 200, repeat: -1, ease: "Linear",
+          onUpdate: () => { const a = spin.angle * Math.PI / 180; spin.setPosition(x + dx + Math.cos(a) * 10, y - 12 + Math.sin(a) * 6); } });
+        objs.push(spin);
+      });
+      // mixer VU strip in the middle
+      const bars = [];
+      for (let i = 0; i < 5; i++) {
+        const bar = scene.add.rectangle(x - 6 + i * 4, y - 6, 3, 8, V.green).setOrigin(0.5, 1).setDepth(y + 32);
+        bars.push(bar); objs.push(bar);
+        scene.tweens.add({ targets: bar, scaleY: 0.3 + (i % 2) * 0.6, duration: 320 + i * 80, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: i * 70 });
+      }
+      // a tall speaker stack to the right
+      g.fillStyle(0x2A2622, 1); g.fillRect(x + 60, y - 96, 30, 122);
+      g.fillStyle(0x3A342E, 1); g.fillRect(x + 64, y - 92, 22, 40); g.fillRect(x + 64, y - 44, 22, 40);
+      g.fillStyle(0x1A1714, 1); g.fillEllipse(x + 75, y - 72, 16, 16); g.fillEllipse(x + 75, y - 24, 16, 16);
+      const pulse = scene.add.ellipse(x + 75, y - 48, 30, 30, V.amber, 0.14).setDepth(y - 40);
+      scene.tweens.add({ targets: pulse, scaleX: 1.2, scaleY: 1.2, alpha: 0.02, duration: 700, repeat: -1, ease: "Sine.easeOut" }); objs.push(pulse);
+      // rising notes
+      ["♪", "♫", "♪"].forEach((ch, i) => {
+        const nx = x - 20 + i * 20;
+        const note = scene.add.text(nx, y - 20, ch, { fontFamily: "monospace", fontSize: "13px", color: i % 2 ? "#F8DFA0" : "#9BD8B4" }).setDepth(y + 34);
+        scene.tweens.add({ targets: note, y: y - 58, x: nx + (i % 2 ? 8 : -8), alpha: 0, duration: 2200, delay: i * 480, repeat: -1, ease: "Sine.easeOut" }); objs.push(note);
+      });
+      // actor stands BEHIND the decks
+      return { px: x, py: y - 34, sit: false };
+    },
+
+    // ── WRITING: a cozy READING NOOK. A wing-back armchair, a gooseneck floor
+    // lamp casting an amber pool, a side table with a coffee, and a tall stack
+    // of books. The actor SITS in the chair with an open notebook. Reads as
+    // "someone curled up writing," not "someone at a word processor."
+    writing(scene, x, y, objs) {
+      propShadow(scene, x, y + 28, 120, 30, objs);
+      const g = scene.add.graphics(); objs.push(g);
+      // small round rug
+      g.fillStyle(V.amber, 0.35); g.fillEllipse(x, y + 20, 170, 70);
+      // amber lamp pool
+      const glow = scene.add.ellipse(x + 6, y - 10, 110, 60, V.amber, 0.2).setDepth(y - 70);
+      scene.tweens.add({ targets: glow, alpha: 0.32, duration: 2100, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }); objs.push(glow);
+      // gooseneck floor lamp behind the chair (to the right)
+      g.fillStyle(V.metalDk, 1); g.fillRect(x + 52, y + 4, 20, 5);        // base
+      g.fillStyle(V.metal, 1); g.fillRect(x + 60, y - 92, 3, 96);         // pole
+      g.fillStyle(V.metal, 1); g.fillRect(x + 44, y - 92, 20, 3);         // neck
+      g.fillStyle(V.amber, 1); g.fillRect(x + 34, y - 96, 14, 10);        // shade
+      g.fillStyle(0xFFF3C4, 1); g.fillRect(x + 36, y - 88, 10, 3);        // bulb
+      // the ARMCHAIR (wing-back) — the actor will sit in it
+      const chX = x - 6;
+      g.fillStyle(0xB88A6A, 1); g.fillRect(chX - 34, y + 14, 68, 14);      // base/legs shadow
+      g.fillStyle(V.cushion, 1); g.fillRect(chX - 36, y - 40, 72, 60);     // chair body
+      g.fillStyle(0xD98F79, 1); g.fillRect(chX - 42, y - 44, 14, 60);      // left wing
+      g.fillStyle(0xD98F79, 1); g.fillRect(chX + 30, y - 44, 14, 60);      // right wing
+      g.fillStyle(0xF0BBA8, 1); g.fillRect(chX - 28, y - 30, 56, 40);      // seat cushion (lighter)
+      g.fillStyle(0xFFFFFF, 0.18); g.fillRect(chX - 28, y - 30, 56, 4);
+      // side table with coffee + book stack (left)
+      g.fillStyle(V.woodDk, 1); g.fillRect(x - 74, y - 6, 26, 26);
+      g.fillStyle(V.woodLt, 1); g.fillRect(x - 76, y - 10, 30, 6);
+      g.fillStyle(V.paper, 1); g.fillRect(x - 70, y - 18, 9, 8); g.fillStyle(V.coral, 1); g.fillRect(x - 61, y - 16, 3, 4); // mug
+      // tall stack of books beside the chair
+      [V.coral, V.sky, V.green, V.violet, V.amber].forEach((c, i) => {
+        g.fillStyle(c, 1); g.fillRect(x - 92 + (i % 2) * 2, y + 16 - i * 6, 24, 6); });
+      const steam = scene.add.rectangle(x - 66, y - 20, 2, 5, 0xFFFFFF, 0.4).setDepth(y + 32);
+      scene.tweens.add({ targets: steam, y: y - 36, alpha: 0, duration: 2400, repeat: -1, ease: "Sine.easeOut" }); objs.push(steam);
+      // actor SITS in the chair, notebook glyph appears in front via badge/prop
+      return { px: chX, py: y + 4, sit: true };
+    },
+
+    // ── BROWSING: a LOUNGE PERCH. A beanbag / lounge chair, a small pouffe, a
+    // potted palm, and the actor reclining with a tablet showing a web feed.
+    // Reads as "someone reading, feet up," not "someone at a browser."
+    browsing(scene, x, y, objs) {
+      propShadow(scene, x, y + 26, 120, 28, objs);
+      const g = scene.add.graphics(); objs.push(g);
+      g.fillStyle(V.coral, 0.28); g.fillEllipse(x, y + 18, 160, 66);       // rug
+      const glow = scene.add.ellipse(x, y - 6, 100, 44, V.coral, 0.16).setDepth(y - 70);
+      scene.tweens.add({ targets: glow, alpha: 0.28, duration: 2200, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }); objs.push(glow);
+      // BEANBAG — a big rounded blob the actor sinks into
+      g.fillStyle(0xE59E90, 1); g.fillEllipse(x, y + 6, 96, 60);
+      g.fillStyle(V.coral, 1); g.fillEllipse(x, y - 2, 88, 50);
+      g.fillStyle(0xFFFFFF, 0.16); g.fillEllipse(x - 10, y - 10, 40, 20);
+      // a footstool / pouffe out front
+      g.fillStyle(0xD6C4F2, 1); g.fillEllipse(x + 6, y + 40, 44, 20);
+      // a potted palm to the right
+      g.fillStyle(0x8A5E38, 1); g.fillRect(x + 58, y + 2, 18, 16);
+      g.fillStyle(V.leaf, 1); g.fillRect(x + 60, y - 30, 14, 32); g.fillRect(x + 55, y - 26, 6, 10); g.fillRect(x + 74, y - 20, 6, 10);
+      g.fillStyle(V.leafLt, 1); g.fillRect(x + 64, y - 26, 3, 18);
+      // the TABLET the actor holds — propped, showing a web feed
+      const tx = x - 4, ty = y - 30;
+      g.fillStyle(0x2E3438, 1); g.fillRect(tx - 16, ty - 12, 34, 24);
+      g.fillStyle(0xF0E8DA, 1); g.fillRect(tx - 14, ty - 10, 30, 20);
+      g.fillStyle(V.coral, 1); g.fillRect(tx - 14, ty - 10, 30, 4);         // chrome bar
+      g.fillStyle(0xCBD8DA, 1); g.fillRect(tx - 12, ty - 4, 8, 6);          // thumbnail
+      g.fillStyle(V.ink, 0.5); g.fillRect(tx - 2, ty - 4, 14, 2); g.fillRect(tx - 2, ty - 1, 10, 2); g.fillRect(tx - 12, ty + 5, 26, 2);
+      // scrolling feed rows
+      const rows = [];
+      for (let i = 0; i < 3; i++) { const r = scene.add.rectangle(tx + 2, ty - 4 + i * 4, 14, 2, V.ink, 0.5).setOrigin(0, 0.5).setDepth(y + 32); rows.push(r); objs.push(r); }
+      scene.tweens.add({ targets: rows, y: "-=3", duration: 1100, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      // actor reclines low on the beanbag
+      return { px: x - 2, py: y + 8, sit: true };
+    },
+
+    // ── REVIEW: an INSPECTION WALL. A big corkboard pinned with PR tickets and
+    // red string connecting them (detective board), ✓/✗ approval stamps, a
+    // standing spotlight, and the actor standing in front holding a clipboard.
+    // Reads as "someone investigating / reviewing," not "someone at GitHub."
+    review(scene, x, y, objs) {
+      const g = scene.add.graphics(); objs.push(g);
+      const glow = scene.add.ellipse(x, y - 40, 120, 80, V.violet, 0.16).setDepth(y - 70);
+      scene.tweens.add({ targets: glow, alpha: 0.28, duration: 1900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }); objs.push(glow);
+      // a big CORKBOARD standing on the floor (a real wall of evidence)
+      const bx = x - 58, bTop = y - 126, bw = 116, bh = 104;
+      g.fillStyle(V.metalDk, 1); g.fillRect(bx + 6, y - 22, 8, 40); g.fillRect(bx + bw - 14, y - 22, 8, 40); // stand legs
+      g.fillStyle(V.corkDk, 1); g.fillRect(bx - 4, bTop - 4, bw + 8, bh + 8);   // frame
+      g.fillStyle(V.cork, 1); g.fillRect(bx, bTop, bw, bh);                      // cork face
+      // pinned PR tickets in a scatter
+      const tickets = [[10, 12, V.greenDk], [46, 8, 0xB0554C], [80, 16, V.greenDk], [24, 52, 0xB0554C], [66, 58, V.greenDk], [40, 34, V.greenDk]];
+      const pins = [];
+      tickets.forEach(([dx, dy, stamp]) => {
+        g.fillStyle(V.paper, 1); g.fillRect(bx + dx, bTop + dy, 22, 26);
+        g.fillStyle(V.violet, 1); g.fillRect(bx + dx, bTop + dy, 22, 6);          // PR header
+        g.fillStyle(V.ink, 0.4); g.fillRect(bx + dx + 3, bTop + dy + 10, 16, 2); g.fillRect(bx + dx + 3, bTop + dy + 14, 12, 2);
+        g.fillStyle(stamp, 1); g.fillRect(bx + dx + 7, bTop + dy + 18, 8, 6);      // ✓/✗ stamp
+        pins.push([bx + dx + 11, bTop + dy]);
+      });
+      // red string connecting a few tickets (detective board)
+      g.lineStyle(1.5, 0xC0554C, 0.7);
+      g.lineBetween(pins[0][0], pins[0][1], pins[3][0], pins[3][1]);
+      g.lineBetween(pins[1][0], pins[1][1], pins[4][0], pins[4][1]);
+      g.lineBetween(pins[5][0], pins[5][1], pins[2][0], pins[2][1]);
+      // pin heads
+      pins.forEach(([px, py]) => { g.fillStyle(0xE24A3A, 1); g.fillCircle(px, py, 2); });
+      // a standing spotlight aimed at the board
+      g.fillStyle(V.metalDk, 1); g.fillRect(x + 54, y + 4, 16, 4); g.fillRect(x + 60, y - 40, 3, 44);
+      g.fillStyle(V.amber, 1); g.fillRect(x + 52, y - 46, 14, 8);
+      // one stamp flips approve ↔ comment
+      const stamp = scene.add.rectangle(bx + 17, bTop + 30, 8, 6, V.greenDk).setDepth(bTop + bh);
+      scene.tweens.add({ targets: stamp, alpha: 0.25, duration: 1300, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }); objs.push(stamp);
+      // actor STANDS in front of the board (slightly right), clipboard implied
+      return { px: x + 20, py: y + 12, sit: false, flip: true };
+    },
+
+    // ── TERMINAL / OPS: a real SERVER RACK the actor tends. A tall rack of
+    // blinking machine units, cables, a floor console, a network blip along a
+    // cable. The actor stands beside it. Reads as "someone running servers."
+    terminal(scene, x, y, objs) {
+      propShadow(scene, x - 30, y + 26, 90, 26, objs);
+      const g = scene.add.graphics(); objs.push(g);
+      const glow = scene.add.ellipse(x - 24, y - 30, 110, 90, 0x2E4A3A, 0.16).setDepth(y - 70);
+      scene.tweens.add({ targets: glow, alpha: 0.26, duration: 1800, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }); objs.push(glow);
+      // TALL server rack (to the left so actor stands right of it)
+      const rx = x - 56, rTop = y - 128;
+      g.fillStyle(0x3A4750, 1); g.fillRect(rx, rTop, 48, 150);
+      g.fillStyle(0x2A343C, 1); g.fillRect(rx + 3, rTop + 3, 42, 144);
+      const leds = [];
+      for (let i = 0; i < 9; i++) {
+        g.fillStyle(0x4A5A62, 1); g.fillRect(rx + 6, rTop + 6 + i * 16, 36, 12);   // unit face
+        g.fillStyle(0x6E7E79, 1); g.fillRect(rx + 10, rTop + 9 + i * 16, 14, 3);   // vents
+        const led = scene.add.rectangle(rx + 36, rTop + 12 + i * 16, 4, 4, [0x86CFA6, 0xEFC08A, 0x86CFA6, 0xF09B90, 0x86CFA6][i % 5]).setDepth(rTop + 150);
+        scene.tweens.add({ targets: led, alpha: 0.2, duration: 500 + i * 160, yoyo: true, repeat: -1 });
+        leds.push(led); objs.push(led);
+      }
+      // cables spilling out the side
+      g.lineStyle(2, 0x59696E, 0.8);
+      g.lineBetween(rx + 48, rTop + 40, rx + 70, rTop + 60);
+      g.lineBetween(rx + 48, rTop + 60, rx + 66, rTop + 90);
+      // a small floor console with a green prompt
+      g.fillStyle(0x0E1216, 1); g.fillRect(x + 6, y - 20, 40, 24);
+      g.fillStyle(V.green, 1); g.fillRect(x + 9, y - 16, 3, 2); g.fillRect(x + 14, y - 16, 12, 2);
+      g.fillStyle(0x86CFA6, 0.8); g.fillRect(x + 9, y - 11, 26, 2); g.fillRect(x + 9, y - 6, 18, 2);
+      const caret = scene.add.rectangle(x + 30, y - 6, 3, 3, V.green).setDepth(y + 33);
+      scene.tweens.add({ targets: caret, alpha: 0.1, duration: 540, yoyo: true, repeat: -1 }); objs.push(caret);
+      // network blip travelling up the rack
+      const blip = scene.add.rectangle(rx + 24, y, 3, 3, V.green).setDepth(rTop + 151);
+      scene.tweens.add({ targets: blip, y: rTop + 10, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }); objs.push(blip);
+      // actor stands to the right, tending the rack
+      return { px: x + 30, py: y + 12, sit: false, flip: true };
+    },
+
+    // ── CODING: the ONE screen station — a compact standing CODE KIOSK in the
+    // corner. A slim pedestal holds a dark IDE screen with code + a blinking
+    // caret and a terminal-green glow; the actor stands at it. Kept per the
+    // "coding only, at some corner" note — everything else is physical.
+    coding(scene, x, y, objs) {
+      propShadow(scene, x, y + 24, 80, 22, objs);
+      const g = scene.add.graphics(); objs.push(g);
+      const glow = scene.add.ellipse(x, y - 30, 96, 70, 0x2E4A3A, 0.2).setDepth(y - 70);
+      scene.tweens.add({ targets: glow, scaleX: 1.06, alpha: 0.3, duration: 1700, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }); objs.push(glow);
+      // pedestal / kiosk stand
+      g.fillStyle(V.metalDk, 1); g.fillRect(x - 6, y - 40, 12, 60);
+      g.fillStyle(V.metal, 1); g.fillRect(x - 22, y + 16, 44, 6);            // foot
+      // the IDE screen (big, dark, code-lit)
+      const sw = 88, sh = 60, sx = x - sw / 2, sTop = y - 108;
+      g.fillStyle(0x2A3237, 1); g.fillRect(sx - 4, sTop - 4, sw + 8, sh + 8);
+      g.fillStyle(V.screenDk, 1); g.fillRect(sx, sTop, sw, sh);
+      g.fillStyle(0x2C6F9E, 1); g.fillRect(sx, sTop, 6, sh);                  // activity bar
+      // code lines
+      g.fillStyle(V.green, 0.9); g.fillRect(sx + 12, sTop + 8, 34, 3);
+      g.fillStyle(V.greenDk, 0.9); g.fillRect(sx + 12, sTop + 15, 46, 3);
+      g.fillStyle(0xEFC08A, 0.85); g.fillRect(sx + 20, sTop + 22, 28, 3);     // amber string
+      g.fillStyle(V.green, 0.9); g.fillRect(sx + 20, sTop + 29, 38, 3);
+      g.fillStyle(V.greenDk, 0.9); g.fillRect(sx + 12, sTop + 36, 24, 3);
+      g.fillStyle(0x6E7E79, 0.8); g.fillRect(sx + 12, sTop + 43, 40, 3);
+      const caret = scene.add.rectangle(sx + 40, sTop + 43, 3, 5, V.green).setDepth(sTop + sh);
+      scene.tweens.add({ targets: caret, alpha: 0.1, duration: 520, yoyo: true, repeat: -1 }); objs.push(caret);
+      const scan = scene.add.rectangle(sx + sw / 2, sTop + 10, sw - 8, 4, V.green, 0.14).setDepth(sTop + sh - 1);
+      scene.tweens.add({ targets: scan, y: sTop + 48, duration: 2200, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }); objs.push(scan);
+      // actor stands at the kiosk
+      return { px: x, py: y + 14, sit: false };
+    },
+
+    // ── FOCUS / OTHER: a ZEN CORNER. A floor cushion on a tatami mat, a little
+    // stone fountain trickling, tall calm plants, a soft breathing glow. The
+    // actor SITS cross-legged. Reads as "heads-down / recharging," not a desk.
+    focus(scene, x, y, objs) {
+      const g = scene.add.graphics(); objs.push(g);
+      // tatami mat
+      g.fillStyle(0xE7DCC0, 0.85); g.fillRect(x - 60, y - 20, 120, 60);
+      g.fillStyle(0xD8CBA8, 0.7); for (let i = -60; i < 60; i += 16) g.fillRect(x + i, y - 20, 2, 60);
+      g.fillStyle(0xCFBE9E, 0.9); g.fillRect(x - 60, y - 20, 120, 3); g.fillRect(x - 60, y + 37, 120, 3);
+      // breathing glow
+      const glow = scene.add.ellipse(x, y - 6, 90, 60, V.sky, 0.14).setDepth(y - 70);
+      scene.tweens.add({ targets: glow, alpha: 0.04, duration: 2800, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }); objs.push(glow);
+      // floor cushion the actor sits on
+      g.fillStyle(0xC6A7E0, 1); g.fillEllipse(x, y + 12, 56, 26);
+      g.fillStyle(0xD6C4F2, 1); g.fillEllipse(x, y + 8, 48, 20);
+      // little stone fountain to the left, trickling
+      g.fillStyle(0x9AA6A8, 1); g.fillEllipse(x - 58, y + 6, 34, 18);
+      g.fillStyle(0xB7C9CB, 1); g.fillEllipse(x - 58, y + 2, 24, 12);
+      g.fillStyle(V.water, 1); g.fillEllipse(x - 58, y, 14, 7);
+      const drip = scene.add.rectangle(x - 58, y - 6, 2, 5, V.water, 0.7).setDepth(y + 32);
+      scene.tweens.add({ targets: drip, y: y + 2, alpha: 0.1, duration: 1200, repeat: -1, ease: "Sine.easeIn" }); objs.push(drip);
+      // tall calm plants flanking
+      g.fillStyle(0x8A5E38, 1); g.fillRect(x + 44, y + 2, 18, 18);
+      g.fillStyle(V.leaf, 1); g.fillRect(x + 46, y - 40, 14, 44); g.fillRect(x + 40, y - 30, 6, 14); g.fillRect(x + 60, y - 24, 6, 12);
+      g.fillStyle(V.leafLt, 1); g.fillRect(x + 50, y - 34, 3, 24);
+      // a faint incense wisp
+      const wisp = scene.add.rectangle(x + 30, y + 4, 2, 6, 0xFFFFFF, 0.35).setDepth(y + 32);
+      scene.tweens.add({ targets: wisp, y: y - 20, alpha: 0, duration: 2600, repeat: -1, ease: "Sine.easeOut" }); objs.push(wisp);
+      // actor SITS cross-legged on the cushion
+      return { px: x, py: y + 6, sit: true };
+    },
+  };
+  VIGNETTE.other = VIGNETTE.focus;
 
   // --- Per-APP (tool) identity (docs/office-visual-design.md §2a) ----------
   // Owner direction: the office should read as the SPECIFIC app, not a vague
@@ -1512,18 +1907,21 @@
         this.plant(1370, 372);
         this.arcade(1330, 660);
 
-        // Scattered work booths instead of a desk grid: each is its own nook
-        // (mat + booth back + compact desk), so the room reads as different
-        // kinds of work happening in their own corners, not a cubicle farm.
-        DESKS.forEach((dd, i) => this.boothUnit(dd.x, dd.y, i, dd.tone));
-        // a couple of plants tucked between booths break up the floor so the
-        // scatter feels like a lived-in room, not a grid with the lines removed.
-        this.plant(1120, 300);
-        this.plant(640, 400);
-        this.serverRack(1110, 470);
-        this.printer(440, 470);
-        this.waterCooler(700, 560);
-        this.plant(950, 150);
+        // NO shared desks. Each actor's VIGNETTE (drawn in setStationProp when
+        // they arrive) IS the furniture for their corner — an easel, a turntable,
+        // a reading armchair, a corkboard wall, a server rack, a zen cushion, a
+        // code kiosk — so the room reads as different KINDS of work physically
+        // happening, not people parked at identical monitors. We only lay down a
+        // faint soft mat per booth so an empty corner still reads as "a spot for
+        // something," and scatter a few plants to break up the floor.
+        DESKS.forEach((dd) => {
+          const t = BOOTH_MAT[dd.tone] || BOOTH_MAT.oat;
+          const m = this.layer(dd.y - 46);
+          m.fillStyle(t.fill, 0.32); m.fillEllipse(dd.x, dd.y + 12, 176, 96);
+        });
+        this.plant(1150, 300);
+        this.plant(430, 250);
+        this.plant(1200, 470);
 
         this.counter(70, 760, 92, 250);
         this.coffeeMachine(84, 690);
@@ -1583,43 +1981,49 @@
       }
 
       seatAgent(data, texKey, desk) {
-        const seatY = desk.y + 34;
         const startX = DOOR.x, startY = DOOR.y; // live actors walk in through the door
 
         const spr = this.add.sprite(startX, startY, texKey).setScale(3).setDepth(startY + 30).setInteractive({ useHandCursor: true });
         const shadow = this.footShadow(startX, startY);
         const status = data.status || "idle";
 
-        const pillBg = this.add.rectangle(desk.x, seatY - 42, 74, 17, 0xFFF6E4, 0.95).setDepth(1200).setStrokeStyle(2, STATUS_COL[status] || STATUS_COL.idle);
-        const pillTx = this.add.text(desk.x, seatY - 42, status.toUpperCase(), {
+        // Labels start at the booth centre; placeInScene re-anchors them to the
+        // pose once the vignette is drawn. Hidden until the actor arrives.
+        const pillBg = this.add.rectangle(desk.x, desk.y - 42, 74, 17, 0xFFF6E4, 0.95).setDepth(1200).setStrokeStyle(2, STATUS_COL[status] || STATUS_COL.idle);
+        const pillTx = this.add.text(desk.x, desk.y - 42, status.toUpperCase(), {
           fontFamily: "ui-monospace, Menlo, monospace", fontSize: "9px", color: STATUS_INK[status] || STATUS_INK.idle,
         }).setOrigin(0.5).setDepth(1201).setResolution(3);
-        const nameTx = this.add.text(desk.x, seatY + 26, data.name, {
+        const nameTx = this.add.text(desk.x, desk.y + 26, data.name, {
           fontFamily: "ui-monospace, Menlo, monospace", fontSize: "10px", color: "#22312E",
         }).setOrigin(0.5).setDepth(1201).setResolution(3);
         nameTx.setStroke("#FFF6E4", 4);
-
         [pillBg, pillTx, nameTx].forEach((o) => o.setAlpha(0));
-        spr.setDepth(700);
-        this.tweens.add({
-          targets: spr, x: desk.x, y: seatY, duration: 1600, ease: "Sine.easeInOut",
-          onUpdate: () => { spr.setDepth(spr.y + 30); shadow.setPosition(spr.x, spr.y + 28).setDepth(spr.y + 29); },
-          onComplete: () => {
-            spr.setDepth(seatY + 30);
-            this.tweens.add({ targets: [pillBg, pillTx, nameTx], alpha: 1, duration: 300 });
-            ui.toast(data.name + " is on it.");
-            this.bob(spr);
-          },
-        });
 
         const agent = {
           externalId: data.externalId, name: data.name, role: data.role, status,
           category: data.category || null, tool: data.tool || null, object: data.object || null,
           currentTask: data.currentTask, events: data.events || [],
-          spr, shadow, pillBg, pillTx, nameTx, desk, badge: null, station: null,
+          spr, shadow, pillBg, pillTx, nameTx, desk, badge: null, station: null, pose: null, seated: false,
         };
-        this.setCategoryBadge(agent, desk);
+        // Draw the vignette FIRST so we know where the actor stands/sits in it.
         this.setStationProp(agent, desk);
+        this.setCategoryBadge(agent, desk);
+        const pose = agent.pose || { px: desk.x, py: desk.y, sit: false };
+        const destY = pose.sit ? pose.py + 8 : pose.py;
+
+        spr.setDepth(700);
+        this.tweens.add({
+          targets: spr, x: pose.px, y: destY, duration: 1600, ease: "Sine.easeInOut",
+          onUpdate: () => { spr.setDepth(spr.y + 30); shadow.setPosition(spr.x, spr.y + 28).setDepth(spr.y + 29); },
+          onComplete: () => {
+            agent.seated = true;
+            this.placeInScene(agent);              // snap into the scene + move labels
+            this.tweens.add({ targets: [pillBg, pillTx, nameTx], alpha: 1, duration: 300 });
+            ui.toast(data.name + " is on it.");
+            if (!pose.sit) this.bob(spr);          // standing actors bob; seated stay put
+          },
+        });
+
         spr.on("pointerdown", () => { this.openAgent === agent ? this.closePanel() : this.openPanel(agent); });
         this.agents.push(agent);
         return agent;
@@ -1664,24 +2068,38 @@
       // removeAgent. Returns a flat list of display objects stored on agent.station.
       setStationProp(agent, desk) {
         if (agent.station) { agent.station.forEach((o) => o && o.destroy()); agent.station = null; }
-        // Station/zone falls back to the app's category when the tool is known
-        // (so an uncatalogued app still lands somewhere sensible), then to the
-        // raw category. No category at all → the plain seated look, no prop.
+        // Draw the actor's VIGNETTE — a physical scene of their work — at the
+        // booth spot, and record the pose (where the actor stands/sits inside
+        // it). No desk is drawn: the scene IS the furniture. Terminal overrides
+        // its vignette to the server rack; otherwise the category's scene runs.
         const app = appLook(agent);
         const cat = (app && app.category) || agent.category;
-        if (!cat && !app) return;
         const objs = [];
-        const g = this.add.graphics().setDepth(desk.y + 31); // just above the desk top
-        objs.push(g);
         const x = desk.x, y = desk.y;
-        // Paint the desk monitor: the SPECIFIC APP's screen if known (VS Code,
-        // Figma, Zoom, …), else the category tint. Static — reads on the card too.
-        this.paintScreen(g, agent, x, y);
-        // Station painter: a tool may override its station (terminal → ops rack)
-        // via TOOL_LOOK.station; otherwise the category's station is drawn.
-        const stationKey = (app && app.station) || cat;
-        (STATION_DRAW[stationKey] || STATION_DRAW.focus)(this, g, x, y, objs, desk);
+        const key = (app && app.station) || cat;      // e.g. terminal → server rack
+        const painter = VIGNETTE[key] || VIGNETTE.focus;
+        const pose = painter(this, x, y, objs) || { px: x, py: y, sit: false };
         agent.station = objs;
+        agent.pose = pose;
+        // Re-place the actor inside its scene (in case the category changed).
+        if (agent.spr && agent.seated) this.placeInScene(agent);
+        return pose;
+      }
+
+      // Move a seated actor onto its vignette's pose anchor, facing the scene,
+      // sitting a touch lower on a chair/cushion. Keeps labels above the head.
+      placeInScene(agent) {
+        const p = agent.pose || { px: agent.desk.x, py: agent.desk.y, sit: false };
+        const py = p.sit ? p.py + 8 : p.py;
+        agent.spr.setPosition(p.px, py).setDepth(py + 30);
+        if (typeof p.flip === "boolean") agent.spr.setFlipX(p.flip);
+        agent.spr.setScale(p.sit ? 2.7 : 3);
+        if (agent.shadow) agent.shadow.setPosition(p.px, py + 28).setDepth(py + 29);
+        const labelY = py - (p.sit ? 40 : 52);
+        if (agent.pillBg) agent.pillBg.setPosition(p.px, labelY);
+        if (agent.pillTx) agent.pillTx.setPosition(p.px, labelY);
+        if (agent.nameTx) agent.nameTx.setPosition(p.px, py + 28);
+        if (agent.badge) { agent.badge.bg.setPosition(p.px + 34, labelY + 4); agent.badge.tx.setPosition(p.px + 34, labelY + 4); }
       }
 
       // Overflow indicator: when more actors are present than the 6 desks can

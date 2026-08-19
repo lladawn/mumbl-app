@@ -119,6 +119,24 @@ async function capture(headless) {
     if (canvasEl) {
       await canvasEl.screenshot({ path: OUT_PATH });
       console.log(`  ✓ Canvas screenshot → ${OUT_PATH}`);
+
+      // Second shot: pan LEFT + DOWN to frame the front-row vignettes
+      // (browsing perch / corkboard wall / zen corner) and prove the scene is
+      // actually walkable, not a single static frame.
+      try {
+        await page.keyboard.down("ArrowDown");
+        await page.waitForTimeout(700);
+        await page.keyboard.up("ArrowDown");
+        await page.keyboard.down("ArrowLeft");
+        await page.waitForTimeout(900);
+        await page.keyboard.up("ArrowLeft");
+        await page.waitForTimeout(900);
+        const stationsPath = OUT_PATH.replace(/\.png$/, "-stations.png");
+        await canvasEl.screenshot({ path: stationsPath });
+        console.log(`  ✓ Walkable pan screenshot → ${stationsPath}`);
+      } catch {
+        console.log("  ⚠  second pan shot skipped");
+      }
     } else {
       // Fallback: full-page screenshot
       await page.screenshot({ path: OUT_PATH, fullPage: false });

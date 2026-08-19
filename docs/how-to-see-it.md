@@ -13,25 +13,27 @@ Wait ~3 seconds for the Phaser canvas to load ("opening the office…" disappear
 
 ## What you should see at /office/demo
 
-The room is a loose **scatter of work booths** — not a grid of desks. Each booth
-rides its own soft coloured mat (mint / sky / blush / lilac / oat) at a staggered
-position, with the warm plank floor flowing between them, so the office reads as
-"different kinds of work happening in their own corners" rather than a cubicle
-farm. The demo cast exercises every set-piece added in commits d11e8ea, a9823cf, 44f6318:
+**There are no desks.** Each kind of work is a small **physical scene** ("the
+studio") that the actor stands or sits *inside*, so the room reads as different
+_kinds of doing_ happening in their own corners — a designer painting at an easel,
+a DJ spinning a turntable, a reviewer in front of a detective corkboard — not nine
+people parked behind identical monitors. Only **coding** keeps a screen: a compact
+standing code kiosk in the corner.
 
-| Actor    | Tool       | Category | Set-piece                                                        |
-|----------|------------|----------|------------------------------------------------------------------|
-| Marisol  | vscode     | coding   | IDE nook — dual monitor, terminal slab, code-green glow, blinking caret |
-| Riku     | terminal   | coding   | Server rack — blinking LEDs, ops prompt slab, network blip       |
-| Petra    | figma      | design   | Design studio — tilted easel/artboard, swatch tray, floating chip |
-| Theo     | zoom       | call     | Meeting room — wall display with 6 camera tiles, ON AIR bar, speaker-hop |
-| Yuki     | spotify    | music    | Turntable console — vinyl, chrome tonearm, VU bars, rising notes  |
-| Clem     | notion     | writing  | Library nook — gooseneck lamp, open manuscript, book stack, coffee |
-| Soren    | chrome     | browsing | Reading perch — laptop, article cards, scrolling feed            |
-| Anya     | github     | review   | Inspection station — diff screen, corkboard of PR tickets, magnifier |
-| Felix    | other      | other    | Quiet nook — plant, mug, soft breathing desk glow (heads-down)   |
+| Actor    | Tool     | Category | Physical vignette (the actor is *in* it)                              |
+|----------|----------|----------|----------------------------------------------------------------------|
+| Marisol  | vscode   | coding   | **Code kiosk** — a standing pedestal with a dark IDE screen, code lines, blinking caret, scan line (the one screen station) |
+| Riku     | terminal | coding   | **Server rack** — a tall rack of blinking machine units + cables, floor console, network blip; the actor stands tending it |
+| Petra    | figma    | design   | **Artist's easel** — a standing easel with a bright canvas + palette on a stool, drop cloth with paint splashes; the actor paints |
+| Theo     | zoom     | call     | **Huddle** — a round rug + presentation screen on a stand with participant camera tiles + ON AIR bar; the actor stands presenting |
+| Yuki     | spotify  | music    | **DJ turntables** — twin spinning decks on a console + a tall speaker stack + VU strip + rising notes; the actor spins |
+| Clem     | notion   | writing  | **Reading armchair** — a wing-back chair, gooseneck floor lamp, side table + book stack; the actor sits writing in a notebook |
+| Soren    | chrome   | browsing | **Lounge perch** — a beanbag + pouffe + potted palm; the actor reclines with a tablet showing a web feed |
+| Anya     | github   | review   | **Corkboard wall** — a detective pinboard of PR tickets with red string + ✓/✗ stamps + a spotlight; the actor stands inspecting |
+| Felix    | other    | other    | **Zen corner** — a tatami mat, floor cushion, trickling stone fountain, tall plants; the actor sits cross-legged |
 
-Each desk shows the category badge glyph (VS, >_, Fi, Zm, Sp, N, Ch, PR, •) and the tool-specific screen painter.
+Each scene still shows the category badge glyph (VS, >_, Fi, Zm, Sp, N, Ch, PR, •)
+above the actor. The scenes are the furniture — there is no shared desk anywhere.
 
 ## Controls
 
@@ -50,16 +52,21 @@ Requires the dev server running at `127.0.0.1:3000` and Playwright installed:
 ```bash
 npx playwright install chromium   # one-time
 node scripts/screenshot-office-demo.mjs
-# → outputs/office-screens/live-demo-office.png
+# → outputs/office-screens/live-demo-office.png           (the studio)
+# → outputs/office-screens/live-demo-office-stations.png  (walkable pan)
 ```
 
-The script uses **headed Chromium** on macOS (no GPU flags needed), waits for the Phaser canvas to initialize, then screenshots the canvas element at native 960×600. 0 console errors expected.
+The script uses **headed Chromium** on macOS (no GPU flags needed), waits for the
+Phaser canvas to initialize, seats the actors in their vignettes, then screenshots
+the canvas at native 960×600. It then walks the player to prove the scene is a real
+navigable room and takes a second framed shot. 0 console errors expected.
 
 ---
 
 ## /office/demo/recap — status
 
-There is **no page at `/office/demo/recap`** (returns 404). The recap directory contains only `opengraph-image.jsx` (an OG card, not a browseable page). The OG image itself renders at:
+`/office/demo/recap` now returns **200** (a backend agent added the recap page). The
+recap directory's `opengraph-image.jsx` also renders the shareable OG card at:
 
 ```
 http://127.0.0.1:3000/office/demo/recap/opengraph-image
