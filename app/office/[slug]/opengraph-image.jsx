@@ -297,11 +297,29 @@ function Pill({ label, ink, ring, left }) {
 // area and also remain visible (they're above the monitor, which ends at top:52).
 const STATION_PROP_RECTS = {
   // [left, top, width, height, background, extra?] — relative to the Station div.
-  // CODING — green/dim code lines on the monitor (live: drawn in the screen layer)
+  // CODING — a code-lit NOOK: green glow band + syntax code lines + a SECOND
+  // angled monitor and a terminal slab on the desk (mirrors the v2 live set piece).
   coding: [
+    // terminal-green glow spilling onto the desk
+    [-48, 54, 150, 12, "#2E4A3A", { opacity: 0.28 }],
+    // main-screen syntax code lines
     [-8, 16, 34, 4, "#9BD8B4", { opacity: 0.9 }],
     [-8, 24, 22, 4, "#4E7D66", { opacity: 0.9 }],
-    [-8, 32, 40, 4, "#9BD8B4", { opacity: 0.9 }],
+    [-8, 32, 30, 4, "#EFC08A", { opacity: 0.85 }],   // a "string" line
+    [-8, 40, 40, 4, "#9BD8B4", { opacity: 0.9 }],
+    // SECOND monitor, angled to the right
+    [58, 6, 26, 30, "#2A3237"],
+    [61, 9, 20, 24, "#1E262B"],
+    [64, 13, 14, 3, "#9BD8B4", { opacity: 0.85 }],
+    [64, 19, 16, 3, "#4E7D66", { opacity: 0.85 }],
+    [64, 25, 10, 3, "#EFC08A", { opacity: 0.8 }],
+    // TERMINAL slab on the desk (black + green prompt)
+    [-52, 66, 26, 18, "#0E1216"],
+    [-48, 70, 3, 3, "#9BD8B4"],
+    [-43, 70, 12, 3, "#9BD8B4", { opacity: 0.9 }],
+    [-48, 76, 16, 3, "#86CFA6", { opacity: 0.8 }],
+    // status LED
+    [24, 62, 4, 4, "#86CFA6", { borderRadius: 4 }],
   ],
   // REVIEW — diff lines + PR ticket pinned on the desk
   review: [
@@ -310,28 +328,81 @@ const STATION_PROP_RECTS = {
     [48, 74, 22, 16, "#FFFBF0"],   // PR ticket — now at top:74 (on desk surface)
     [48, 74, 22, 4, "#CFBBF0"],    // ticket header strip
   ],
-  // DESIGN — 2x3 mood-board swatches on the wall behind monitor
+  // DESIGN — a drafting STUDIO: a tilted easel/artboard (bright lightbox canvas
+  // with a composition-in-progress + selection frame) + a swatch tray of chips on
+  // the desk + a stylus, over a blush glow (mirrors the v2 live set piece).
   design: [
-    [-56, -2, 26, 30, "#F3E9DA"],   // board backing
-    [-54, 2, 10, 8, "#F4B3A6"], [-42, 2, 10, 8, "#F8DFA0"], [-30, 2, 10, 8, "#9BD8B4"],
-    [-54, 12, 10, 8, "#BEE7F7"], [-42, 12, 10, 8, "#CFBBF0"], [-30, 12, 10, 8, "#F6BCD1"],
+    // blush studio glow
+    [-60, 40, 150, 20, "#F6BCD1", { opacity: 0.2 }],
+    // easel frame + bright canvas floating above the monitor
+    [-64, -20, 58, 46, "#E0CBA6"],       // frame
+    [-61, -17, 52, 40, "#FBF7F0"],       // bright canvas (lightbox)
+    // composition-in-progress
+    [-54, -10, 20, 15, "#CFBBF0"],       // accent block (the "cycling" one)
+    [-32, -14, 16, 11, "#BEE7F7"],
+    [-28, 4, 14, 12, "#F4B3A6", { borderRadius: 12 }],
+    [-56, 6, 18, 2, "#59696E", { opacity: 0.55 }],
+    [-56, 10, 12, 2, "#59696E", { opacity: 0.55 }],
+    // selection frame around the accent block
+    [-56, -12, 24, 19, "transparent", { border: "1px solid #F6BCD1" }],
+    // swatch TRAY of chips on the desk + a stylus
+    [-30, 68, 52, 12, "#EADFC7"],
+    [-27, 71, 7, 6, "#F4B3A6"], [-19, 71, 7, 6, "#F8DFA0"], [-11, 71, 7, 6, "#9BD8B4"],
+    [-3, 71, 7, 6, "#BEE7F7"], [5, 71, 7, 6, "#CFBBF0"], [13, 71, 7, 6, "#F6BCD1"],
+    [30, 70, 16, 3, "#E29CBE"],           // stylus
   ],
-  // CALL — speech bubble floating above desk + live-dot
+  // CALL — the meeting room LIT UP: a wall display tiled with participant camera
+  // faces + an "● ON AIR" bar, over a cool sky wash (mirrors the v2 live set piece).
   call: [
-    [6, -14, 40, 22, "#FFFBF0"],    // bubble body
-    [12, -8, 26, 4, "#BEE7F7"],     // bubble lines
-    [12, -1, 16, 4, "#BEE7F7"],
-    [52, -12, 8, 8, "#86CFA6", { borderRadius: 8 }],  // live dot
+    // cool "room lights up" wash behind the screen
+    [-40, -30, 130, 60, "#BEE7F7", { opacity: 0.28 }],
+    // display bezel + dark room fill, floating above the desk
+    [-34, -26, 88, 60, "#24333F"],
+    [-30, -22, 80, 52, "#1B2732"],
+    // 2x3 grid of participant camera tiles (each: colored fill + head/shoulders)
+    [-27, -19, 24, 22, "#6E9FD8", { opacity: 0.85 }],
+    [-1, -19, 24, 22, "#86CFA6", { opacity: 0.85 }],
+    [25, -19, 24, 22, "#F0A79E", { opacity: 0.85 }],
+    [-27, 5, 24, 22, "#EFC08A", { opacity: 0.85 }],
+    [-1, 5, 24, 22, "#9E86C8", { opacity: 0.85 }],
+    [25, 5, 24, 22, "#BEE7F7", { opacity: 0.85 }],
+    // a couple of head/shoulders silhouettes to read as faces
+    [-19, -8, 8, 9, "#2E3A44", { opacity: 0.9 }], [-17, -15, 5, 6, "#2E3A44", { opacity: 0.9 }],
+    [7, -8, 8, 9, "#2E3A44", { opacity: 0.9 }], [9, -15, 5, 6, "#2E3A44", { opacity: 0.9 }],
+    // "● ON AIR" bar above the screen
+    [-16, -38, 52, 10, "#7A2E2E"],
+    [-12, -35, 4, 4, "#F0605A", { borderRadius: 4 }],  // on-air dot
+    [-4, -34, 34, 4, "#FFE3DC", { opacity: 0.9 }],     // "ON AIR" text bar
+    // active-speaker highlight ring on the first tile
+    [-27, -19, 24, 22, "transparent", { border: "2px solid #FFF6E4" }],
   ],
-  // MUSIC — record player on desk surface: wood base + vinyl + tonearm + label.
-  // top:64 = on desk (desk surface is top:58, body top:70 — so 64 is deskTop band).
-  // Drawn after desk divs, so fully visible now (og-prop-zorder fix).
+  // MUSIC — a TURNTABLE CONSOLE on the desk: wood cabinet + raised deck + thick
+  // grooved vinyl + chrome tonearm & counterweight + a VU/EQ strip + rising notes,
+  // over a warm glow (mirrors the v2 live set piece). Drawn after the desk divs so
+  // it's fully visible (og-prop-zorder fix).
   music: [
-    [-44, 64, 68, 26, "#CBA87C"],                        // wood platter base
-    [-32, 68, 44, 18, "#2A2622", { borderRadius: 22 }],  // vinyl disc (rounded)
-    [-14, 72, 8, 8, "#F4B3A6", { borderRadius: 8 }],     // centre label
-    [12, 64, 4, 14, "#B7C9CB"],                          // tonearm
-    [-4, 70, 2, 2, "#FFFBF0"],                           // highlight on vinyl
+    // warm glow pooling under the console
+    [-52, 78, 120, 16, "#F8DFA0", { opacity: 0.24 }],
+    // console cabinet — wood grain body + highlight + feet
+    [-50, 58, 76, 30, "#9E7A52"],                        // rim
+    [-47, 61, 70, 24, "#CBA87C"],                        // main chassis
+    [-47, 61, 70, 4, "#D4A86A"],                         // wood highlight
+    [-46, 86, 6, 4, "#6E543A"], [16, 86, 6, 4, "#6E543A"], // feet
+    // raised platter deck + thick grooved vinyl
+    [-34, 62, 46, 22, "#3A342E", { borderRadius: 24 }],  // platter deck
+    [-31, 64, 40, 18, "#2A2622", { borderRadius: 22 }],  // vinyl outer
+    [-27, 66, 32, 14, "#3A3430", { borderRadius: 18 }],  // inner groove
+    [-15, 69, 8, 8, "#F4B3A6", { borderRadius: 8 }],     // centre label
+    [-5, 70, 2, 2, "#FFFBF0"],                           // spindle highlight
+    // tonearm + counterweight
+    [16, 56, 4, 16, "#9AA6A8"],                          // pivot post
+    [12, 54, 10, 4, "#6E7276"],                          // counterweight
+    [2, 64, 16, 3, "#B7C9CB"],                           // arm
+    // VU / EQ strip — 4 bars of varied height
+    [-44, 76, 4, 8, "#9BD8B4"], [-38, 78, 4, 6, "#9BD8B4"], [-32, 74, 4, 10, "#9BD8B4"], [-26, 79, 4, 5, "#9BD8B4"],
+    // rising notes (small note-heads + stems, as tinted rects)
+    [24, 50, 6, 6, "#9BD8B4", { borderRadius: 6 }], [29, 44, 2, 8, "#9BD8B4"],
+    [34, 40, 5, 5, "#F8DFA0", { borderRadius: 6 }], [38, 35, 2, 7, "#F8DFA0"],
   ],
   // WRITING — warm lamp + notebook on desk surface
   writing: [

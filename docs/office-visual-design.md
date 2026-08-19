@@ -333,3 +333,100 @@ const CATEGORY_LOOK = {
   // agent + unknown → fall back to today's look (no regression)
 };
 ```
+
+---
+
+## v2 — artistic set pieces
+
+_Direction, 2026-08-20. Branch `feat/office-sim`._
+
+**The founder's brief:** the office must literally EMBODY the promise — "a coding
+desk appears because you're coding, a record player spins because Spotify's on, a
+meeting room lights up because you're on a call. Nobody designs it — it just shows
+up, shaped like your actual day." v1 made each activity *legible* (right screen,
+right badge, a small prop). v1 still reads as **a person parked at a generic desk
+with a badge**. v2's job is to make each activity its own **SET PIECE** — furniture
+with character, its own MOOD and LIGHTING, and MOTION that says "this corner is
+alive" — so the room feels inhabited and no two activities look alike.
+
+### The elevation model — from "prop on a desk" to "set piece"
+
+Every v1 station had one small marker sitting on the desk. A v2 set piece adds
+**four things on top of that marker**, all procedural, all Satori-mirrorable for
+the static levers:
+
+1. **A signature piece of FURNITURE** bigger than a desk-prop — the object that
+   gives the station its silhouette (a turntable console, a lit meeting screen, a
+   multi-monitor rig, an easel + swatch tray). This is the at-a-glance read.
+2. **MOOD LIGHTING** — a colored ambient glow ellipse under/around the station in
+   the activity's key color (warm amber for music, cool sky for a call, terminal
+   green for code, blush pink for design). This is what makes a corner "light up."
+3. **ATMOSPHERE PROPS** — the small storytelling details (drifting notes, a tiled
+   grid of call faces, a blinking "on air" bar, floating color chips) that give the
+   scene life beyond the hero object.
+4. **LAYERED MOTION** — not one tween but two-to-three, staggered, so the station
+   breathes: a spin + a rise + a pulse, a caret blink + a scanning line + a glow
+   throb. Motion is canvas-only and never load-bearing (the OG card carries the
+   read from furniture + lighting + props alone).
+
+### AMBIENT STATE model — idle -> ALIVE
+
+Each station has two states, driven purely by whether the person is currently on
+that activity (the engine already re-skins on `tool`/`category` change — v2 rides
+that, adds NO reconcile logic):
+
+- **idle** — the furniture is present but *dormant*: dimmed mood glow (~30% of
+  ALIVE), motion at rest or very slow (a still turntable, a dark call screen, a
+  screensaver-dim code rig). Signals "this station exists in your day but you're
+  not here right now." (Used today for the current station whose actor is present
+  but `idle`; the full recently-used stand-in tier is still deferred per §1.5.)
+- **ALIVE** — the person is on it: mood glow at full strength, all motion running
+  (vinyl spinning, notes rising, call grid lit + "on air" pulsing, code caret
+  blinking + scan line sweeping, design swatches cycling). This is the delight
+  moment — the station visibly *wakes up* when the activity starts.
+
+On the OG card there is no motion, so idle/ALIVE is expressed by glow opacity and
+the presence of the "live" atmosphere props (lit call grid, spinning-frozen vinyl
+with notes, glowing screens). The card always renders the ALIVE composition since
+a lit card is the postable artifact.
+
+### The four HERO set pieces (implemented this pass)
+
+| Activity | Furniture (silhouette) | Mood + lighting | Atmosphere props | Motion (canvas) |
+|---|---|---|---|---|
+| **MUSIC** (Spotify / Apple Music) | **Turntable console** — wide wood-grain cabinet, raised platter, thick vinyl disc with grooves, chrome tonearm + counterweight, a small VU/level strip | Warm amber-green glow pooling under the console; the record is the light source of the corner | 3–4 ♪/♫ notes drifting up on staggered arcs and fading; a bouncing EQ level meter | Vinyl disc **rotates continuously**; a spinning groove-glint orbits the label; notes rise + fade on stagger; EQ bars bounce |
+| **CALL** (Zoom / Meet / Teams) | **Lit meeting screen** — a large wall-mounted display on a stand, framed bezel, tiled into a 2×2/2×3 grid of **participant camera tiles** (each a head-and-shoulders silhouette on a colored fill) | Cool sky-blue "room lights up" wash — a bright glow behind the screen so the whole nook reads as an ON-AIR room | A red **"● ON AIR" bar** lit above the screen; a speaker-active ring that jumps between tiles | "On air" dot **pulses**; the active-speaker highlight **hops** tile→tile; one tile's camera "breathes" (alpha) |
+| **CODING** (VS Code / terminal / Cursor / GitHub) | **Multi-monitor code rig** — a main dark IDE monitor PLUS a second angled monitor and a small terminal slab, on a riser; syntax-colored code lines + a terminal prompt | Terminal-green glow spilling off the screens onto the desk (the "code-lit nook") | A blinking cursor caret; a compile/status LED; a stack of colored code-line runs (keyword/string/comment palette) | Caret **blinks**; a highlight line **scans** down the code (like an active cursor line); the green glow **throbs** softly |
+| **DESIGN** (Figma / Sketch / PS / AI) | **Drafting station** — a tilted **easel/artboard** on a stand showing a composition-in-progress, plus a **swatch tray** of color chips and a stylus | Soft blush-pink studio glow; the artboard is bright like a lightbox | Floating color chips above the tray; a crop/selection frame on the artboard; a stylus | The artboard's accent block **cycles hue**; a selection frame **pulses**; one floating chip **drifts** |
+
+### The other activities (v2 direction, lighter touch this pass)
+
+These keep their v1 stations but inherit the **mood-glow + idle/ALIVE** treatment
+so the whole room is consistent; full set-piece furniture is a fast follow.
+
+- **review** — the coding rig, tinted violet, with the PR ticket promoted to a
+  small **corkboard** (ticket + ✓/✗ stamps); glow violet. Motion: ticket stamp
+  flips approve/comment.
+- **writing** — warm **library nook**: desk lamp as the key light (amber pool),
+  an open manuscript page, a coffee cup, a small stack of books. Motion: a line of
+  ink "writes" across the page; lamp glow flickers faintly.
+- **browsing** — **reading perch**: a propped tablet/laptop with a scrolling feed
+  and a floating bookmark/tab; coral glow. Motion: feed rows scroll.
+- **terminal** — treated as a coding sub-look: same rig but the main screen is the
+  black terminal (green prompt) and the second monitor is dimmed; glow green.
+- **focus / other** — deliberately the *quiet* corner: a plain desk, a single soft
+  blue desk glow that slowly breathes, a coffee cup. The absence of a set piece is
+  itself the read ("heads-down, nothing flashy").
+
+### Constraints honored
+
+- Procedural pixel art only — every set piece is `fillRect`/`fillEllipse`/`text`
+  primitives, no assets, drawn in `STATION_DRAW` (live) + `STATION_PROP_RECTS`
+  (card).
+- Core "you" identity is untouched — hair/skin/build/outfit still come from
+  `PALETTES`/`external_id`; v2 only enriches the *furniture and lighting around*
+  the person, plus the existing light accessory/accent signal.
+- OG-card safety: every card prop helper stays a **plain function returning an
+  array of nodes** spread into a parent's children (never a component returning a
+  bare array), and props are drawn AFTER the desk so they sit above it.
+- No reconcile / data-layer changes: v2 lives entirely in the two draw layers.

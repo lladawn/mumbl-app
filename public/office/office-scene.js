@@ -131,15 +131,42 @@
     wood: 0xCBA87C, vinyl: 0x2A2622, grey: 0xC7D2CE, metal: 0xB7C9CB,
   };
   const STATION_DRAW = {
-    // CODING — dark IDE screen with green code lines + a small terminal caret.
+    // CODING — a code-lit NOOK, not just a screen. A second angled monitor + a
+    // terminal slab flank the main IDE screen; terminal-green glow spills onto the
+    // desk; the cursor blinks, a highlight line scans down the code, and the glow
+    // throbs. (v2 set piece — docs §"v2 — artistic set pieces".)
     coding(scene, g, x, y, objs) {
+      // terminal-green mood glow pooling off the screens onto the desk
+      const glow = scene.add.ellipse(x, y - 8, 132, 40, 0x2E4A3A, 0.22).setDepth(y - 58);
+      scene.tweens.add({ targets: glow, scaleX: 1.08, alpha: 0.34, duration: 1700, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      objs.push(glow);
+      // SECOND monitor, angled to the right of the main one — a slim IDE panel
+      g.fillStyle(0x2A3237, 1); g.fillRect(x + 28, y - 44, 22, 24);         // bezel
+      g.fillStyle(S.screenDark, 1); g.fillRect(x + 30, y - 42, 18, 20);     // screen
+      g.fillStyle(S.codeGreen, 0.85); g.fillRect(x + 32, y - 39, 12, 2);
+      g.fillStyle(S.codeDim, 0.85); g.fillRect(x + 32, y - 35, 14, 2);
+      g.fillStyle(0xEFC08A, 0.8); g.fillRect(x + 32, y - 31, 8, 2);
+      g.fillStyle(0x6E8896, 1); g.fillRect(x + 36, y - 20, 6, 4);           // its little stand
+      // TERMINAL slab sitting on the desk to the left — a black prompt window
+      g.fillStyle(0x0E1216, 1); g.fillRect(x - 48, y - 12, 22, 14);
+      g.fillStyle(S.codeGreen, 1); g.fillRect(x - 45, y - 9, 2, 2); g.fillRect(x - 42, y - 9, 8, 2);
+      g.fillStyle(0x86CFA6, 0.8); g.fillRect(x - 45, y - 5, 12, 2);
+      // main-screen syntax code lines (over whatever paintScreen laid down)
       g.fillStyle(S.codeGreen, 0.9); g.fillRect(x - 19, y - 42, 18, 2);
       g.fillStyle(S.codeDim, 0.9); g.fillRect(x - 19, y - 38, 26, 2);
-      g.fillStyle(S.codeGreen, 0.9); g.fillRect(x - 15, y - 34, 20, 2);
-      g.fillStyle(S.codeDim, 0.9); g.fillRect(x - 19, y - 30, 14, 2);
-      const caret = scene.add.rectangle(x + 8, y - 30, 3, 4, S.codeGreen).setDepth(y + 32);
-      scene.tweens.add({ targets: caret, alpha: 0.1, duration: 620, yoyo: true, repeat: -1 });
+      g.fillStyle(0xEFC08A, 0.85); g.fillRect(x - 15, y - 34, 14, 2);       // a "string" line (amber)
+      g.fillStyle(S.codeGreen, 0.9); g.fillRect(x - 15, y - 30, 20, 2);
+      g.fillStyle(S.codeDim, 0.9); g.fillRect(x - 19, y - 26, 12, 2);
+      // status LED on the desk (green = compiling ok)
+      g.fillStyle(0x86CFA6, 1); g.fillRect(x + 20, y - 8, 3, 3);
+      // blinking caret on the main screen
+      const caret = scene.add.rectangle(x + 8, y - 26, 3, 4, S.codeGreen).setDepth(y + 32);
+      scene.tweens.add({ targets: caret, alpha: 0.1, duration: 520, yoyo: true, repeat: -1 });
       objs.push(caret);
+      // a highlight line that SCANS down the main screen (active cursor line feel)
+      const scan = scene.add.rectangle(x - 4, y - 42, 40, 3, 0x9BD8B4, 0.16).setDepth(y + 31);
+      scene.tweens.add({ targets: scan, y: y - 26, duration: 2200, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      objs.push(scan);
     },
     // REVIEW — coding screen (diff green/red lines) + a pinned PR ticket w/ a ✓.
     review(scene, g, x, y, objs) {
@@ -151,57 +178,134 @@
       g.fillStyle(S.violet, 1); g.fillRect(x + 30, y - 12, 16, 3);
       g.fillStyle(0x2E7F5C, 1); g.fillRect(x + 33, y - 6, 3, 3); g.fillRect(x + 36, y - 8, 2, 5);
     },
-    // DESIGN — mood-board wall (2x3 swatches) behind the desk + a stylus.
+    // DESIGN — a drafting STUDIO: a tilted easel/artboard on a stand showing a
+    // composition-in-progress (bright like a lightbox), a swatch tray of color
+    // chips + a stylus, floating chips drifting up, a pulsing selection frame, and
+    // a soft blush studio glow. The artboard's accent block cycles hue. (v2 set
+    // piece.)
     design(scene, g, x, y, objs) {
-      const board = scene.add.graphics().setDepth(y - 60);
-      board.fillStyle(0xF3E9DA, 1); board.fillRect(x - 44, y - 92, 40, 28);
-      board.fillStyle(0xCBA87C, 1); board.fillRect(x - 44, y - 92, 40, 2);
-      const sw = [S.coral, S.amber, 0x9BD8B4, S.sky, S.violet, S.pink];
-      let hue = null;
-      sw.forEach((c, i) => {
-        const cx = x - 41 + (i % 3) * 13, cy = y - 88 + Math.floor(i / 3) * 12;
-        const r = scene.add.rectangle(cx + 5, cy + 4, 10, 8, c).setDepth(y - 59);
-        if (i === 4) hue = r;
-        objs.push(r);
-      });
-      objs.push(board);
-      // stylus on the desk
-      g.fillStyle(S.pinkDk, 1); g.fillRect(x + 30, y - 8, 12, 2); g.fillStyle(S.ink, 1); g.fillRect(x + 40, y - 8, 3, 2);
-      if (hue) scene.tweens.add({ targets: hue, alpha: 0.45, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      // soft blush studio glow
+      const glow = scene.add.ellipse(x - 8, y - 30, 88, 54, 0xF6BCD1, 0.2).setDepth(y - 62);
+      scene.tweens.add({ targets: glow, alpha: 0.32, duration: 2000, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      objs.push(glow);
+      // Easel / artboard on a stand, tilted, floating above the desk
+      const ax = x - 44, ay = y - 92, aw = 44, ah = 34;
+      g.fillStyle(0xCBA87C, 1); g.fillRect(ax + aw / 2 - 2, ay + ah, 4, 20);   // easel post
+      g.fillStyle(0xB68F62, 1); g.fillRect(ax + 2, ay + ah + 14, aw - 4, 3);   // tray ledge
+      g.fillStyle(0xE0CBA6, 1); g.fillRect(ax - 3, ay - 3, aw + 6, ah + 6);    // frame
+      g.fillStyle(0xFBF7F0, 1); g.fillRect(ax, ay, aw, ah);                    // bright canvas (lightbox)
+      // a composition-in-progress: a couple of shapes + a text-block hint
+      const artboard = scene.add.rectangle(ax + 12, ay + 12, 16, 12, S.violet).setDepth(y - 60);
+      objs.push(artboard);
+      g.fillStyle(S.sky, 1); g.fillRect(ax + 26, ay + 6, 12, 8);
+      g.fillStyle(S.coral, 1); g.fillEllipse(ax + 32, ay + 24, 12, 10);
+      g.fillStyle(S.ink, 0.55); g.fillRect(ax + 6, ay + 26, 14, 2); g.fillRect(ax + 6, ay + 30, 10, 2);
+      // pulsing crop/selection frame around the accent shape
+      const sel = scene.add.rectangle(ax + 12, ay + 12, 20, 16).setStrokeStyle(1, 0xF6BCD1, 0.95).setDepth(y - 59);
+      scene.tweens.add({ targets: sel, alpha: 0.3, duration: 900, yoyo: true, repeat: -1 });
+      objs.push(sel);
+      // swatch TRAY of color chips on the desk + a stylus
+      const chips = [S.coral, S.amber, 0x9BD8B4, S.sky, S.violet, S.pink];
+      g.fillStyle(0xEADFC7, 1); g.fillRect(x - 22, y - 10, 40, 8);            // tray
+      chips.forEach((c, i) => { g.fillStyle(c, 1); g.fillRect(x - 20 + i * 6, y - 8, 5, 4); });
+      g.fillStyle(S.pinkDk, 1); g.fillRect(x + 22, y - 8, 12, 2); g.fillStyle(S.ink, 1); g.fillRect(x + 32, y - 8, 3, 2); // stylus
+      // artboard accent block cycles hue (tint alpha as a cheap hue "cycle")
+      scene.tweens.add({ targets: artboard, alpha: 0.5, duration: 1200, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      // one floating color chip drifting up off the tray
+      const chip = scene.add.rectangle(x + 6, y - 10, 5, 4, S.amber).setDepth(y + 33);
+      scene.tweens.add({ targets: chip, y: y - 30, alpha: 0, duration: 2100, repeat: -1, ease: "Sine.easeOut" });
+      objs.push(chip);
     },
-    // CALL — speech bubble + a "● live" dot floating over the desk.
+    // CALL — the meeting room LIGHTS UP. A big wall display tiled with participant
+    // camera faces glows over the desk, an "● ON AIR" bar burns above it, the
+    // active-speaker highlight hops tile→tile, and a cool sky wash floods the nook.
+    // (v2 set piece.)
     call(scene, g, x, y, objs) {
-      g.fillStyle(S.paper, 1); g.fillRect(x - 6, y - 64, 24, 14); g.fillRect(x - 2, y - 50, 5, 4);
-      g.fillStyle(S.sky, 1); g.fillRect(x - 3, y - 60, 18, 2); g.fillRect(x - 3, y - 56, 12, 2);
-      const dot = scene.add.rectangle(x + 20, y - 60, 5, 5, 0x86CFA6).setDepth(y + 32);
-      scene.tweens.add({ targets: dot, alpha: 0.2, duration: 800, yoyo: true, repeat: -1 });
+      // cool "room lights up" wash behind the screen
+      const wash = scene.add.ellipse(x, y - 40, 96, 60, 0xBEE7F7, 0.28).setDepth(y - 60);
+      scene.tweens.add({ targets: wash, alpha: 0.42, scaleY: 1.1, duration: 1500, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      objs.push(wash);
+      // wall-mounted display: dark room fill + framed bezel, floating above the desk
+      const bx = x - 30, by = y - 78, bw = 60, bh = 40;
+      g.fillStyle(0x24333F, 1); g.fillRect(bx - 2, by - 2, bw + 4, bh + 4);   // bezel
+      g.fillStyle(0x1B2732, 1); g.fillRect(bx, by, bw, bh);                   // screen room fill
+      // 2x3 grid of participant camera tiles — each a head+shoulders silhouette
+      const tileCols = [0x6E9FD8, 0x86CFA6, 0xF0A79E, 0xEFC08A, 0x9E86C8, 0xBEE7F7];
+      const cells = [];
+      for (let i = 0; i < 6; i++) {
+        const cx = bx + 3 + (i % 3) * 19, cy = by + 3 + Math.floor(i / 3) * 18;
+        g.fillStyle(tileCols[i], 0.85); g.fillRect(cx, cy, 17, 16);          // camera fill
+        g.fillStyle(0x2E3A44, 0.9); g.fillRect(cx + 6, cy + 9, 5, 7);        // shoulders
+        g.fillStyle(0x2E3A44, 0.9); g.fillRect(cx + 7, cy + 4, 3, 4);        // head
+        cells.push({ cx: cx + 8, cy: cy + 8 });
+      }
+      // stand
+      g.fillStyle(0x8A9EA8, 1); g.fillRect(x - 3, y - 38, 6, 8);
+      // "● ON AIR" bar above the screen — red, lit
+      g.fillStyle(0x7A2E2E, 1); g.fillRect(bx + 12, by - 8, 36, 7);
+      g.fillStyle(0xF0A79E, 1); g.fillRect(bx + 15, by - 6, 3, 3);           // the dot
+      g.fillStyle(0xFFE3DC, 0.9); g.fillRect(bx + 20, by - 6, 24, 3);        // "ON AIR" text bar
+      // pulsing on-air dot
+      const dot = scene.add.rectangle(bx + 16, by - 5, 4, 4, 0xF0605A).setDepth(y + 33);
+      scene.tweens.add({ targets: dot, alpha: 0.25, duration: 650, yoyo: true, repeat: -1 });
       objs.push(dot);
+      // active-speaker highlight ring that hops between tiles
+      const ring = scene.add.rectangle(cells[0].cx, cells[0].cy, 19, 18).setStrokeStyle(2, 0xFFF6E4, 0.9).setDepth(y + 33);
+      objs.push(ring);
+      let hop = 0;
+      const speaker = scene.time.addEvent({ delay: 1400, loop: true, callback: () => {
+        hop = (hop + 1 + Math.floor(Math.random() * 2)) % cells.length;
+        ring.setPosition(cells[hop].cx, cells[hop].cy);
+      } });
+      objs.push({ destroy: () => speaker.remove() });
     },
-    // MUSIC — record player on the desk: spinning vinyl + rising ♪ notes. This is
-    // the "why does theirs have a record player" hook. Reads even with no body.
+    // MUSIC — a full TURNTABLE CONSOLE, the "why does theirs have a record player"
+    // hook. Wide wood-grain cabinet, raised platter, thick grooved vinyl SPINNING,
+    // chrome tonearm + counterweight, a bouncing VU/EQ level strip, notes drifting
+    // up, and a warm amber-green glow pooling under it. Reads even with no body.
+    // (v2 set piece — the record is the light source of the corner.)
     music(scene, g, x, y, objs) {
-      // Wood chassis — slightly larger + darker rim for depth
-      g.fillStyle(0x9E7A52, 1); g.fillRect(x - 24, y - 16, 42, 20);  // shadow/rim
-      g.fillStyle(S.wood, 1); g.fillRect(x - 22, y - 14, 38, 17);    // main chassis
-      g.fillStyle(0xD4A86A, 1); g.fillRect(x - 22, y - 14, 38, 3);   // wood highlight
-      // Vinyl disc — two ellipses for a sense of thickness + spinning groove
-      g.fillStyle(S.vinyl, 1); g.fillEllipse(x - 3, y - 5, 26, 17);
-      g.fillStyle(0x3A3430, 1); g.fillEllipse(x - 3, y - 5, 20, 13); // inner groove
-      g.fillStyle(S.coral, 1); g.fillEllipse(x - 3, y - 5, 7, 5);    // centre label
-      g.fillStyle(0xFFECE0, 1); g.fillRect(x - 4, y - 6, 2, 2);      // spindle highlight
-      // Tonearm — angled from top-right to vinyl
-      g.fillStyle(0xB7C9CB, 1); g.fillRect(x + 10, y - 14, 3, 10);   // arm vertical
-      g.fillStyle(S.metal, 1); g.fillRect(x + 6, y - 8, 6, 2);       // arm horizontal
-      g.fillStyle(0x8A8A8A, 1); g.fillRect(x + 5, y - 9, 3, 3);      // cartridge head
-      // Spinning groove highlight (rotates around vinyl)
-      const spin = scene.add.rectangle(x - 3, y - 9, 4, 2, 0x5E6870).setDepth(y + 32);
-      scene.tweens.add({ targets: spin, angle: 360, duration: 1600, repeat: -1, ease: "Linear",
-        onUpdate: () => { const a = spin.angle * Math.PI / 180; spin.setPosition(x - 3 + Math.cos(a) * 9, y - 5 + Math.sin(a) * 5); } });
+      // warm mood glow pooling under the console (the corner "warms up")
+      const glow = scene.add.ellipse(x - 3, y + 2, 84, 30, 0xF8DFA0, 0.22).setDepth(y - 58);
+      scene.tweens.add({ targets: glow, alpha: 0.34, duration: 1900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      objs.push(glow);
+      // Console cabinet — wider wood-grain body with a raised platter deck + feet
+      g.fillStyle(0x8A6A46, 1); g.fillRect(x - 30, y - 4, 54, 8);     // base shadow
+      g.fillStyle(0x9E7A52, 1); g.fillRect(x - 30, y - 18, 54, 22);   // rim
+      g.fillStyle(S.wood, 1); g.fillRect(x - 28, y - 16, 50, 18);     // main chassis
+      g.fillStyle(0xD4A86A, 1); g.fillRect(x - 28, y - 16, 50, 3);    // wood highlight
+      g.fillStyle(0x6E543A, 0.5); g.fillRect(x - 28, y - 8, 50, 1);   // grain seam
+      g.fillStyle(0x6E543A, 1); g.fillRect(x - 27, y + 2, 4, 3); g.fillRect(x + 17, y + 2, 4, 3); // feet
+      // raised platter deck the vinyl sits on
+      g.fillStyle(0x3A342E, 1); g.fillEllipse(x - 6, y - 6, 32, 20);
+      // Vinyl disc — thickness via stacked ellipses + a couple of groove rings
+      g.fillStyle(S.vinyl, 1); g.fillEllipse(x - 6, y - 7, 28, 18);
+      g.fillStyle(0x211E1B, 1); g.fillEllipse(x - 6, y - 7, 24, 15);  // outer groove
+      g.fillStyle(0x3A3430, 1); g.fillEllipse(x - 6, y - 7, 16, 10);  // inner groove
+      g.fillStyle(S.coral, 1); g.fillEllipse(x - 6, y - 7, 8, 5);     // centre label
+      g.fillStyle(0xFFECE0, 1); g.fillRect(x - 7, y - 8, 2, 2);       // spindle highlight
+      // Tonearm with counterweight, angled to the vinyl
+      g.fillStyle(0x9AA6A8, 1); g.fillRect(x + 14, y - 16, 3, 12);    // pivot post
+      g.fillStyle(0x6E7276, 1); g.fillRect(x + 12, y - 18, 7, 3);     // counterweight
+      g.fillStyle(S.metal, 1); g.fillRect(x + 4, y - 8, 12, 2);       // arm
+      g.fillStyle(0x8A8A8A, 1); g.fillRect(x + 3, y - 9, 3, 3);       // cartridge head on the groove
+      // VU / EQ level strip on the cabinet face — 4 bouncing bars
+      const bars = [];
+      for (let i = 0; i < 4; i++) {
+        const bar = scene.add.rectangle(x - 26 + i * 5, y - 2, 3, 6, 0x9BD8B4).setOrigin(0.5, 1).setDepth(y + 32);
+        bars.push(bar); objs.push(bar);
+        scene.tweens.add({ targets: bar, scaleY: 0.3 + (i % 2) * 0.5, duration: 340 + i * 90, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: i * 80 });
+      }
+      // Spinning groove-glint that orbits the label (sells the rotation)
+      const spin = scene.add.rectangle(x - 6, y - 12, 5, 2, 0x6E6A64).setDepth(y + 33);
+      scene.tweens.add({ targets: spin, angle: 360, duration: 1500, repeat: -1, ease: "Linear",
+        onUpdate: () => { const a = spin.angle * Math.PI / 180; spin.setPosition(x - 6 + Math.cos(a) * 10, y - 7 + Math.sin(a) * 6); } });
       objs.push(spin);
-      // rising ♪ notes with stagger
-      [0, 1, 2].forEach((i) => {
-        const note = scene.add.text(x + 14 + i * 5, y - 8, "♪", { fontFamily: "monospace", fontSize: "10px", color: "#9BD8B4" }).setDepth(y + 33);
-        scene.tweens.add({ targets: note, y: y - 32, alpha: 0, duration: 2000, delay: i * 500, repeat: -1, ease: "Sine.easeOut" });
+      // rising notes on staggered arcs — alternate ♪ / ♫, drift sideways as they climb
+      ["♪", "♫", "♪", "♫"].forEach((ch, i) => {
+        const nx = x + 16 + i * 4;
+        const note = scene.add.text(nx, y - 6, ch, { fontFamily: "monospace", fontSize: "11px", color: i % 2 ? "#F8DFA0" : "#9BD8B4" }).setDepth(y + 34);
+        scene.tweens.add({ targets: note, y: y - 38, x: nx + (i % 2 ? 6 : -6), alpha: 0, duration: 2200, delay: i * 480, repeat: -1, ease: "Sine.easeOut" });
         objs.push(note);
       });
     },
