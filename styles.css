@@ -5584,6 +5584,76 @@ select:focus {
   .mv-belief { flex-direction: column; align-items: flex-start; gap: 12px; }
 }
 
+/* blog: essay layout — narrower measure, prose-first, pixel chrome for headings only */
+.blog-post,
+.blog-index {
+  width: min(720px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: clamp(24px, 4vw, 48px) 0 90px;
+}
+
+.blog-hero { margin-bottom: clamp(32px, 6vw, 56px); }
+.blog-hero h1 { margin: 16px 0 12px; font-size: clamp(1.5rem, 4.4vw, 2.6rem); line-height: 1.4; }
+.blog-dek { margin: 0; color: var(--muted); font-size: clamp(1rem, 1.7vw, 1.15rem); line-height: 1.6; }
+.blog-byline { margin: 18px 0 0; color: var(--faint); font-size: 0.9rem; }
+
+.blog-body { display: grid; gap: 20px; }
+.blog-body p { margin: 0; color: var(--ink); font-size: clamp(1rem, 1.5vw, 1.08rem); line-height: 1.75; }
+.blog-body code, .blog-quote code {
+  font-family: var(--px-font);
+  font-size: 0.92em;
+  padding: 1px 5px;
+  background: var(--mint);
+  border: 1px solid var(--line-strong);
+}
+
+.blog-quote {
+  margin: 8px 0;
+  padding: 18px 22px;
+  border-left: 4px solid var(--gold);
+  background: var(--panel);
+  box-shadow: var(--px-shadow-sm);
+  color: var(--ink);
+}
+.blog-quote p { margin: 0; font-style: italic; font-size: clamp(1.05rem, 2vw, 1.25rem); line-height: 1.6; color: inherit; }
+.blog-quote cite { display: block; margin-top: 10px; font-style: normal; font-size: 0.85rem; color: var(--muted); }
+
+.blog-further-reading {
+  margin-top: clamp(28px, 5vw, 44px);
+  padding: 18px 20px;
+  border: 2px dashed var(--line-strong);
+  display: grid;
+  gap: 10px;
+}
+.blog-further-reading ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.blog-further-reading a { color: var(--muted); font-size: 0.92rem; text-decoration: underline; text-underline-offset: 3px; }
+.blog-further-reading a:hover { color: var(--ink); }
+
+.blog-closing {
+  margin-top: clamp(36px, 6vw, 56px);
+  padding-top: 24px;
+  border-top: 2px solid var(--line);
+  display: grid;
+  gap: 12px;
+}
+.blog-closing p { margin: 0; color: var(--muted); font-size: 0.98rem; line-height: 1.6; }
+
+.blog-index-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.blog-index-item {
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px;
+  border: 2px solid var(--px-edge);
+  box-shadow: var(--px-shadow-sm);
+  background: var(--panel);
+  text-decoration: none;
+  color: inherit;
+}
+.blog-index-item:hover { transform: translate(-2px, -2px); box-shadow: var(--px-shadow); }
+.blog-index-date { color: var(--faint); font-size: 0.82rem; }
+.blog-index-title { font-family: var(--px-display); font-size: 0.85rem; color: var(--ink); }
+.blog-index-dek { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
+
 .button-with-loader {
   display: inline-flex;
   align-items: center;

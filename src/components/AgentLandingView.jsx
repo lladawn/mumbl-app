@@ -640,6 +640,7 @@ export default function AgentLandingView() {
         <p>mumbl is also a place for the human layer of work — the part no ticket captures.</p>
         <div>
           <Link href="/slack">mumbl for slack</Link>
+          <Link href="/blog">blog</Link>
         </div>
       </footer>
     </section>
