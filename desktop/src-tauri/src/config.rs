@@ -92,6 +92,18 @@ pub struct ConfigPatch {
 /// In-memory cache guarded by a mutex; the store is the source of truth on disk.
 pub struct ConfigState {
     inner: Mutex<Config>,
+    /// The ingest token, read from the keychain ONCE per run and held here.
+    ///
+    /// Why this exists: every keychain read is an authorization decision by the
+    /// OS, and a dev/unsigned build has no stable code identity for the item's
+    /// ACL to trust, so macOS re-prompts for the login-keychain password on
+    /// EVERY read. The send path used to read on every event plus the 60s
+    /// heartbeat, which turned into a password prompt every minute or two. The
+    /// hot path must never touch the keychain — it reads this instead.
+    ///
+    /// `None` means "not loaded yet"; the load is lazy-once (see `token`), and
+    /// `write_token` refreshes it so a Save takes effect without a re-read.
+    token: Mutex<Option<String>>,
 }
 
 impl ConfigState {
@@ -131,14 +143,27 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
         config.install_id = uuid::Uuid::new_v4().to_string();
     }
     persist(app, &config)?;
-    app.manage(ConfigState { inner: Mutex::new(config) });
+
+    // The ONE keychain read of this run. Doing it here means any OS
+    // authorization prompt happens at launch (where "Always Allow" makes
+    // sense to the user), never mid-session on a heartbeat.
+    let token = read_token_from_keychain();
+    log::info!(
+        "ingest token {} — cached for this run, keychain not read again",
+        if token.is_some() { "loaded from keychain" } else { "not set in keychain" }
+    );
+
+    app.manage(ConfigState {
+        inner: Mutex::new(config),
+        token: Mutex::new(token),
+    });
     Ok(())
 }
 
 pub fn view(app: &AppHandle) -> ConfigView {
     let config = app.state::<ConfigState>().snapshot();
     ConfigView {
-        has_token: read_token(app).map(|t| !t.is_empty()).unwrap_or(false),
+        has_token: token(app).map(|t| !t.is_empty()).unwrap_or(false),
         config,
     }
 }
@@ -159,7 +184,7 @@ pub fn apply_patch(app: &AppHandle, patch: ConfigPatch) -> Result<ConfigView, St
     // token: only a non-empty value writes the keychain; empty means untouched.
     if let Some(token) = patch.token {
         if !token.is_empty() {
-            write_token(&token)?;
+            write_token(app, &token)?;
         }
     }
     Ok(view(app))
@@ -206,17 +231,67 @@ fn entry() -> Result<keyring::Entry, String> {
     keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT).map_err(|e| e.to_string())
 }
 
-pub fn write_token(token: &str) -> Result<(), String> {
-    entry()?.set_password(token).map_err(|e| e.to_string())
+/// Persist the token to the keychain AND refresh the in-memory cache, so the
+/// send path picks up a freshly-saved token without ever reading back.
+pub fn write_token(app: &AppHandle, token: &str) -> Result<(), String> {
+    entry()?.set_password(token).map_err(|e| e.to_string())?;
+    if let Some(state) = app.try_state::<ConfigState>() {
+        *state.token.lock().unwrap() = Some(token.to_string());
+    }
+    log::info!("ingest token saved to keychain and cached");
+    Ok(())
 }
 
-pub fn read_token(_app: &AppHandle) -> Option<String> {
+/// The ingest token for this run — served from memory.
+///
+/// THE HOT PATH CALLS THIS. It must not hit the keychain: see `ConfigState::token`
+/// for why (unsigned build → no trusted ACL identity → a password prompt on every
+/// single read). `init` seeds the cache at launch; this only falls back to the
+/// keychain if the cache is still empty, which happens when no token was set at
+/// launch and one has since been written by something other than `write_token`.
+/// A successful lazy read is memoized, so that fallback can fire at most once
+/// with a token present.
+pub fn token(app: &AppHandle) -> Option<String> {
+    let state = app.try_state::<ConfigState>()?;
+    {
+        let cached = state.token.lock().unwrap();
+        if cached.is_some() {
+            return cached.clone();
+        }
+    }
+    // Cache empty: nothing was in the keychain at launch. Re-checking is cheap
+    // and cannot prompt while the item does not exist; the moment one does
+    // exist we memoize it and never read again.
+    let fresh = read_token_from_keychain();
+    if fresh.is_some() {
+        log::info!("ingest token loaded from keychain (cached for this run)");
+        *state.token.lock().unwrap() = fresh.clone();
+    }
+    fresh
+}
+
+/// The ONLY place that talks to the keychain for a read. Everything else goes
+/// through `token()`.
+fn read_token_from_keychain() -> Option<String> {
+    // Every keychain read is an OS authorization decision and, on an unsigned
+    // build, a potential password prompt. Counting them makes "the hot path
+    // never reads" an observable fact in the log rather than a claim.
+    static READS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+    log::info!("keychain read #{n} (service={KEYRING_SERVICE} account={KEYRING_ACCOUNT})");
+
     match entry() {
         Ok(e) => match e.get_password() {
             Ok(t) => Some(t),
             Err(keyring::Error::NoEntry) => None,
-            Err(_) => None,
+            Err(e) => {
+                log::warn!("keychain read failed: {e}");
+                None
+            }
         },
-        Err(_) => None,
+        Err(e) => {
+            log::warn!("keychain entry unavailable: {e}");
+            None
+        }
     }
 }

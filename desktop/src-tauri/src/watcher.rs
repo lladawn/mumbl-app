@@ -230,7 +230,9 @@ fn current_bundle_for_tool(_app: &AppHandle, tool: &str) -> Option<String> {
 
 async fn deliver_and_report(app: &AppHandle, event: &ActivityEvent) {
     let config = app.state::<ConfigState>().snapshot();
-    let token = match config::read_token(app) {
+    // Cached in memory — deliberately NOT a keychain read. Reading here fired
+    // an OS password prompt on every heartbeat; see config::ConfigState::token.
+    let token = match config::token(app) {
         Some(t) if !t.is_empty() => t,
         _ => {
             log::warn!("no ingest token set — dropping event");
