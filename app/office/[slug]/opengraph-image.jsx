@@ -78,10 +78,10 @@ const TOOL_CARD = {
   pycharm: { accent: "#9BD8B4", category: "coding", screen: "vscode", label: "PyCharm" },
   zed: { accent: "#6E9FD8", category: "coding", screen: "vscode", label: "Zed" },
   sublime: { accent: "#EFC08A", category: "coding", screen: "vscode", label: "Sublime" },
-  terminal: { accent: "#9BD8B4", category: "coding", screen: "terminal", label: "Terminal" },
-  iterm: { accent: "#9BD8B4", category: "coding", screen: "terminal", label: "iTerm" },
-  ghostty: { accent: "#CFBBF0", category: "coding", screen: "terminal", label: "Ghostty" },
-  warp: { accent: "#6E9FD8", category: "coding", screen: "terminal", label: "Warp" },
+  terminal: { accent: "#9BD8B4", category: "coding", screen: "terminal", station: "terminal", label: "Terminal" },
+  iterm: { accent: "#9BD8B4", category: "coding", screen: "terminal", station: "terminal", label: "iTerm" },
+  ghostty: { accent: "#CFBBF0", category: "coding", screen: "terminal", station: "terminal", label: "Ghostty" },
+  warp: { accent: "#6E9FD8", category: "coding", screen: "terminal", station: "terminal", label: "Warp" },
   figma: { accent: "#F0A79E", category: "design", screen: "figma", label: "Figma" },
   sketch: { accent: "#EFC08A", category: "design", screen: "figma", label: "Sketch" },
   photoshop: { accent: "#6E9FD8", category: "design", screen: "figma", label: "Photoshop" },
@@ -114,6 +114,9 @@ function cardLook(a) {
     screenKind: t && t.screen ? t.screen : null,
     label: (t && t.label) || base.label,
     category: cat,
+    // a tool may override which STATION PROP is drawn (terminal → ops rack) while
+    // keeping its category for zone/screen; falls back to the category otherwise.
+    station: (t && t.station) || cat,
   };
 }
 // back-compat helper used by the headline
@@ -279,9 +282,9 @@ function Person({ look, s }) {
   );
 }
 
-function Pill({ label, ink, ring, left }) {
+function Pill({ label, ink, ring, left, top = 84 }) {
   return (
-    <div style={{ position: "absolute", left, top: 84, display: "flex", padding: "5px 11px", borderRadius: 8, background: "#FFF6E4", border: `3px solid ${ring}`, color: ink, fontSize: 15, fontWeight: 700, letterSpacing: 1.5 }}>
+    <div style={{ position: "absolute", left, top, display: "flex", padding: "5px 11px", borderRadius: 8, background: "#FFF6E4", border: `3px solid ${ring}`, color: ink, fontSize: 15, fontWeight: 700, letterSpacing: 1.5 }}>
       {label}
     </div>
   );
@@ -321,12 +324,25 @@ const STATION_PROP_RECTS = {
     // status LED
     [24, 62, 4, 4, "#86CFA6", { borderRadius: 4 }],
   ],
-  // REVIEW — diff lines + PR ticket pinned on the desk
+  // REVIEW — an INSPECTION station: diff screen (+/−) + a corkboard of PR tickets
+  // with ✓/✗ stamps + a magnifier on the desk, violet glow (mirrors v3 live).
   review: [
-    [-8, 16, 34, 4, "#86CFA6"],
-    [-8, 24, 24, 4, "#F09B90"],
-    [48, 74, 22, 16, "#FFFBF0"],   // PR ticket — now at top:74 (on desk surface)
-    [48, 74, 22, 4, "#CFBBF0"],    // ticket header strip
+    // violet glow
+    [-48, 54, 150, 12, "#CFBBF0", { opacity: 0.22 }],
+    // diff lines (+ green / − red) on the monitor
+    [-8, 16, 4, 4, "#86CFA6"], [-2, 16, 34, 4, "#86CFA6"],
+    [-8, 24, 4, 4, "#F09B90"], [-2, 24, 26, 4, "#F09B90"],
+    [-8, 32, 4, 4, "#86CFA6"], [-2, 32, 40, 4, "#86CFA6"],
+    // corkboard of PR tickets floating above the desk
+    [-64, -18, 62, 46, "#C7A16A"],   // cork frame
+    [-60, -14, 54, 38, "#D8B681"],   // cork face
+    [-56, -10, 14, 18, "#FFFBF0"], [-56, -10, 14, 5, "#CFBBF0"], [-52, -2, 6, 6, "#2E7F5C"],  // ticket 1 ✓
+    [-38, -6, 14, 18, "#FFFBF0"], [-38, -6, 14, 5, "#CFBBF0"], [-34, 2, 6, 6, "#B0554C"],     // ticket 2 ✗
+    [-20, -10, 14, 18, "#FFFBF0"], [-20, -10, 14, 5, "#CFBBF0"], [-16, -2, 6, 6, "#2E7F5C"],  // ticket 3 ✓
+    // magnifier on the desk
+    [44, 70, 16, 16, "#8A9EA8", { borderRadius: 16 }],
+    [48, 74, 8, 8, "#EAF4F8", { borderRadius: 8 }],
+    [58, 82, 10, 4, "#6E543A"],
   ],
   // DESIGN — a drafting STUDIO: a tilted easel/artboard (bright lightbox canvas
   // with a composition-in-progress + selection frame) + a swatch tray of chips on
@@ -404,29 +420,73 @@ const STATION_PROP_RECTS = {
     [24, 50, 6, 6, "#9BD8B4", { borderRadius: 6 }], [29, 44, 2, 8, "#9BD8B4"],
     [34, 40, 5, 5, "#F8DFA0", { borderRadius: 6 }], [38, 35, 2, 7, "#F8DFA0"],
   ],
-  // WRITING — warm lamp + notebook on desk surface
+  // WRITING — a warm LIBRARY NOOK: gooseneck lamp (amber pool) + an open
+  // manuscript (two pages) + a stack of books + a mug (mirrors v3 live).
   writing: [
-    [44, 62, 4, 18, "#B7C9CB"],     // lamp pole
-    [32, 54, 20, 8, "#F8DFA0"],     // lamp shade
-    [-38, 68, 30, 20, "#FFFBF0"],   // notebook page
-    [-32, 74, 18, 2, "#59696E", { opacity: 0.7 }],   // text lines
-    [-32, 79, 22, 2, "#59696E", { opacity: 0.7 }],
+    // amber lamp glow band
+    [-48, 56, 150, 10, "#F8DFA0", { opacity: 0.24 }],
+    // gooseneck lamp
+    [44, 62, 4, 18, "#B7C9CB"],     // pole
+    [40, 48, 4, 14, "#B7C9CB"],     // stem
+    [30, 46, 14, 3, "#B7C9CB"],     // neck
+    [26, 46, 10, 6, "#F8DFA0"],     // shade
+    [28, 51, 6, 2, "#FFF3C4"],      // bulb
+    // open manuscript (book cover + two facing pages)
+    [-40, 66, 40, 22, "#E8DCC4"],
+    [-37, 68, 17, 18, "#FFFBF0"], [-18, 68, 17, 18, "#FFFBF0"],
+    [-19, 68, 2, 18, "#C7A16A"],    // spine
+    [-33, 73, 11, 2, "#59696E", { opacity: 0.6 }], [-33, 78, 9, 2, "#59696E", { opacity: 0.6 }],
+    [-14, 73, 11, 2, "#59696E", { opacity: 0.6 }],
+    // stack of books on the left
+    [-66, 78, 16, 4, "#F4B3A6"], [-65, 73, 15, 4, "#BEE7F7"], [-66, 68, 14, 4, "#9BD8B4"],
+    // mug
+    [10, 72, 8, 7, "#FFFBF0"], [18, 74, 3, 3, "#F4B3A6"],
   ],
-  // BROWSING — tablet propped on desk, scrollable content visible
-  // top:66 = on desk surface (above desk body at top:70 — minor overlap is fine,
-  // prop is above desk div in DOM order now).
+  // BROWSING — a READING PERCH: a propped laptop (browser chrome + article cards)
+  // + a floating bookmark tab + a mug, over a coral glow (mirrors v3 live).
   browsing: [
-    [-26, 60, 42, 30, "#3A4348"],   // tablet body
-    [-22, 64, 34, 6, "#F4B3A6"],    // header bar
-    [-22, 72, 34, 14, "#EFE7DA"],   // content area
-    [-18, 75, 20, 2, "#9AA3A0"],    // content line
-    [-18, 80, 26, 2, "#9AA3A0"],    // content line
+    // coral glow band
+    [-48, 56, 150, 10, "#F4B3A6", { opacity: 0.2 }],
+    // laptop screen
+    [-30, 52, 44, 30, "#2E3438"],   // screen frame
+    [-27, 55, 38, 24, "#F0E8DA"],   // page bg
+    [-27, 55, 38, 5, "#F4B3A6"],    // browser chrome bar
+    [-24, 56, 5, 3, "#6E9FD8"], [-17, 56, 5, 3, "#86CFA6"],  // tabs
+    [-24, 62, 10, 8, "#CBD8DA"], [-24, 72, 10, 5, "#CBD8DA"],  // thumbnails
+    [-12, 62, 22, 3, "#596E6E", { opacity: 0.55 }], [-12, 66, 16, 3, "#596E6E", { opacity: 0.55 }], [-12, 72, 22, 3, "#596E6E", { opacity: 0.55 }],
+    [-32, 80, 50, 5, "#9AA6A2"],    // laptop base deck
+    // floating bookmark tab
+    [22, 48, 8, 14, "#F8DFA0"], [22, 60, 8, 4, "#E4C878"],
+    // mug
+    [38, 74, 8, 7, "#FFFBF0"], [46, 76, 3, 3, "#BEE7F7"],
   ],
-  // FOCUS / OTHER — coffee cup, deliberately quiet
+  // TERMINAL — a SERVER / OPS station: a server rack of blinking LEDs + a black
+  // prompt slab with a running log + green caret (mirrors v3 live).
+  terminal: [
+    // green ops glow band
+    [-48, 56, 150, 10, "#2E4A3A", { opacity: 0.22 }],
+    // server rack (right of desk): chassis + 4 stacked units w/ LEDs
+    [40, 30, 34, 60, "#3A4750"],
+    [44, 34, 26, 52, "#2A343C"],
+    [48, 38, 22, 9, "#4A5A62"], [54, 40, 10, 2, "#6E7E79"], [66, 41, 3, 3, "#86CFA6"],
+    [48, 50, 22, 9, "#4A5A62"], [54, 52, 10, 2, "#6E7E79"], [66, 53, 3, 3, "#EFC08A"],
+    [48, 62, 22, 9, "#4A5A62"], [54, 64, 10, 2, "#6E7E79"], [66, 65, 3, 3, "#86CFA6"],
+    [48, 74, 22, 9, "#4A5A62"], [54, 76, 10, 2, "#6E7E79"], [66, 77, 3, 3, "#F09B90"],
+    // black prompt slab on the desk w/ a running log
+    [-40, 64, 46, 20, "#0E1216"],
+    [-36, 67, 3, 3, "#9BD8B4"], [-31, 67, 14, 3, "#9BD8B4"],
+    [-36, 73, 26, 2, "#86CFA6", { opacity: 0.8 }], [-36, 78, 16, 2, "#86CFA6", { opacity: 0.8 }],
+    [-8, 78, 3, 3, "#9BD8B4"],  // caret
+  ],
+  // FOCUS / OTHER — the QUIET nook: a small potted plant + a mug, soft glow.
   focus: [
-    [46, 72, 12, 10, "#FFFBF0"],    // coffee cup body
-    [58, 74, 4, 5, "#F4B3A6"],      // cup handle
-    [48, 68, 8, 4, "#9FB3BE", { opacity: 0.4 }],  // steam wisp
+    [-48, 60, 150, 8, "#BBDCF0", { opacity: 0.16 }],  // soft breathing glow band
+    // potted plant
+    [44, 72, 12, 10, "#8A5E38"], [44, 72, 12, 2, "#6B4A2F"],
+    [45, 62, 10, 10, "#B6E4C0"], [48, 58, 4, 5, "#B6E4C0"],
+    // coffee mug + steam
+    [-40, 74, 10, 8, "#FFFBF0"], [-30, 76, 3, 4, "#BEE7F7"],
+    [-37, 68, 3, 5, "#FFFFFF", { opacity: 0.4 }],
   ],
 };
 
@@ -465,9 +525,12 @@ const TOOL_SCREEN_RECTS = {
   notion: [[0, 0, SCREEN_W, SCREEN_H, "#F7F5F1"], [6, 5, 3, 12, "#2A2622"], [15, 5, 3, 12, "#2A2622"], [8, 6, 8, 3, "#2A2622"], [24, 7, 40, 3, "#9AA3A0"], [6, 17, 58, 3, "#9AA3A0"], [6, 24, 44, 3, "#9AA3A0"]],
 };
 
-function Station({ left, look, s, category, screenKind }) {
+function Station({ left, look, s, category, station, screenKind }) {
   const screen = cardCat(category).screen;
   const kindRects = screenKind ? TOOL_SCREEN_RECTS[screenKind] : null;
+  // the prop is chosen by `station` (a tool may override it, e.g. terminal → ops
+  // rack) while the screen tint stays keyed on `category`.
+  const propKey = station || category;
   // Station geometry: monitor at top, then desk surface, then person sitting in front.
   // stationPropRects are drawn AFTER the desk divs so props with top >= 58 (music
   // record player, browsing tablet, etc.) render above the desk surface and are
@@ -487,7 +550,7 @@ function Station({ left, look, s, category, screenKind }) {
       <div style={{ position: "absolute", left: -52, top: 58, width: 152, height: 12, background: C.deskTop }} />
       <div style={{ position: "absolute", left: -52, top: 70, width: 152, height: 24, background: C.desk }} />
       <div style={{ position: "absolute", left: -46, top: 94, width: 140, height: 8, borderRadius: 6, background: "#C9AE86", opacity: 0.35 }} />
-      {stationPropRects(category)}
+      {stationPropRects(propKey)}
       <div style={{ position: "absolute", left: 0, top: 96, display: "flex" }}>
         <Person look={look} s={s} />
       </div>
@@ -497,8 +560,11 @@ function Station({ left, look, s, category, screenKind }) {
 
 function ShareImage({ actors, title, offline }) {
   const s = 5;
-  // spread up to 4 stations across the room band
-  const slots = [150, 460, 770, 1000];
+  // Spread up to 4 stations EVENLY across the room band (inner width ~1080). Slots
+  // are pulled in from the edges so wide set-pieces — the music turntable console
+  // (extends ~-52..+40 from its slot) especially — read FULLY without clipping at
+  // the right edge. Even 270px pitch keeps the room feeling like one shared floor.
+  const slots = [130, 400, 670, 940];
   // offline: no cast — we do not paint an absent user's last-known shape as if
   // it were live. The room shows an empty, lights-low office instead.
   const stations = offline
@@ -510,7 +576,11 @@ function ShareImage({ actors, title, offline }) {
         const cl = cardLook(a);
         const look = { ...LOOKS[i % LOOKS.length], accent: cl.accent };
         const style = STATUS_STYLE[a.status] || STATUS_STYLE.idle;
-        return { look, category: cl.category, screenKind: cl.screenKind, status: a.status || "idle", ...style, left: slots[i] || slots[slots.length - 1] };
+        // the music turntable console is the one set piece tall enough to sit at
+        // the default pill height — drop its status pill onto the desk front so the
+        // console reads fully (all other stations keep the default pill position).
+        const pillTop = cl.station === "music" ? 140 : 84;
+        return { look, category: cl.category, station: cl.station, screenKind: cl.screenKind, status: a.status || "idle", ...style, left: slots[i] || slots[slots.length - 1], pillTop };
       });
   const subhead = offline ? "away · nobody's in right now" : headline(actors);
 
@@ -537,10 +607,16 @@ function ShareImage({ actors, title, offline }) {
         </div>
       </div>
 
+      {/* ONE cohesive room, not a row of separate desks: a single shared back
+          wall + continuous window band + one warm floor plane, plus a consistent
+          top-left light wash tying every station into the same space. */}
       <div style={{ display: "flex", position: "absolute", left: 60, bottom: 0, width: 1080, height: 300, border: `3px solid ${C.edge}`, borderBottom: "none", borderRadius: "18px 18px 0 0", background: C.floor, overflow: "hidden" }}>
+        {/* shared back wall + baseboard trim, spanning the whole room */}
         <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: 62, background: C.wall }} />
+        <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: 62, background: "linear-gradient(105deg, #FFFFFF 0%, rgba(255,255,255,0) 42%)", opacity: 0.35 }} />
         <div style={{ position: "absolute", left: 0, top: 58, width: 1080, height: 4, background: "#A6D8D4" }} />
-        {[210, 620].map((x) => (
+        {/* continuous ribbon window running the length of the wall — one shared space */}
+        {[70, 340, 610, 880].map((x) => (
           <div key={x} style={{ display: "flex", position: "absolute", left: x, top: 10, width: 190, height: 42 }}>
             <div style={{ position: "absolute", left: 0, top: 0, width: 190, height: 42, background: C.wallTrim }} />
             <div style={{ position: "absolute", left: 5, top: 5, width: 180, height: 32, background: C.sky }} />
@@ -549,15 +625,24 @@ function ShareImage({ actors, title, offline }) {
             <div style={{ position: "absolute", left: 92, top: 0, width: 6, height: 42, background: C.wallTrim }} />
           </div>
         ))}
+        {/* string lights across the whole room — a shared ceiling detail */}
+        <div style={{ position: "absolute", left: 0, top: 60, width: 1080, height: 2, background: "#C3D4D6", opacity: 0.7 }} />
+        {[120, 300, 480, 660, 840, 1020].map((x, i) => (
+          <div key={`b${x}`} style={{ position: "absolute", left: x, top: 60, width: 7, height: 9, borderRadius: 3, background: ["#F4B3A6", "#F8DFA0", "#9BD8B4", "#BEE7F7", "#CFBBF0", "#F9CBDA"][i % 6], opacity: 0.9 }} />
+        ))}
 
+        {/* one continuous floor plane: carpet + a shared warm rug under all desks */}
         <div style={{ position: "absolute", left: 40, top: 92, width: 1000, height: 208, background: C.carpet }} />
         <div style={{ position: "absolute", left: 40, top: 92, width: 1000, height: 4, background: C.carpetEdge }} />
+        <div style={{ position: "absolute", left: 70, top: 150, width: 940, height: 140, borderRadius: 12, background: "#CBD6F0", opacity: 0.5 }} />
+        {/* consistent light direction: a soft top-left wash over the whole floor */}
+        <div style={{ position: "absolute", left: 0, top: 62, width: 1080, height: 238, background: "linear-gradient(115deg, rgba(255,247,225,0.5) 0%, rgba(255,247,225,0) 50%)" }} />
 
         {stations.map((st, i) => (
-          <Station key={i} left={st.left} look={st.look} s={s} category={st.category} screenKind={st.screenKind} />
+          <Station key={i} left={st.left} look={st.look} s={s} category={st.category} station={st.station} screenKind={st.screenKind} />
         ))}
         {stations.map((st, i) => (
-          <Pill key={`p${i}`} label={st.status.toUpperCase()} ink={st.ink} ring={st.ring} left={st.left - 38} />
+          <Pill key={`p${i}`} label={st.status.toUpperCase()} ink={st.ink} ring={st.ring} left={st.left - 38} top={st.pillTop} />
         ))}
         {stations.length === 0 ? (
           <div style={{ display: "flex", position: "absolute", left: 60, top: 150, fontSize: 26, color: C.muted }}>

@@ -430,3 +430,68 @@ so the whole room is consistent; full set-piece furniture is a fast follow.
   array of nodes** spread into a parent's children (never a component returning a
   bare array), and props are drawn AFTER the desk so they sit above it.
 - No reconcile / data-layer changes: v2 lives entirely in the two draw layers.
+
+---
+
+## v3 — remaining activities + cohesion
+
+_Direction, 2026-08-20. Branch `feat/office-sim`. Part A of the follow-up pass._
+
+v2 shipped the four HERO set pieces (music, call, coding, design). v3 does two
+things: (1) gives every remaining activity the same full set-piece treatment so
+NOTHING reads as "a person at a generic desk" anymore, and (2) ties all the
+stations into ONE cohesive room — "an office for their day," not a row of
+disconnected desks. Guiding rule from the founder: **sensible, not vague** — each
+station reads *unmistakably* as that activity. All five keep the v2 idle->ALIVE
+ambient model (dim glow + slow/at-rest motion when idle; full glow + full motion
+when the person is on it) and are implemented in BOTH the live scene
+(`STATION_DRAW`, animated) and the OG card (`STATION_PROP_RECTS`, static).
+
+### The five new set pieces
+
+| Activity | Furniture (silhouette) | Mood + lighting | Atmosphere props | Motion (canvas) |
+|---|---|---|---|---|
+| **WRITING** (Notion / docs / Obsidian) | A warm **library nook** — an open two-page manuscript on a book cover, a **gooseneck desk lamp**, a stack of books | Amber lamp pool as the key light | The lamp is the light source; a mug; the book stack's colored spines | A line of ink **"writes"** across the right page; lamp glow breathes |
+| **BROWSING** (Chrome / Safari / Arc) | A **reading perch** — a propped **laptop** showing a browser (chrome bar + tabs + article cards w/ thumbnails), a laptop base deck | Coral glow band | A floating **bookmark tab**; a mug; the article feed | The feed rows **scroll** up-and-back; glow breathes |
+| **REVIEW** (PRs / GitHub review) | An **inspection station** — a **diff screen** (green +/red − columns) + a **corkboard of PR tickets** with ✓/✗ approval stamps + a **magnifier** on the desk | Violet glow | Three pinned tickets, mixed approve/reject stamps; the magnifier lens | The top ticket's **stamp flips** approve↔comment; glow breathes |
+| **TERMINAL** (iTerm / Ghostty / Warp) | A **server / ops station** — a **rack** of stacked units with blinking status LEDs + a black **prompt slab** running a log | Green ops glow | Per-unit LEDs in green/amber/red; the live prompt | LEDs **blink** at staggered rates; a green **caret** blinks; a network **blip** travels rack→slab |
+| **FOCUS / OTHER** (heads-down) | The **quiet nook** — deliberately no gadgets: a small **potted plant** + a coffee **mug**; the calm IS the read | A single soft-blue desk glow that slowly **breathes** | Plant greenery; a rising steam wisp from the mug | Glow breathes very slowly; steam rises + fades |
+
+**Terminal gets its own station without touching seating/zones.** The ingest
+`tool` for a terminal still resolves to `category:"coding"` (so its zone, seat, and
+screen tint are unchanged, no per-tool regression), but a new optional
+`TOOL_LOOK.station` (`"terminal"`) overrides *only which STATION_DRAW painter*
+runs — so a terminal reads as an ops rack instead of the code nook. `setStationProp`
+picks `app.station || category`; the OG card mirrors this via `cardLook().station`
+threaded into `<Station station=… />`. Purely a rendering choice; no reconcile
+logic touched.
+
+### Cohesion — one room, not a row of desks
+
+The office now reads as a single shared space, achieved entirely on the OG card's
+room band (the live Phaser room was already one contiguous space):
+
+- **Shared back wall + continuous window ribbon** — four evenly-spaced windows run
+  the whole length of the wall (instead of two clustered), reading as one long
+  room rather than separate booths.
+- **One continuous floor plane** — the carpet spans the full band with a single
+  shared warm **rug** under all four desks tying them to the same floor.
+- **Consistent light direction** — a soft **top-left light wash** over both the
+  wall and the floor (a `linear-gradient` at ~115°), so every station is lit from
+  the same source; the per-station glows sit on top of this shared key light.
+- **Shared ceiling detail** — a string-lights line with colored bulbs runs across
+  the whole room, a unifying overhead element.
+- **Cohesive palette** — every set piece's mood glow is drawn from the same soft
+  pastel family (amber/sky/green/coral/violet/pink) already in `C`, so distinct
+  activities still feel like one designed space.
+- **Even station spacing** — the four slots are spread on an even ~270px pitch and
+  pulled in from the edges (`[130, 400, 670, 940]`), which also **fixes the v2
+  slot-4 turntable clipping**: the music console (which extends widest of all the
+  set pieces) now sits fully inside the room band in every slot.
+
+### Constraints honored (unchanged from v2)
+
+Procedural pixel art only; core "you" identity untouched; per-tool/category
+stations not regressed (terminal keeps its coding zone/seat/screen); OG props stay
+plain array-returning functions spread into children (Satori-safe), drawn after
+the desk; no pipeline/reconcile/data-layer changes.

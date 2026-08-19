@@ -168,15 +168,38 @@
       scene.tweens.add({ targets: scan, y: y - 26, duration: 2200, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
       objs.push(scan);
     },
-    // REVIEW — coding screen (diff green/red lines) + a pinned PR ticket w/ a ✓.
+    // REVIEW — an INSPECTION station: a diff screen (green +/red − lines side by
+    // side) + a corkboard of PR tickets with ✓/✗ approval stamps + a magnifier
+    // resting on the desk, violet mood glow. The top ticket's stamp flips
+    // approve↔comment. Reads unmistakably as "reviewing PRs." (v3 set piece.)
     review(scene, g, x, y, objs) {
-      g.fillStyle(0x86CFA6, 0.9); g.fillRect(x - 19, y - 42, 22, 2);
-      g.fillStyle(0xF09B90, 0.9); g.fillRect(x - 19, y - 38, 16, 2);
-      g.fillStyle(0x86CFA6, 0.9); g.fillRect(x - 19, y - 34, 26, 2);
-      // PR ticket on the desk
-      g.fillStyle(S.paper, 1); g.fillRect(x + 30, y - 12, 16, 12);
-      g.fillStyle(S.violet, 1); g.fillRect(x + 30, y - 12, 16, 3);
-      g.fillStyle(0x2E7F5C, 1); g.fillRect(x + 33, y - 6, 3, 3); g.fillRect(x + 36, y - 8, 2, 5);
+      // violet mood glow
+      const glow = scene.add.ellipse(x, y - 8, 120, 38, 0xCFBBF0, 0.2).setDepth(y - 58);
+      scene.tweens.add({ targets: glow, alpha: 0.32, duration: 1900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      objs.push(glow);
+      // diff screen: two columns, added (green) vs removed (red)
+      g.fillStyle(0x86CFA6, 0.9); g.fillRect(x - 19, y - 42, 2, 2); g.fillRect(x - 16, y - 42, 18, 2); // + line
+      g.fillStyle(0xF09B90, 0.9); g.fillRect(x - 19, y - 38, 2, 2); g.fillRect(x - 16, y - 38, 14, 2); // - line
+      g.fillStyle(0x86CFA6, 0.9); g.fillRect(x - 19, y - 34, 2, 2); g.fillRect(x - 16, y - 34, 22, 2); // + line
+      g.fillStyle(0x6E7E79, 0.7); g.fillRect(x - 19, y - 30, 16, 2);                                    // context
+      // corkboard of PR tickets on the wall behind the desk
+      const bx = x - 46, by = y - 90;
+      g.fillStyle(0xC7A16A, 1); g.fillRect(bx - 2, by - 2, 40, 30);        // cork frame
+      g.fillStyle(0xD8B681, 1); g.fillRect(bx, by, 36, 26);               // cork face
+      // three pinned tickets
+      [[2, 3, 0x2E7F5C], [14, 6, 0xB0554C], [24, 2, 0x2E7F5C]].forEach(([dx, dy, stampCol]) => {
+        g.fillStyle(S.paper, 1); g.fillRect(bx + dx, by + dy, 10, 12);
+        g.fillStyle(S.violet, 1); g.fillRect(bx + dx, by + dy, 10, 3);    // PR header strip
+        g.fillStyle(stampCol, 1); g.fillRect(bx + dx + 3, by + dy + 6, 4, 4); // ✓/✗ stamp
+      });
+      // magnifier resting on the desk
+      g.fillStyle(0x8A9EA8, 1); g.fillEllipse(x + 30, y - 8, 12, 12);
+      g.fillStyle(0xEAF4F8, 0.8); g.fillEllipse(x + 30, y - 8, 8, 8);
+      g.fillStyle(0x6E543A, 1); g.fillRect(x + 36, y - 3, 8, 3);
+      // approval stamp on the top ticket flips approve ↔ comment
+      const stamp = scene.add.rectangle(bx + 5, by + 9, 4, 4, 0x2E7F5C).setDepth(y + 32);
+      scene.tweens.add({ targets: stamp, alpha: 0.25, duration: 1300, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      objs.push(stamp);
     },
     // DESIGN — a drafting STUDIO: a tilted easel/artboard on a stand showing a
     // composition-in-progress (bright like a lightbox), a swatch tray of color
@@ -309,43 +332,120 @@
         objs.push(note);
       });
     },
-    // WRITING — warm desk lamp + a page with a line of ink "writing" across it.
+    // WRITING — a warm LIBRARY NOOK: a gooseneck desk lamp casting an amber pool,
+    // an open manuscript page with ink "writing" line by line, a stack of books,
+    // and a coffee cup. Cozy, unmistakably "writing/docs." (v3 set piece.)
     writing(scene, g, x, y, objs) {
-      // lamp
-      g.fillStyle(S.metal, 1); g.fillRect(x + 26, y - 6, 2, 8); g.fillRect(x + 20, y - 16, 12, 2);
-      g.fillStyle(S.amber, 1); g.fillRect(x + 18, y - 16, 8, 5);
-      const glow = scene.add.rectangle(x + 24, y - 4, 26, 12, S.amber, 0.18).setDepth(y - 58);
+      // amber lamp pool — the key light of this nook
+      const glow = scene.add.ellipse(x - 6, y - 6, 78, 30, 0xF8DFA0, 0.22).setDepth(y - 58);
+      scene.tweens.add({ targets: glow, alpha: 0.34, duration: 2100, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
       objs.push(glow);
-      // page
-      g.fillStyle(S.paper, 1); g.fillRect(x - 20, y - 12, 18, 13);
-      g.fillStyle(S.ink, 0.7); g.fillRect(x - 17, y - 8, 10, 1); g.fillRect(x - 17, y - 5, 12, 1);
-      const inkline = scene.add.rectangle(x - 17, y - 2, 2, 1, S.ink).setOrigin(0, 0.5).setDepth(y + 32);
-      scene.tweens.add({ targets: inkline, scaleX: 6, duration: 1500, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      // gooseneck lamp
+      g.fillStyle(S.metal, 1); g.fillRect(x + 28, y - 4, 3, 6);           // base
+      g.fillStyle(S.metal, 1); g.fillRect(x + 29, y - 18, 2, 14);         // stem
+      g.fillStyle(S.metal, 1); g.fillRect(x + 22, y - 20, 9, 2);          // neck
+      g.fillStyle(S.amber, 1); g.fillRect(x + 18, y - 20, 8, 5);          // shade
+      g.fillStyle(0xFFF3C4, 1); g.fillRect(x + 19, y - 16, 6, 2);         // bulb glow
+      // open manuscript (two facing pages)
+      g.fillStyle(0xE8DCC4, 1); g.fillRect(x - 24, y - 14, 34, 16);       // book cover
+      g.fillStyle(S.paper, 1); g.fillRect(x - 22, y - 12, 15, 13); g.fillRect(x - 6, y - 12, 15, 13);
+      g.fillStyle(0xC7A16A, 1); g.fillRect(x - 7, y - 12, 1, 13);         // spine
+      g.fillStyle(S.ink, 0.6); g.fillRect(x - 20, y - 9, 10, 1); g.fillRect(x - 20, y - 6, 8, 1);
+      g.fillStyle(S.ink, 0.6); g.fillRect(x - 4, y - 9, 10, 1);
+      // stack of books to the left
+      g.fillStyle(S.coral, 1); g.fillRect(x - 44, y - 4, 14, 3);
+      g.fillStyle(S.sky, 1); g.fillRect(x - 43, y - 7, 13, 3);
+      g.fillStyle(0x9BD8B4, 1); g.fillRect(x - 44, y - 10, 12, 3);
+      // coffee cup
+      g.fillStyle(S.paper, 1); g.fillRect(x + 12, y - 6, 7, 6); g.fillStyle(S.coral, 1); g.fillRect(x + 19, y - 5, 2, 3);
+      // ink "writing" line advancing across the right page
+      const inkline = scene.add.rectangle(x - 4, y - 3, 2, 1, S.ink).setOrigin(0, 0.5).setDepth(y + 32);
+      scene.tweens.add({ targets: inkline, scaleX: 5, duration: 1500, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
       objs.push(inkline);
     },
-    // BROWSING — a tablet propped on the desk with scrolling content.
+    // BROWSING — a READING PERCH: a laptop/tablet propped up showing a scrolling
+    // web feed (header bar + article cards) with a floating bookmark/tab and a
+    // mug, coral glow. Unmistakably "reading the web." (v3 set piece.)
     browsing(scene, g, x, y, objs) {
-      // Tablet: dark frame with a slight bezel inset on all sides
-      g.fillStyle(0x2E3438, 1); g.fillRect(x - 16, y - 20, 28, 20); // outer tablet frame
-      g.fillStyle(S.coral, 1); g.fillRect(x - 14, y - 18, 24, 4);   // header/chrome bar
-      g.fillStyle(0xF0E8DA, 1); g.fillRect(x - 14, y - 13, 24, 12); // screen content area
-      g.fillStyle(0x6E7E79, 0.8); g.fillRect(x - 6, y - 4, 8, 2);   // home bar hint
-      // Content lines (text rows)
-      g.fillStyle(S.ink, 0.5); g.fillRect(x - 12, y - 11, 18, 2); g.fillRect(x - 12, y - 7, 14, 2); g.fillRect(x - 12, y - 3, 16, 2);
-      // Scrolling animation — the content rows move up slightly
+      // coral glow
+      const glow = scene.add.ellipse(x - 4, y - 8, 84, 30, 0xF4B3A6, 0.18).setDepth(y - 58);
+      scene.tweens.add({ targets: glow, alpha: 0.3, duration: 2200, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      objs.push(glow);
+      // laptop: propped screen + a base/keyboard deck
+      g.fillStyle(0x2E3438, 1); g.fillRect(x - 20, y - 24, 34, 22);       // screen frame
+      g.fillStyle(0xF0E8DA, 1); g.fillRect(x - 18, y - 22, 30, 18);       // page bg
+      g.fillStyle(S.coral, 1); g.fillRect(x - 18, y - 22, 30, 4);         // browser chrome bar
+      g.fillStyle(0x6E9FD8, 0.9); g.fillRect(x - 16, y - 21, 4, 2);       // tab dots
+      g.fillStyle(0x86CFA6, 0.9); g.fillRect(x - 11, y - 21, 4, 2);
+      // article cards (thumbnail + lines)
+      g.fillStyle(0xCBD8DA, 1); g.fillRect(x - 16, y - 16, 8, 6); g.fillRect(x - 16, y - 8, 8, 4);
+      g.fillStyle(0x596E6E, 0.55); g.fillRect(x - 6, y - 16, 16, 2); g.fillRect(x - 6, y - 13, 12, 2); g.fillRect(x - 6, y - 8, 16, 2);
+      g.fillStyle(0x9AA6A2, 1); g.fillRect(x - 22, y - 2, 38, 4);         // laptop base deck
+      // floating bookmark tab
+      g.fillStyle(S.amber, 1); g.fillRect(x + 16, y - 26, 6, 10); g.fillStyle(0xE4C878, 1); g.fillRect(x + 16, y - 18, 6, 3);
+      // mug
+      g.fillStyle(S.paper, 1); g.fillRect(x + 26, y - 6, 7, 6); g.fillStyle(S.sky, 1); g.fillRect(x + 33, y - 5, 2, 3);
+      // scrolling feed rows
       const rows = [];
       for (let i = 0; i < 3; i++) {
-        const r = scene.add.rectangle(x - 12, y - 11 + i * 4, 18, 2, S.ink, 0.55).setOrigin(0, 0.5).setDepth(y + 32);
+        const r = scene.add.rectangle(x - 6, y - 16 + i * 4, 16, 2, S.ink, 0.5).setOrigin(0, 0.5).setDepth(y + 32);
         rows.push(r); objs.push(r);
       }
       scene.tweens.add({ targets: rows, y: "-=3", duration: 1100, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
     },
-    // FOCUS / OTHER — deliberately quiet: a dim desk, a coffee cup, no signature.
-    focus(scene, g, x, y, objs) {
-      g.fillStyle(S.paper, 1); g.fillRect(x + 30, y - 8, 7, 6); g.fillStyle(S.coral, 1); g.fillRect(x + 37, y - 7, 2, 3);
-      const glow = scene.add.rectangle(x, y - 30, 40, 20, 0xBBDCF0, 0.12).setDepth(y + 30);
-      scene.tweens.add({ targets: glow, alpha: 0.04, duration: 2400, yoyo: true, repeat: -1 });
+    // TERMINAL → a SERVER / OPS station: a small rack of blinking status LEDs, a
+    // black prompt slab with a running log + a live green caret, and a network
+    // activity blip travelling along a cable. Reads as "ops / running servers."
+    // (v3 set piece — its own look, distinct from the coding nook.)
+    terminal(scene, g, x, y, objs) {
+      // cool green ops glow
+      const glow = scene.add.ellipse(x, y - 8, 120, 36, 0x2E4A3A, 0.2).setDepth(y - 58);
+      scene.tweens.add({ targets: glow, alpha: 0.3, duration: 1800, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
       objs.push(glow);
+      // server rack behind/right of the desk — stacked units with LEDs
+      const rx = x + 24, ry = y - 60;
+      g.fillStyle(0x3A4750, 1); g.fillRect(rx, ry, 26, 52);              // rack chassis
+      g.fillStyle(0x2A343C, 1); g.fillRect(rx + 2, ry + 2, 22, 48);     // inner
+      const leds = [];
+      for (let i = 0; i < 4; i++) {
+        g.fillStyle(0x4A5A62, 1); g.fillRect(rx + 4, ry + 4 + i * 12, 18, 9); // unit face
+        g.fillStyle(0x6E7E79, 1); g.fillRect(rx + 7, ry + 6 + i * 12, 8, 2);  // vents
+        const led = scene.add.rectangle(rx + 19, ry + 8 + i * 12, 3, 3, [0x86CFA6, 0xEFC08A, 0x86CFA6, 0xF09B90][i]).setDepth(y + 32);
+        scene.tweens.add({ targets: led, alpha: 0.2, duration: 500 + i * 220, yoyo: true, repeat: -1 });
+        leds.push(led); objs.push(led);
+      }
+      // black prompt slab on the desk with a running log
+      g.fillStyle(0x0E1216, 1); g.fillRect(x - 30, y - 14, 40, 16);
+      g.fillStyle(S.codeGreen, 1); g.fillRect(x - 27, y - 11, 2, 2); g.fillRect(x - 24, y - 11, 10, 2); // prompt
+      g.fillStyle(0x86CFA6, 0.8); g.fillRect(x - 27, y - 7, 22, 2); g.fillRect(x - 27, y - 3, 14, 2);
+      // live green caret
+      const caret = scene.add.rectangle(x - 11, y - 3, 3, 3, S.codeGreen).setDepth(y + 33);
+      scene.tweens.add({ targets: caret, alpha: 0.1, duration: 540, yoyo: true, repeat: -1 });
+      objs.push(caret);
+      // network activity blip travelling from rack to slab (a cable "packet")
+      const blip = scene.add.rectangle(rx, y - 2, 3, 3, 0x9BD8B4).setDepth(y + 33);
+      scene.tweens.add({ targets: blip, x: x - 8, duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      objs.push(blip);
+    },
+    // FOCUS / OTHER — the deliberately QUIET nook: no gadgets, just a soft blue
+    // desk glow that slowly breathes, a mug of coffee, and a small "do not
+    // disturb" plant. The calm is the read — "heads-down." (v3 set piece.)
+    focus(scene, g, x, y, objs) {
+      // small potted plant — a bit of calm greenery
+      g.fillStyle(0x8A5E38, 1); g.fillRect(x + 28, y - 8, 10, 8);        // pot
+      g.fillStyle(0x6B4A2F, 1); g.fillRect(x + 28, y - 8, 10, 2);        // pot rim
+      g.fillStyle(C.leaf, 1); g.fillRect(x + 29, y - 18, 8, 10); g.fillRect(x + 31, y - 22, 4, 5);
+      g.fillStyle(C.leafLight, 1); g.fillRect(x + 30, y - 16, 2, 6);
+      // coffee mug
+      g.fillStyle(S.paper, 1); g.fillRect(x - 34, y - 8, 8, 7); g.fillStyle(S.sky, 1); g.fillRect(x - 26, y - 7, 2, 4);
+      // soft breathing desk glow
+      const glow = scene.add.ellipse(x, y - 24, 44, 22, 0xBBDCF0, 0.14).setDepth(y - 58);
+      scene.tweens.add({ targets: glow, alpha: 0.05, duration: 2600, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      objs.push(glow);
+      // faint steam wisp rising from the mug
+      const steam = scene.add.rectangle(x - 30, y - 10, 2, 4, 0xFFFFFF, 0.4).setDepth(y + 32);
+      scene.tweens.add({ targets: steam, y: y - 24, alpha: 0, duration: 2400, repeat: -1, ease: "Sine.easeOut" });
+      objs.push(steam);
     },
   };
   STATION_DRAW.other = STATION_DRAW.focus;
@@ -371,11 +471,13 @@
     pycharm:  { accent: "#9BD8B4", badge: "Py", category: "coding", screen: "vscode" },
     zed:      { accent: "#6E9FD8", badge: "Ze", category: "coding", screen: "vscode" },
     sublime:  { accent: "#EFC08A", badge: "Su", category: "coding", screen: "vscode" },
-    // ---- terminal (coding, but a black prompt screen) ----
-    terminal: { accent: "#9BD8B4", badge: ">_", category: "coding", screen: "terminal" },
-    iterm:    { accent: "#9BD8B4", badge: ">_", category: "coding", screen: "terminal" },
-    ghostty:  { accent: "#CFBBF0", badge: ">_", category: "coding", screen: "terminal" },
-    warp:     { accent: "#6E9FD8", badge: ">_", category: "coding", screen: "terminal" },
+    // ---- terminal → a SERVER/OPS station (its own set piece), not the code nook.
+    // `station` overrides the category's station painter so a terminal reads as an
+    // ops rack, while `category:"coding"` keeps its zone/seating unchanged.
+    terminal: { accent: "#9BD8B4", badge: ">_", category: "coding", screen: "terminal", station: "terminal" },
+    iterm:    { accent: "#9BD8B4", badge: ">_", category: "coding", screen: "terminal", station: "terminal" },
+    ghostty:  { accent: "#CFBBF0", badge: ">_", category: "coding", screen: "terminal", station: "terminal" },
+    warp:     { accent: "#6E9FD8", badge: ">_", category: "coding", screen: "terminal", station: "terminal" },
     // ---- design ----
     figma:      { accent: "#F0A79E", badge: "Fi", category: "design", screen: "figma" },
     sketch:     { accent: "#EFC08A", badge: "Sk", category: "design", screen: "figma" },
@@ -1479,7 +1581,10 @@
         // Paint the desk monitor: the SPECIFIC APP's screen if known (VS Code,
         // Figma, Zoom, …), else the category tint. Static — reads on the card too.
         this.paintScreen(g, agent, x, y);
-        (STATION_DRAW[cat] || STATION_DRAW.focus)(this, g, x, y, objs, desk);
+        // Station painter: a tool may override its station (terminal → ops rack)
+        // via TOOL_LOOK.station; otherwise the category's station is drawn.
+        const stationKey = (app && app.station) || cat;
+        (STATION_DRAW[stationKey] || STATION_DRAW.focus)(this, g, x, y, objs, desk);
         agent.station = objs;
       }
 
