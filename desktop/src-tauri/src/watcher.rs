@@ -37,6 +37,9 @@ const HEARTBEAT: Duration = Duration::from_secs(60);
 #[derive(Clone, Debug, Serialize)]
 pub struct ActivityEvent {
     pub tool: String,
+    /// Station name for this app ("VS Code"). Shipped label, never the raw app
+    /// name of an uncatalogued app — see catalog::GENERIC_LABEL.
+    pub label: String,
     pub category: String,
     pub object: String,
     pub status: String,
@@ -206,6 +209,7 @@ fn resolve(app: &AppHandle, bundle_id: &str) -> Option<ActivityEvent> {
 
     Some(ActivityEvent {
         tool: mapping.tool,
+        label: mapping.label,
         category: mapping.category,
         object: mapping.object,
         // A held foreground app is, by definition, active work.
@@ -233,7 +237,9 @@ async fn deliver_and_report(app: &AppHandle, event: &ActivityEvent) {
             return;
         }
     };
-    let name = config
+    // The station's NAME is the app ("Figma"); the user's configured name rides
+    // along as the role so we still know whose machine a station belongs to.
+    let owner = config
         .name
         .clone()
         .unwrap_or_else(|| "Desktop".to_string());
@@ -243,7 +249,7 @@ async fn deliver_and_report(app: &AppHandle, event: &ActivityEvent) {
         &config.endpoint,
         &token,
         &config.install_id,
-        &name,
+        &owner,
         event,
     )
     .await

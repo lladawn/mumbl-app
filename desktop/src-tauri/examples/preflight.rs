@@ -89,6 +89,7 @@ async fn main() {
     // ---- 3. Build the REAL activity event + deliver via REAL network module -
     let event = ActivityEvent {
         tool: mapping.tool.to_string(),
+        label: mapping.label.to_string(),
         category: mapping.category.to_string(),
         object: mapping.object.to_string(),
         status: "working".to_string(),

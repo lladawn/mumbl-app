@@ -2,6 +2,10 @@
 //! endpoint, authenticated with the space ingest token (Bearer HMAC on the
 //! server side).
 //!
+//! One ACTOR PER TOOL: the envelope's `agent.id` is `desktop:<install>:<tool>`,
+//! so each actively-used app becomes its own station in the office rather than
+//! all of them collapsing onto one rotating character.
+//!
 //! The envelope MUST match the existing contract (app/api/agents/ingest and
 //! scripts/mumbl-report.mjs): an `agent` block + `status` + `kind` + `task` +
 //! `occurredAt` + `detail`, plus the SHAPE fields `tool`/`category`/`object`.
@@ -69,9 +73,19 @@ pub async fn deliver(
 
     let envelope = Envelope {
         agent: Agent {
-            id: format!("desktop:{install_id}"),
-            name: display_name.to_string(),
-            role: "You".to_string(),
+            // IDENTITY IS PER TOOL, not per machine. recordAgentState upserts on
+            // (space_id, external_id), so a single `desktop:<install_id>` id made
+            // every app-switch overwrite ONE row — the office rendered one
+            // character whose tool rotated instead of the user's live stack.
+            // Suffixing the tool gives each actively-used app its own row, hence
+            // its own station. Apps that go quiet age out on their own: the read
+            // path marks an actor `stale` after 5min and applyState walks stale
+            // actors out of the scene.
+            id: format!("desktop:{install_id}:{}", event.tool),
+            // Named for the app; the machine's configured name becomes the role
+            // so a station still says whose it is.
+            name: event.label.clone(),
+            role: display_name.to_string(),
             source: "desktop".to_string(),
         },
         source: "desktop".to_string(),
@@ -84,7 +98,7 @@ pub async fn deliver(
         kind: "focus".to_string(),
         occurred_at: event.occurred_at.clone(),
         // shape restated, never content
-        detail: format!("{} · {}", titlecase(&event.tool), event.category),
+        detail: format!("{} · {}", event.label, event.category),
     };
 
     let client = reqwest::Client::builder()
@@ -101,12 +115,4 @@ pub async fn deliver(
         .map_err(|e| e.to_string())?;
 
     Ok(resp.status().is_success())
-}
-
-fn titlecase(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-        None => String::new(),
-    }
 }

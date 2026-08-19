@@ -23,6 +23,8 @@ type OfficeActor = {
   name: string;
   role: string;
   status: string;
+  /** true once the actor has gone quiet past STALE_MS — it has walked out. */
+  stale?: boolean;
   currentTask?: string;
   events?: { detail?: string }[];
 };
@@ -121,7 +123,16 @@ export default function LiveOffice({ slug, initialState }: { slug: string; initi
     };
   }, [wanted]);
 
-  const actors = useMemo(() => state.actors || [], [state]);
+  // Parity with the canvas: office-scene applyState() drops stale actors ("a
+  // stale actor has walked out"), so this text fallback — which is the SAME
+  // information for screen readers and no-canvas browsers — must drop them too.
+  // Since desktop identity became per-tool, every app the user has ever opened
+  // has its own row, so an unfiltered list reads as "17 people in" for an
+  // office the canvas is drawing with four.
+  const actors = useMemo(
+    () => (state.actors || []).filter((a) => !a.stale),
+    [state]
+  );
   const offline = Boolean(state.offline) && !state.demo;
 
   return (

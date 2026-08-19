@@ -95,6 +95,12 @@ pub struct Classification {
     /// SHAPE — a coarse, generic tool token. For unknown apps this is the
     /// generic `"other"` — never the raw app name / bundle id.
     pub tool: String,
+    /// The shipped, hard-coded display label for this tool ("VS Code", "Figma").
+    /// This is the station's name in the office. PRIVACY: it is drawn from this
+    /// compiled-in table and only ever exists for apps whose `tool` token
+    /// already leaves, so it carries no information the shape didn't already —
+    /// an UNKNOWN app gets the fixed GENERIC_LABEL, never its real name.
+    pub label: String,
     /// SHAPE — one of the fixed category vocabulary.
     pub category: String,
     /// SHAPE — office-object hint.
@@ -108,10 +114,14 @@ pub struct Classification {
 pub const GENERIC_TOOL: &str = "other";
 pub const GENERIC_CATEGORY: &str = "focus";
 pub const GENERIC_OBJECT: &str = "focus-desk";
+/// Station name for an app NOT in the catalog. Fixed and generic on purpose —
+/// the raw app name must never leave the machine.
+pub const GENERIC_LABEL: &str = "Heads-down";
 
 pub fn generic_classification() -> Classification {
     Classification {
         tool: GENERIC_TOOL.to_string(),
+        label: GENERIC_LABEL.to_string(),
         category: GENERIC_CATEGORY.to_string(),
         object: GENERIC_OBJECT.to_string(),
     }
@@ -121,6 +131,7 @@ impl AppMapping {
     pub fn to_classification(&self) -> Classification {
         Classification {
             tool: self.tool.to_string(),
+            label: self.label.to_string(),
             category: self.category.to_string(),
             object: self.object.to_string(),
         }
