@@ -24,6 +24,7 @@ async function boot() {
   renderShareAll();
   renderAllowlist();
   renderToggle();
+  renderStatus();
   await refreshReceipt();
 
   wire();
@@ -36,6 +37,7 @@ async function boot() {
     renderShareAll();
     renderAllowlist();
     renderToggle();
+    renderStatus();
   });
 }
 
@@ -91,6 +93,57 @@ function renderShareAll() {
     ? "All your apps are shared as shapes by default — untick any you want to keep private. Only the app category ever leaves, never titles or content."
     : "Only ticked apps are shared, as shapes. Only the app category ever leaves, never titles or content.";
   document.body.classList.toggle("opt-in", !shareAll);
+}
+
+// Status & permissions card + the first-run guide. Both are derived purely from
+// the existing config (hasToken / enabled) — no new IPC needed. The permission
+// line is static-true: the helper only reads the frontmost app via the public
+// NSWorkspace notification, so there is genuinely nothing to grant.
+function renderStatus() {
+  const hasToken = !!config.hasToken;
+  const enabled = !!config.enabled;
+
+  const tokenLine = $("st-token");
+  if (tokenLine) {
+    setStatusLine(
+      tokenLine,
+      hasToken,
+      hasToken
+        ? "Ingest token set — securely stored in your macOS keychain."
+        : "No ingest token yet — paste one below and Save to connect.",
+      hasToken ? "good" : "todo"
+    );
+  }
+
+  const sharingLine = $("st-sharing");
+  if (sharingLine) {
+    if (!hasToken) {
+      setStatusLine(sharingLine, false, "Sharing starts once a token is set.", "idle");
+    } else {
+      setStatusLine(
+        sharingLine,
+        enabled,
+        enabled
+          ? "Sharing is on — focused apps light up your office."
+          : "Sharing is paused — nothing is leaving this machine.",
+        enabled ? "good" : "paused"
+      );
+    }
+  }
+
+  // First-run guide: only while there is no token.
+  const guide = $("setup-guide");
+  if (guide) guide.hidden = hasToken;
+}
+
+// Paint one status line: tick glyph + text + state class (good/todo/paused/idle).
+function setStatusLine(el, on, text, state) {
+  el.classList.remove("good", "todo", "paused", "idle");
+  el.classList.add(state);
+  const tick = el.querySelector(".tick");
+  if (tick) tick.textContent = on ? "✓" : state === "paused" ? "⏸" : "•";
+  const txt = el.querySelector(".st-text");
+  if (txt) txt.textContent = text;
 }
 
 function renderToggle() {

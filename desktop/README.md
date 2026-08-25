@@ -99,6 +99,19 @@ cd desktop/src-tauri && cargo check
 > This is a dev/unsigned build. Code-signing & notarization are a deliberately
 > deferred, human-owned decision (architecture spike risk #1) — not done here.
 
+## The settings window at a glance
+
+The window is ordered as a first-run path, top to bottom:
+
+1. **Get your office running** — a 3-step guide that appears only until a token is
+   saved (paste token → keep working → watch the receipt).
+2. **Status & permissions** — an at-a-glance panel that states the honest headline
+   (**no special macOS permissions needed** — no Accessibility / Screen Recording /
+   Input Monitoring) and shows two live checks: token set? sharing on/paused?
+3. **What’s leaving this machine** — the live receipt of the last shape-only event.
+4. **Connection** — endpoint / slug / display name / ingest token.
+5. **Apps** — the share-all master toggle + per-app allowlist.
+
 ## Configure it
 
 1. The app launches into the menubar (tray). Click the tray icon → **Settings…**.

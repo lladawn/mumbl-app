@@ -17,14 +17,46 @@
         <button id="toggle" class="toggle" type="button">Pause sharing</button>
       </header>
 
+      <!-- First-run guide: shows only until a token is saved. -->
+      <section class="card setup" id="setup-guide" hidden>
+        <h2>Get your office running</h2>
+        <ol class="steps">
+          <li>Paste your space <b>ingest token</b> below and hit Save.</li>
+          <li>Keep working — the apps you use light up your office automatically.</li>
+          <li>Watch <b>“What’s leaving this machine”</b> to see exactly what’s shared.</li>
+        </ol>
+      </section>
+
+      <!-- Status & permissions: the "what does it need to run" answer, up front. -->
+      <section class="card status-card">
+        <h2>Status &amp; permissions</h2>
+        <ul class="status-grid">
+          <li id="st-perms" class="status-line good">
+            <span class="tick">✓</span>
+            <span><b>No special macOS permissions needed.</b>
+            No Accessibility, Screen Recording, or Input Monitoring — mumbl only
+            reads which app is frontmost.</span>
+          </li>
+          <li id="st-token" class="status-line">
+            <span class="tick"></span>
+            <span class="st-text">Checking ingest token…</span>
+          </li>
+          <li id="st-sharing" class="status-line">
+            <span class="tick"></span>
+            <span class="st-text">Checking sharing…</span>
+          </li>
+        </ul>
+      </section>
+
       <section class="card">
-        <h2>What am I sharing right now?</h2>
+        <h2>What’s leaving this machine</h2>
         <div class="receipt" id="receipt">
           <em class="muted">Nothing sent yet.</em>
         </div>
         <p class="fine muted">
           A live receipt of the last event that left this machine. Only
-          <b>shape</b> ever leaves — app category, never window titles or content.
+          <b>shape</b> ever leaves — the app’s category, never window titles,
+          URLs, keystrokes, or content.
         </p>
       </section>
 

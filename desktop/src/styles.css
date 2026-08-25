@@ -40,6 +40,27 @@ body {
 .muted { color: var(--muted); }
 .fine { font-size: 11px; }
 
+/* First-run guide — a numbered path to a live office, shown until a token is set. */
+.setup { background: linear-gradient(180deg, #f2f6f0, var(--card)); border-color: #d8e5d6; }
+.steps { margin: 0; padding-left: 18px; }
+.steps li { margin: 0 0 5px; font-size: 12.5px; }
+.steps li:last-child { margin-bottom: 0; }
+
+/* Status & permissions card. */
+.status-grid { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.status-line { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; line-height: 1.4; }
+.status-line .tick {
+  flex: 0 0 16px; width: 16px; height: 16px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; margin-top: 1px;
+  background: var(--off); color: #fff;
+}
+.status-line.good .tick { background: var(--accent); }
+.status-line.todo .tick { background: var(--danger); }
+.status-line.paused .tick { background: #c9a24a; }
+.status-line.idle .tick { background: var(--off); }
+.status-line.todo .st-text { color: var(--ink); }
+
 .card {
   background: var(--card);
   border: 1px solid var(--line);
