@@ -14,6 +14,12 @@
 //! closes the tab, the flow just times out instead of leaving a dangling
 //! handler. The code is single-use and short-lived server-side.
 //!
+//! THE TOKEN THIS RETURNS MUST BE DEVICE-SCOPED, INGEST-ONLY AND REVOCABLE —
+//! see `REQUIRED_BACKEND`. Pairing is the moment that scope gets decided, and
+//! it is the reason pairing is worth building at all rather than just asking
+//! the user to paste something: a pasted token is whatever the user could copy,
+//! which today is the whole space.
+//!
 //! BACKEND IS NOT LIVE YET. Nothing under app/api/agents/pair exists, so
 //! `claim` treats 404/405 as the documented "not deployed" state and reports it
 //! as `Unavailable` rather than an error — the UI then points the user at the
@@ -28,8 +34,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// 1. `GET /pair?code=<code>&name=<display-name>` — a PAGE, not an API. The
 ///    user is already signed in; it shows "Connect <name> to <space>?" and an
-///    Authorize button. On authorize it mints an ingest token for the chosen
-///    space and binds it to `code`.
+///    Authorize button. On authorize it mints a token (see the HARD REQUIREMENT
+///    below) and binds it to `code`.
 ///
 /// 2. `POST /api/agents/pair/claim` — body `{ "code": "<code>" }`. Responses:
 ///      200 `{ "token": "...", "slug": "...", "endpoint": "..." }` authorized
@@ -40,7 +46,30 @@ use serde::{Deserialize, Serialize};
 /// Codes should be single-use and expire in ~10 minutes. The claim route must
 /// NOT require the desktop app to be authenticated — possession of the freshly
 /// minted code IS the proof, which is why the code has to be short-lived.
-pub const REQUIRED_BACKEND: &str = "GET /pair?code&name  +  POST /api/agents/pair/claim";
+///
+/// ── HARD REQUIREMENT: THE MINTED TOKEN MUST BE DEVICE-SCOPED, INGEST-ONLY AND
+/// REVOCABLE. This is part of the contract, not an optimisation, and it has to
+/// be built in from the start — retrofitting scope onto tokens already handed
+/// out means reissuing every one of them.
+///
+///   DEVICE-SCOPED  one token per paired machine, never a shared space-wide
+///                  credential. Today a user pastes a token that is valid for
+///                  the whole space into a desktop app; that is a far broader
+///                  credential than a single Mac needs in order to say "I am in
+///                  Figma".
+///   INGEST-ONLY    it may POST activity to exactly one space. It must not read
+///                  the office, enumerate actors, or touch the account.
+///   REVOCABLE      "Disconnect this Mac" in the web UI kills that one token
+///                  and nothing else.
+///
+/// The point of all three together is blast radius: a leaked token means
+/// "somebody can post fake activity for one Mac", and revoking it costs the
+/// user one click and disturbs none of their other machines.
+///
+/// Practically, that means `claim` returns a token bound to the pairing code's
+/// device identity, and the space's own ingest token is never what travels.
+pub const REQUIRED_BACKEND: &str =
+    "GET /pair?code&name  +  POST /api/agents/pair/claim (token MUST be device-scoped, ingest-only, revocable)";
 
 const CLAIM_PATH: &str = "/api/agents/pair/claim";
 const TIMEOUT: Duration = Duration::from_secs(8);
