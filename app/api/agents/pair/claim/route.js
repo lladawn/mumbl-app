@@ -1,5 +1,6 @@
 import { badRequest, serverError } from "../../../../../src/server/http";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
+import { enforceRateLimit } from "../../../../../src/server/rateLimit";
 import { claimPairingCode, normalizePairingCode } from "../../../../../src/server/devicePairing";
 
 /**
@@ -31,6 +32,14 @@ export async function POST(request) {
     if (!code) return badRequest("code is required");
 
     const supabase = getSupabaseAdmin();
+
+    // Keyed on client IP, because there is no session here to key on. The
+    // limiter is generous enough for the helper's 2-second poll (see the
+    // agent_pair_claim note in rateLimit.js); it exists so that an
+    // unauthenticated endpoint taking a guessable code is not the one place we
+    // skip the rate limiter we already own.
+    await enforceRateLimit({ supabase, action: "agent_pair_claim", sessionToken: clientIp(request) });
+
     const result = await claimPairingCode(supabase, { code });
 
     if (result.state === "pending") {
@@ -52,8 +61,24 @@ export async function POST(request) {
       endpoint: new URL("/api/agents/ingest", request.url).toString(),
     });
   } catch (error) {
+    if (error?.status === 429) {
+      // NOT a 4xx the client should read as "code spent" — pairing.rs treats
+      // any client error other than 404/405/501 as Expired and stops polling.
+      // 429 is in that bucket, so we send Retry-After and let the helper's own
+      // 3-minute deadline decide, rather than killing a legitimate pairing.
+      return Response.json({ error: "too many pairing attempts" }, { status: 429, headers: { "retry-after": "60" } });
+    }
     return serverError(error);
   }
+}
+
+// Vercel sets x-forwarded-for; the first entry is the client. Falls back to a
+// constant so a missing header degrades to one shared bucket rather than to no
+// limiting at all.
+function clientIp(request) {
+  const fwd = request.headers.get("x-forwarded-for") || "";
+  const ip = fwd.split(",")[0].trim() || request.headers.get("x-real-ip") || "";
+  return ip || "unknown-client";
 }
 
 // If migration 0010 has not run, the query throws and serverError returns 500.

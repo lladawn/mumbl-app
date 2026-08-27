@@ -15,6 +15,14 @@ const LIMITS = {
   // an unauthenticated way to make the app send mail, so the ceiling has to be
   // per link. Generous for a real calendar, useless as a spam relay.
   booking_create: { limit: 20, windowSeconds: 60 * 60 },
+  // Device pairing claims, keyed on client IP because the endpoint is
+  // deliberately unauthenticated (see app/api/agents/pair/claim). The helper
+  // polls every 2s for up to 3 minutes — 30 requests/minute for ONE pairing —
+  // and a shared office NAT can have several people pairing at once, so the
+  // ceiling has to clear that comfortably or the limiter breaks the feature it
+  // is protecting. 240/min still caps guessing at ~350k/day against a ~1.5e9
+  // code space (8 chars, 14-symbol alphabet) that also expires in 10 minutes.
+  agent_pair_claim: { limit: 240, windowSeconds: 60 },
 };
 
 export async function enforceRateLimit({ supabase, action, sessionToken }) {
