@@ -1,6 +1,7 @@
 import { badRequest, serverError } from "../../../../../src/server/http";
 import { getSupabaseAdmin } from "../../../../../src/server/supabase";
 import { enforceRateLimit } from "../../../../../src/server/rateLimit";
+import { getServerEnv } from "../../../../../src/server/env";
 import { claimPairingCode, normalizePairingCode } from "../../../../../src/server/devicePairing";
 
 /**
@@ -54,11 +55,23 @@ export async function POST(request) {
     return Response.json({
       token: result.token,
       slug: result.slug,
-      // Absolute ingest endpoint, so a helper paired against staging keeps
-      // talking to staging. pairing.rs treats this as optional and falls back
-      // to its own origin, but being explicit costs nothing and removes a
-      // whole class of "why is my laptop posting to prod" confusion.
-      endpoint: new URL("/api/agents/ingest", request.url).toString(),
+      // ALWAYS returned, never conditional. Re-pairing is an explicit "connect
+      // this Mac to that office", so it has to correct the ADDRESS as well as
+      // the credential — a helper holding a stale endpoint looks connected and
+      // posts into the void, which is the exact silent failure this flow exists
+      // to remove. The helper overwrites on Some(value) and leaves the existing
+      // value alone on None, so omitting this is what strands a bad address.
+      //
+      // Derived from NEXT_PUBLIC_APP_URL, NOT from request.url. This app is
+      // behind Vercel's proxy, so request.url is whatever reached the lambda
+      // and is not a reliable statement of where the deployment publicly lives;
+      // in local dev it is not even the address the helper uses (NEXT_PUBLIC_APP_URL
+      // is an ngrok tunnel there). appUrl is the repo's existing answer to
+      // exactly this question — src/server/slack.js builds every OAuth callback
+      // from it, which has the same "must be the public origin" requirement. If
+      // it is ever wrong the breakage is loud and shared rather than silent and
+      // pairing-specific.
+      endpoint: new URL("/api/agents/ingest", getServerEnv().appUrl).toString(),
     });
   } catch (error) {
     if (error?.status === 429) {

@@ -30,6 +30,9 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "fake-service-key";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "fake-anon-key";
 process.env.MUMBL_TOKEN_HASH_SECRET = "test-hash-secret";
 process.env.MUMBL_CONTENT_ENCRYPTION_KEY = "test-content-encryption-key";
+// Deliberately NOT the host the test Requests use (localhost:3000), so an
+// endpoint derived from request.url would fail these assertions.
+process.env.NEXT_PUBLIC_APP_URL = "https://pair-test.example";
 
 const { db, reset, setRateLimit } = await import("./fake-supabase.mjs");
 const { setUser } = await import("./fake-auth.mjs");
@@ -82,7 +85,9 @@ const claimed = await r.json();
 check("authorized -> 200", r.status === 200, `got ${r.status}`);
 check("returns a token", Boolean(claimed.token), JSON.stringify(claimed));
 check("returns the slug", claimed.slug === "acme", claimed.slug);
-check("returns an absolute ingest endpoint", /\/api\/agents\/ingest$/.test(claimed.endpoint || ""), claimed.endpoint);
+check("returns an absolute ingest endpoint", /^https:\/\/.+\/api\/agents\/ingest$/.test(claimed.endpoint || ""), claimed.endpoint);
+check("endpoint comes from NEXT_PUBLIC_APP_URL, not the request host",
+  claimed.endpoint === "https://pair-test.example/api/agents/ingest", claimed.endpoint);
 
 r = await post(claim, { code: CODE });
 check("SINGLE USE: second claim -> 404", r.status === 404, `got ${r.status}`);
@@ -170,6 +175,8 @@ r = await claimOtherLambda.POST(new Request("http://localhost:3000/api/agents/pa
 const other = await r.json();
 check("a DIFFERENT instance can complete the claim", r.status === 200 && Boolean(other.token), `${r.status} ${JSON.stringify(other)}`);
 check("that token authenticates ingest", (await resolveSpaceByIngestToken(getSupabaseAdmin(), other.token))?.slug === "acme");
+check("EVERY successful claim carries the endpoint, so re-pairing re-points a stale address",
+  other.endpoint === "https://pair-test.example/api/agents/ingest", other.endpoint);
 check("the ciphertext is wiped on claim", !db.agent_pairing_codes[0].encrypted_payload?.device_token);
 
 console.log("\n7. RATE LIMITING on the unauthenticated claim");
