@@ -139,6 +139,15 @@ fn pair_required_backend() -> &'static str {
 }
 
 #[tauri::command]
+fn set_show_in_dock(app: AppHandle, show: bool) -> Result<Config, String> {
+    let config = config::set_show_in_dock(&app, show)?;
+    #[cfg(target_os = "macos")]
+    apply_dock_policy(&app, show);
+    let _ = app.emit("config-changed", ());
+    Ok(config)
+}
+
+#[tauri::command]
 fn get_last_receipt(app: AppHandle) -> Option<Receipt> {
     app.state::<LastReceipt>().0.lock().unwrap().clone()
 }
@@ -170,14 +179,13 @@ pub fn run() {
                 let _ = tx.send(change);
             });
 
-            // Menubar `Accessory` app: no dock icon. We still surface the
-            // Settings window on launch (below) so the user never has to hunt
-            // for a menubar tray icon that may be hidden under the notch.
+            // Dock icon or not. A menubar-only (`Accessory`) app is the intended
+            // posture, but a menubar icon that cannot be found leaves the user
+            // with no way in at all — which has happened repeatedly on a
+            // notched MacBook with a full bar. So the Dock icon is ON by
+            // default and the user can switch it off from the popover.
             #[cfg(target_os = "macos")]
-            {
-                use tauri::ActivationPolicy;
-                app.set_activation_policy(ActivationPolicy::Accessory);
-            }
+            apply_dock_policy(&handle, config::view(&handle).config.show_in_dock);
 
             // Closing the Settings window should HIDE it (not destroy it), so
             // the tray "Settings…" item can reliably re-show it and closing the
@@ -230,17 +238,25 @@ pub fn run() {
             set_share_all,
             set_muted,
             get_last_receipt,
+            set_show_in_dock,
             pair_begin,
             pair_poll,
             pair_required_backend,
         ])
         .build(tauri::generate_context!())
         .expect("error while building mumbl helper")
-        .run(|_app, event| {
-            // Keep running when the settings window is closed — it's a tray app.
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
+        .run(|app, event| match event {
+            // Closing the popover must not quit a background helper.
+            tauri::RunEvent::ExitRequested { api, .. } => api.prevent_exit(),
+            // Clicking the Dock tile (or picking the app in Cmd-Tab) is the
+            // fallback way in when the menubar icon cannot be found, so it has
+            // to actually reopen the popover.
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen { .. } => {
+                log::info!("reopened from the Dock — showing the popover");
+                show_popover(app, None);
             }
+            _ => {}
         });
 }
 
@@ -309,7 +325,21 @@ fn position_popover(win: &WebviewWindow, rect: Option<Rect>) {
     let scale = win.scale_factor().unwrap_or(1.0);
     let Ok(size) = win.outer_size() else { return };
 
-    let Some(rect) = rect else { return };
+    let Some(rect) = rect else {
+        // No tray frame (icon missing, or opened from the Dock). Keeping the
+        // last position risks parking it off-screen — the very failure mode
+        // this whole change exists to prevent — so fall back to the top-right
+        // of the current display, under the menubar.
+        if let Ok(Some(monitor)) = win.current_monitor() {
+            let mon = monitor.position();
+            let mon_size = monitor.size();
+            let x = (mon.x + mon_size.width as i32) - size.width as i32 - (EDGE_MARGIN * scale) as i32;
+            let y = mon.y + (MENUBAR_FALLBACK_Y * scale) as i32;
+            let _ = win.set_position(PhysicalPosition::new(x, y));
+            log::info!("popover placed top-right at {x},{y} (no tray frame available)");
+        }
+        return;
+    };
     let tray = rect.position.to_physical::<f64>(scale);
     let tray_size = rect.size.to_physical::<f64>(scale);
 
@@ -344,6 +374,8 @@ fn position_popover(win: &WebviewWindow, rect: Option<Rect>) {
 const GAP_BELOW_MENUBAR: f64 = 6.0;
 /// Keep this much clear of the screen edge when the tray icon sits near it.
 const EDGE_MARGIN: f64 = 8.0;
+/// Logical y for the no-tray-frame fallback: just below a standard menubar.
+const MENUBAR_FALLBACK_Y: f64 = 26.0;
 
 fn show_popover(app: &AppHandle, rect: Option<Rect>) {
     let Some(win) = app.get_webview_window("main") else { return };
@@ -373,6 +405,24 @@ fn toggle_popover(app: &AppHandle, rect: Option<Rect>) {
     } else {
         show_popover(app, rect);
     }
+}
+
+/// Show or hide the Dock tile. `Regular` also puts the app in Cmd-Tab, which is
+/// the other place people look when a menubar icon has gone missing.
+#[cfg(target_os = "macos")]
+fn apply_dock_policy(app: &AppHandle, show_in_dock: bool) {
+    use tauri::ActivationPolicy;
+    let policy = if show_in_dock {
+        ActivationPolicy::Regular
+    } else {
+        ActivationPolicy::Accessory
+    };
+    let _ = app.set_activation_policy(policy);
+    log::info!(
+        "dock icon {} — the app is reachable from {}",
+        if show_in_dock { "ON" } else { "OFF" },
+        if show_in_dock { "the Dock, Cmd-Tab and the menubar" } else { "the menubar only" }
+    );
 }
 
 fn toggle_sharing(app: &AppHandle) {

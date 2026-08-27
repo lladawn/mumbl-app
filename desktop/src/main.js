@@ -40,6 +40,7 @@ async function boot() {
 
 function renderAll() {
   renderView();
+  renderDock();
   renderFields();
   renderShareAll();
   renderAllowlist();
@@ -59,6 +60,12 @@ function renderView() {
   $("foot").textContent = connected
     ? `${config.name || "this Mac"} · install ${config.installId?.slice(0, 8) || "—"}`
     : "nothing is being shared yet";
+}
+
+// The Dock icon is the escape hatch when the menubar icon can't be found, so
+// its state has to be visible and reversible rather than a hidden default.
+function renderDock() {
+  setChecked($("show-dock"), config.showInDock !== false);
 }
 
 // Advanced only — the main flow never asks for these.
@@ -252,6 +259,11 @@ function wire() {
   $("pair-cancel").addEventListener("click", () => {
     stopPairing();
     pairStatus("");
+  });
+
+  $("show-dock").addEventListener("change", async (e) => {
+    config = await invoke("set_show_in_dock", { show: e.target.checked });
+    renderDock();
   });
 
   $("share-all").addEventListener("change", async (e) => {

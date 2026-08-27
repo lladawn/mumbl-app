@@ -47,6 +47,17 @@ pub struct Config {
     /// Absent/false == dropped.
     #[serde(default)]
     pub allowlist: BTreeMap<String, bool>,
+    /// Also show a Dock icon, so the app is reachable when the menubar icon
+    /// cannot be found.
+    ///
+    /// Defaults to TRUE. That is a deliberate reversal: this is a menubar app
+    /// and a Dock icon is not the intended posture, but "I can't find the
+    /// icon" has now stranded the user three separate times on a notched
+    /// MacBook with a full menubar. An app you cannot open is worse than an
+    /// app with an extra Dock tile, so the safe default wins and the user can
+    /// turn it off once they have parked the menubar icon somewhere stable.
+    #[serde(rename = "showInDock", default = "default_true")]
+    pub show_in_dock: bool,
     /// Opt-OUT set (used when `share_all` is true): bundle_id -> muted.
     /// A bundle id mapped to `true` here is hidden even though share-all is on.
     #[serde(default)]
@@ -64,6 +75,7 @@ impl Default for Config {
             enabled: true,
             install_id: uuid::Uuid::new_v4().to_string(),
             share_all: true,
+            show_in_dock: true,
             allowlist: BTreeMap::new(),
             muted: BTreeMap::new(),
         }
@@ -218,6 +230,15 @@ pub fn set_share_all(app: &AppHandle, share_all: bool) -> Result<Config, String>
     let state = app.state::<ConfigState>();
     let mut config = state.inner.lock().unwrap();
     config.share_all = share_all;
+    persist(app, &config)?;
+    Ok(config.clone())
+}
+
+/// Show or hide the Dock icon.
+pub fn set_show_in_dock(app: &AppHandle, show: bool) -> Result<Config, String> {
+    let state = app.state::<ConfigState>();
+    let mut config = state.inner.lock().unwrap();
+    config.show_in_dock = show;
     persist(app, &config)?;
     Ok(config.clone())
 }
