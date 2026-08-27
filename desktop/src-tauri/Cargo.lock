@@ -1984,6 +1984,8 @@ version = "0.1.0"
 dependencies = [
  "block2 0.5.1",
  "chrono",
+ "core-foundation 0.9.4",
+ "core-graphics",
  "keyring",
  "log",
  "objc2 0.5.2",

@@ -198,3 +198,46 @@ pub fn menubar_strip_origin() -> Option<(f64, f64)> {
     let right = unsafe { screen.auxiliaryTopRightArea() };
     Some((right.origin.x, right.size.height))
 }
+
+/// Is the menubar on screen right now?
+///
+/// There is no AppKit property for this. `NSScreen.visibleFrame` keeps its
+/// menubar inset even while a fullscreen app is hiding the bar, and
+/// `NSMenu::menuBarHeight` is 0 unless the receiver IS the main menu — which an
+/// Accessory app has none of. Both were measured and both lied.
+///
+/// So we ask the window server the same question a person would: is any status
+/// item actually being drawn? Status items live at kCGStatusWindowLevel (25),
+/// and when a fullscreen app takes the screen EVERY one of them drops off the
+/// on-screen list together. Verified against Claude, Notion, Soma and ChatGPT
+/// simultaneously, so this is a property of the bar and not of one app.
+pub fn menubar_visible() -> bool {
+    use core_foundation::base::{CFType, TCFType};
+    use core_foundation::dictionary::CFDictionary;
+    use core_foundation::number::CFNumber;
+    use core_foundation::string::CFString;
+    use core_graphics::window::{
+        copy_window_info, kCGNullWindowID, kCGWindowLayer, kCGWindowListOptionOnScreenOnly,
+    };
+
+    const STATUS_ITEM_LEVEL: i64 = 25;
+
+    let Some(list) = copy_window_info(kCGWindowListOptionOnScreenOnly, kCGNullWindowID) else {
+        // Cannot tell — assume visible rather than hiding the character on a
+        // guess. Failing towards "shown" is the recoverable direction.
+        return true;
+    };
+    let key = unsafe { CFString::wrap_under_get_rule(kCGWindowLayer) };
+    for item in list.iter() {
+        let dict: CFDictionary<CFString, CFType> =
+            unsafe { CFDictionary::wrap_under_get_rule(*item as *const _) };
+        if let Some(v) = dict.find(&key) {
+            if let Some(n) = v.downcast::<CFNumber>().and_then(|n| n.to_i64()) {
+                if n == STATUS_ITEM_LEVEL {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}

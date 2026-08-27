@@ -60,6 +60,10 @@ objc2-app-kit = { version = "0.2", features = [
   "NSApplication",
 ] }
 block2 = "0.5"
+# Already in the tree via tauri/wry — used to read the ONE fact AppKit will not
+# tell us directly: whether the menubar is currently on screen.
+core-graphics = "0.25"
+core-foundation = "0.9"
 
 [profile.release]
 panic = "abort"

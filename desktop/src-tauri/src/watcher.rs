@@ -86,6 +86,13 @@ async fn run(app: AppHandle, mut rx: mpsc::UnboundedReceiver<FocusChange>) {
     // Poll a short tick so we can act on the debounce/heartbeat timers even
     // while no new focus change arrives.
     let mut tick = time::interval(Duration::from_secs(1));
+    // The character is a MENUBAR CITIZEN: it lives and dies with the bar. A
+    // sprite left hovering over someone's fullscreen work is exactly the
+    // intrusion the calm constraint exists to prevent. Checked on the tick we
+    // already have rather than a timer of its own, and every other second
+    // because the answer cannot change faster than a person can notice.
+    let mut menubar_was: Option<bool> = None;
+    let mut menubar_countdown: u8 = 0;
 
     loop {
         tokio::select! {
@@ -147,6 +154,23 @@ async fn run(app: AppHandle, mut rx: mpsc::UnboundedReceiver<FocusChange>) {
             }
             _ = tick.tick() => {
                 let now = Instant::now();
+
+                if menubar_countdown == 0 {
+                    menubar_countdown = 2;
+                    let visible = crate::platform::menubar_visible();
+                    if menubar_was != Some(visible) {
+                        menubar_was = Some(visible);
+                        if let Some(ch) = app.get_webview_window("character") {
+                            let _ = if visible { ch.show() } else { ch.hide() };
+                        }
+                        log::info!(
+                            "menubar {} — character {}",
+                            if visible { "visible" } else { "hidden (fullscreen app)" },
+                            if visible { "shown" } else { "hidden with it" }
+                        );
+                    }
+                }
+                menubar_countdown -= 1;
 
                 // Debounce elapsed → promote pending to current and emit.
                 if let Some(p) = pending.take() {

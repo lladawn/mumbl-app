@@ -24,14 +24,36 @@
          A head narrower than the shoulders and a gap between the legs is the
          whole difference between reading as a person and reading as a stack of
          coloured bars. */
+      /* AT REST THE FIGURE IS MONOCHROME, on purpose.
+         Every other citizen of the menubar is a single-colour template glyph.
+         A full-colour sprite among them is instantly the loudest thing up
+         there — a permanent attention tax, which is the exact opposite of the
+         constraint. Rest is a silhouette; COLOUR IS RESERVED for a moment the
+         character has earned, which makes colour itself the signal.
+         There is no template auto-inversion inside a webview, so we follow the
+         system appearance the way a template image would. */
+      :root { --glyph: #f2efe9; }
+      @media (prefers-color-scheme: light) { :root { --glyph: #24211c; } }
+
       #me { position: absolute; left: 8px; bottom: 3px; width: 11px; height: 22px; }
       #me i { position: absolute; display: block; }
-      .hair { left: 18%; right: 18%; top: 0; height: 16%; background: #4a382c; }
-      .face { left: 22%; right: 22%; top: 14%; height: 22%; background: #e3b48d; }
-      .body { left: 0; right: 0; top: 34%; height: 38%; background: #5fcbbc;
+      /* In colour, a head/face/torso stack reads because the bands DIFFER. In
+         monochrome they merge into one blob, so the silhouette has to be carried
+         by NEGATIVE SPACE instead: a head narrower than the shoulders, a real
+         gap at the neck, and a gap between the legs. That is how every other
+         glyph in the bar stays legible at this size. */
+      .hair { left: 23%; right: 23%; top: 0; height: 27%; background: var(--glyph); }   /* head */
+      .face { display: none; }                                                          /* colour-only detail */
+      .body { left: 0; right: 0; top: 36%; height: 34%; background: var(--glyph);
               transition: background .45s steps(3, end); }
-      .legs { left: 6%; right: 6%; top: 71%; height: 29%;
-              background: linear-gradient(90deg, #6e7e96 0 36%, transparent 36% 64%, #6e7e96 64% 100%); }
+      .legs { left: 8%; right: 8%; top: 76%; height: 24%;
+              background: linear-gradient(90deg, var(--glyph) 0 34%, transparent 34% 66%, var(--glyph) 66% 100%); }
+
+      /* An EARNED moment is the only time colour appears. Nothing sets this
+         yet — the rare-moment trigger is a later build — but the seam exists so
+         colour never leaks back into the resting state by accident. */
+      #me.earned .body { background: var(--earned, #cfbbf0); }
+      #me.earned .face { display: block; left: 26%; right: 26%; top: 6%; height: 16%; background: #e3b48d; }
 
       /* ---- the one vignette: coding, a standing kiosk ---------------------- */
       #prop { position: absolute; left: 26px; bottom: 3px; width: 0; height: 0; opacity: 0; }
@@ -39,10 +61,10 @@
          idles, nothing breathes. Motion exists only inside a transition. */
       #prop.up { width: 30px; height: 20px; opacity: 1;
                  transition: width .5s steps(5, end), height .5s steps(5, end), opacity .3s steps(2, end); }
-      #prop .screen { position: absolute; inset: 0; background: #1e262b; border: 1px solid #2a241d; }
-      #prop .line { position: absolute; height: 2px; }
-      #prop .stem { position: absolute; left: 50%; margin-left: -1px; bottom: -5px; width: 3px; height: 5px; background: #8a9ea8; }
-      #prop .base { position: absolute; left: 50%; margin-left: -7px; bottom: -7px; width: 14px; height: 2px; background: #8a9ea8; }
+      #prop .screen { position: absolute; inset: 0; background: var(--glyph); opacity: .18; }
+      #prop .line { position: absolute; height: 2px; background: var(--glyph); }
+      #prop .stem { position: absolute; left: 50%; margin-left: -1px; bottom: -5px; width: 3px; height: 5px; background: var(--glyph); opacity: .5; }
+      #prop .base { position: absolute; left: 50%; margin-left: -7px; bottom: -7px; width: 14px; height: 2px; background: var(--glyph); opacity: .5; }
 
       @media (prefers-reduced-motion: reduce) {
         #prop.up { transition: none; }
@@ -57,9 +79,9 @@
       </div>
       <div id="prop">
         <span class="screen"></span>
-        <span class="line" style="left:4px; top:4px;  width:14px; background:#4fa5e0"></span>
-        <span class="line" style="left:4px; top:9px;  width:9px;  background:#86cfa6"></span>
-        <span class="line" style="left:7px; top:14px; width:12px; background:#efc08a"></span>
+        <span class="line" style="left:4px; top:4px;  width:14px; opacity:.85"></span>
+        <span class="line" style="left:4px; top:9px;  width:9px;  opacity:.6"></span>
+        <span class="line" style="left:7px; top:14px; width:12px; opacity:.45"></span>
         <span class="stem"></span><span class="base"></span>
       </div>
     </div>

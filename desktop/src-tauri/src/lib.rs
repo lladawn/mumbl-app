@@ -298,8 +298,17 @@ pub fn run() {
                     platform::float_above_everything(ns);
                 }
                 place_character(&ch);
-                let _ = ch.show();
-                log::info!("character shown in the menubar strip");
+                // Only appear if the bar is actually there. Showing
+                // unconditionally raced the watcher, which had already hidden it
+                // for a fullscreen app a moment earlier — the character would
+                // pop back up and then stay up, because the watcher only acts on
+                // a CHANGE and the state had not changed again.
+                if platform::menubar_visible() {
+                    let _ = ch.show();
+                    log::info!("character shown in the menubar strip");
+                } else {
+                    log::info!("character staying hidden — a fullscreen app has the menubar");
+                }
             } else {
                 log::warn!("character window not found at setup");
             }

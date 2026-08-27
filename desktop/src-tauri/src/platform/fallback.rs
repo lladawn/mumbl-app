@@ -23,3 +23,6 @@ pub fn float_above_everything(_ns_window: *mut std::ffi::c_void) {}
 
 /// Menubar geometry is a macOS concept.
 pub fn menubar_strip_origin() -> Option<(f64, f64)> { None }
+
+/// No menubar to track off macOS.
+pub fn menubar_visible() -> bool { true }
