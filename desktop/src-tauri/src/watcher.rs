@@ -63,6 +63,23 @@ pub struct Receipt {
 #[derive(Default)]
 pub struct LastReceipt(pub std::sync::Mutex<Option<Receipt>>);
 
+/// The last delivery error, or None if the last send went through.
+///
+/// Separate from `LastReceipt` because a receipt only exists once an event has
+/// happened, and "the endpoint is unreachable" is worth saying before then.
+#[derive(Default)]
+pub struct DeliveryError(pub std::sync::Mutex<Option<String>>);
+
+fn set_delivery_error(app: &AppHandle, err: Option<String>) {
+    if let Some(state) = app.try_state::<DeliveryError>() {
+        let mut slot = state.0.lock().unwrap();
+        if *slot != err {
+            *slot = err;
+            let _ = app.emit("config-changed", ());
+        }
+    }
+}
+
 /// Sender the platform layer pushes focus changes into.
 pub type FocusSender = mpsc::UnboundedSender<FocusChange>;
 
@@ -305,7 +322,7 @@ async fn deliver_and_report(app: &AppHandle, event: &ActivityEvent) {
         .unwrap_or_else(|| "Desktop".to_string());
 
     // never block forever; a failed POST is dropped, not queued.
-    let delivered = network::deliver(
+    let delivered = match network::deliver(
         &config.endpoint,
         &token,
         &config.install_id,
@@ -313,10 +330,22 @@ async fn deliver_and_report(app: &AppHandle, event: &ActivityEvent) {
         event,
     )
     .await
-    .unwrap_or_else(|e| {
-        log::warn!("ingest POST failed (dropped): {e}");
-        false
-    });
+    {
+        Ok(ok) => {
+            if ok {
+                set_delivery_error(&app, None);
+            }
+            ok
+        }
+        Err(e) => {
+            log::warn!("ingest POST failed (dropped): {e}");
+            // Remember WHY. A dropped event with no reason on screen is the same
+            // silent failure as a missing token: the office just looks empty and
+            // nothing says the machine has been talking to a dead endpoint.
+            set_delivery_error(&app, Some(e.to_string()));
+            false
+        }
+    };
 
     let receipt = Receipt {
         tool: event.tool.clone(),

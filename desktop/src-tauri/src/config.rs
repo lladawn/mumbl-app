@@ -104,6 +104,14 @@ pub struct ConfigView {
     pub config: Config,
     #[serde(rename = "hasToken")]
     pub has_token: bool,
+    /// Why sharing is or isn't possible. `has_token` alone cannot say whether
+    /// the answer is "connect" or "try again".
+    #[serde(rename = "tokenState")]
+    pub token_state: TokenState,
+    /// The OS's own words, shown only in Advanced — useful in a bug report,
+    /// meaningless to most people.
+    #[serde(rename = "tokenDetail", skip_serializing_if = "Option::is_none")]
+    pub token_detail: Option<String>,
 }
 
 /// Partial update from the UI. `token: Some("")` is treated as "leave as-is"
@@ -138,6 +146,29 @@ pub struct ConfigState {
 struct TokenCache {
     loaded: bool,
     value: Option<String>,
+    /// WHY the value is None, which is not the same question as whether it is.
+    ///
+    /// This used to collapse into a bare `Option`, and that collapse is exactly
+    /// why the app could sit there sharing nothing and say nothing: "you have
+    /// never connected" and "the OS refused to let me read your token" both
+    /// arrived as None, so neither could be reported. They need completely
+    /// different words and completely different buttons.
+    blocked: Option<String>,
+}
+
+/// Why the helper is or is not sharing, in the words the UI needs.
+#[derive(Clone, Debug, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum TokenState {
+    /// The keychain read is in flight — usually an OS prompt on screen.
+    Loading,
+    /// We have a token.
+    Present,
+    /// No token has ever been stored. The answer is to connect.
+    Missing,
+    /// A token may well exist; the OS would not let us read it. The answer is
+    /// to retry, not to reconnect.
+    Blocked,
 }
 
 impl ConfigState {
@@ -226,7 +257,9 @@ appearing over fullscreen apps); turn it back on from Advanced if you want the D
         if cache.loaded {
             return;
         }
-        cache.value = read_token_from_keychain();
+        let read = read_token_from_keychain();
+        cache.value = read.value;
+        cache.blocked = read.blocked;
         cache.loaded = true;
         let found = cache.value.is_some();
         log::info!(
@@ -244,10 +277,67 @@ appearing over fullscreen apps); turn it back on from Advanced if you want the D
 
 pub fn view(app: &AppHandle) -> ConfigView {
     let config = app.state::<ConfigState>().snapshot();
+    let (token_state, token_detail) = token_state_now(app);
     ConfigView {
-        has_token: has_token_now(app),
+        has_token: token_state == TokenState::Present,
+        token_state,
+        token_detail,
         config,
     }
+}
+
+/// The UI's view of the token, without ever blocking on the keychain.
+///
+/// Same `try_lock` discipline as `has_token_now`: if the startup read is in
+/// flight (an OS prompt is on screen) this reports `Loading` and returns
+/// immediately rather than freezing the popover behind a modal.
+fn token_state_now(app: &AppHandle) -> (TokenState, Option<String>) {
+    let Some(handle) = app.try_state::<ConfigState>() else {
+        return (TokenState::Loading, None);
+    };
+    let state = handle.inner();
+    match state.token.try_lock() {
+        Ok(cache) if !cache.loaded => (TokenState::Loading, None),
+        Ok(cache) => {
+            if cache.value.as_deref().map(|t| !t.is_empty()).unwrap_or(false) {
+                (TokenState::Present, None)
+            } else if let Some(detail) = cache.blocked.clone() {
+                (TokenState::Blocked, Some(detail))
+            } else {
+                (TokenState::Missing, None)
+            }
+        }
+        // Read in flight — the lock is held by it.
+        Err(_) => (TokenState::Loading, None),
+    }
+}
+
+/// Read the keychain again, without relaunching the app.
+///
+/// The whole reason this exists: the keychain prompt appears once at launch, and
+/// if it is dismissed the helper spends the ENTIRE run unable to send anything.
+/// Before this, the only cure was quitting and reopening the app — which is not
+/// a thing anyone would guess to do, because nothing told them there was a
+/// problem. Runs off the main thread so the prompt cannot freeze the popover.
+pub fn retry_token_read(app: &AppHandle) {
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        let Some(state) = handle.try_state::<ConfigState>() else { return };
+        {
+            let mut cache = state.token.lock().unwrap();
+            let read = read_token_from_keychain();
+            cache.value = read.value;
+            cache.blocked = read.blocked;
+            cache.loaded = true;
+            log::info!(
+                "keychain re-read on request: {}",
+                if cache.value.is_some() { "token found" }
+                else if cache.blocked.is_some() { "still blocked" }
+                else { "no token stored" }
+            );
+        }
+        let _ = handle.emit("config-changed", ());
+    });
 }
 
 /// Non-blocking "is a token set?" for the UI.
@@ -394,7 +484,9 @@ pub fn token(app: &AppHandle) -> Option<String> {
     // waiting on that one read is how we avoid starting a second one.
     let mut cache = state.token.lock().unwrap();
     if !cache.loaded {
-        cache.value = read_token_from_keychain();
+        let read = read_token_from_keychain();
+        cache.value = read.value;
+        cache.blocked = read.blocked;
         cache.loaded = true;
     }
     cache.value.clone()
@@ -402,7 +494,13 @@ pub fn token(app: &AppHandle) -> Option<String> {
 
 /// The ONLY place that talks to the keychain for a read. Everything else goes
 /// through `token()`.
-fn read_token_from_keychain() -> Option<String> {
+struct TokenRead {
+    value: Option<String>,
+    /// Set when the keychain could not be READ, as opposed to being empty.
+    blocked: Option<String>,
+}
+
+fn read_token_from_keychain() -> TokenRead {
     // Every keychain read is an OS authorization decision and, on an unsigned
     // build, a potential password prompt. Counting them makes "the hot path
     // never reads" an observable fact in the log rather than a claim.
@@ -412,16 +510,20 @@ fn read_token_from_keychain() -> Option<String> {
 
     match entry() {
         Ok(e) => match e.get_password() {
-            Ok(t) => Some(t),
-            Err(keyring::Error::NoEntry) => None,
+            Ok(t) => TokenRead { value: Some(t), blocked: None },
+            // Genuinely nothing stored — this machine has never connected.
+            Err(keyring::Error::NoEntry) => TokenRead { value: None, blocked: None },
+            // Refused, dismissed, or otherwise unreadable. A token may exist; we
+            // just cannot see it. Reported as BLOCKED so the UI offers a retry
+            // instead of telling the user to connect an office they already have.
             Err(e) => {
-                log::warn!("keychain read failed: {e}");
-                None
+                log::warn!("keychain read failed: {e} — helper will share NOTHING until this is answered");
+                TokenRead { value: None, blocked: Some(e.to_string()) }
             }
         },
         Err(e) => {
-            log::warn!("keychain entry unavailable: {e}");
-            None
+            log::warn!("keychain entry unavailable: {e} — helper will share NOTHING");
+            TokenRead { value: None, blocked: Some(e.to_string()) }
         }
     }
 }

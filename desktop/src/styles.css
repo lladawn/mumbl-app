@@ -343,3 +343,40 @@ body {
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-thumb { background: var(--line); border: 2px solid var(--panel); }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- "nothing is being shared" notice ------------------------------------
+   Clay, not red. The app is not broken and the user has done nothing wrong —
+   it just cannot reach its token, or its endpoint. Alarming colour would
+   overstate a condition whose fix is usually one click. */
+.alert {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: var(--clay);
+  border: 2px solid var(--edge);
+  box-shadow: var(--sh-sm);
+}
+.alert-title {
+  margin: 0;
+  color: var(--clay-ink);
+  font: 400 10px/1.5 var(--display);
+}
+.alert-body {
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.alert-action {
+  margin: 10px 0 0;
+  min-height: 30px;
+  padding: 0 12px;
+  background: var(--paper);
+  border: 2px solid var(--edge);
+  box-shadow: var(--sh-sm);
+  color: var(--ink);
+  font: 400 9px/1.4 var(--display);
+  cursor: pointer;
+  transition: transform .08s steps(2), box-shadow .08s steps(2);
+}
+.alert-action:hover { transform: translate(1px, 1px); box-shadow: none; }
+.alert-action:disabled { opacity: .55; cursor: progress; }

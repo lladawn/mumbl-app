@@ -31,7 +31,23 @@ async function boot() {
   wire();
 
   // The Rust core emits a receipt every time an event leaves the machine.
-  await listen("receipt", (e) => paintReceipt(e.payload));
+  await listen("receipt", (e) => {
+    paintReceipt(e.payload);
+    // A delivery that starts or stops failing changes what the notice should
+    // say, and the receipt is the moment we learn it.
+    renderHealth();
+  });
+
+  $("health-action").addEventListener("click", async () => {
+    const action = $("health-action");
+    action.disabled = true;
+    action.textContent = "checking\u2026";
+    await invoke("retry_token");
+    // The Rust side re-reads off the main thread and emits config-changed when
+    // it lands, so the view corrects itself; this is just so the button doesn't
+    // sit looking dead if the read is slow behind an OS prompt.
+    setTimeout(renderHealth, 1200);
+  });
   await listen("config-changed", async () => {
     config = await invoke("get_config");
     renderAll();
@@ -45,6 +61,80 @@ function renderAll() {
   renderShareAll();
   renderAllowlist();
   renderToggle();
+  renderHealth();
+}
+
+// ---- "nothing is being shared" -------------------------------------------
+
+// Sharing can fail at three separate points, and every one of them used to fail
+// SILENTLY: the helper kept running, the log filled up, and the office just
+// looked empty. Whichever is true, say it here, in the order the user can act on.
+//
+// The keychain case is the one worth the most care. A dismissed launch prompt
+// silences the helper for the entire run, and the only cure used to be quitting
+// and reopening — which nobody would think to do, because nothing told them
+// anything was wrong. So that state gets its own button.
+async function renderHealth() {
+  const box = $("health");
+  if (!box) return;
+  let health;
+  try {
+    health = await invoke("get_sharing_health");
+  } catch {
+    box.hidden = true;
+    return;
+  }
+
+  const title = $("health-title");
+  const body = $("health-body");
+  const action = $("health-action");
+  action.hidden = true;
+  action.disabled = false;
+
+  // "Still checking" is not a problem, and neither is a machine that has simply
+  // never connected — that one already has a whole view of its own.
+  // Whatever we conclude below, the header pill must agree with it.
+  const wasStuck = sharingStuck;
+  sharingStuck =
+    health.enabled &&
+    (health.tokenState === "blocked" || !!health.deliveryError);
+  if (sharingStuck !== wasStuck) renderToggle();
+
+  if (health.tokenState === "loading" || health.tokenState === "missing") {
+    box.hidden = true;
+    return;
+  }
+
+  if (!health.enabled) {
+    title.textContent = "Sharing is paused";
+    body.textContent = "Nothing is leaving this Mac until you resume it.";
+    box.hidden = false;
+    return;
+  }
+
+  if (health.tokenState === "blocked") {
+    title.textContent = "Can\u2019t reach your token";
+    body.textContent =
+      "macOS didn\u2019t let mumbl read its keychain item, so nothing is being " +
+      "shared. Your office is fine \u2014 this Mac just can\u2019t sign its " +
+      "messages. Answering the keychain prompt with Always Allow stops it " +
+      "coming back.";
+    action.textContent = "Try the keychain again";
+    action.hidden = false;
+    box.hidden = false;
+    return;
+  }
+
+  if (health.deliveryError) {
+    title.textContent = "Can\u2019t reach your office";
+    body.textContent =
+      `Events are being dropped \u2014 ${health.endpoint} isn\u2019t answering. ` +
+      "Nothing is lost that was already sent; new activity just isn\u2019t arriving.";
+    box.hidden = false;
+    return;
+  }
+
+  box.hidden = true;
 }
 
 // ---- render ---------------------------------------------------------------
@@ -54,7 +144,12 @@ function renderAll() {
 // there is actually an office to talk about.
 function renderView() {
   const connected = !!config.hasToken;
-  $("view-connect").hidden = connected;
+  // "We can't READ your token" is not "you have never connected". Showing the
+  // empty-desk pitch here would tell someone to connect an office they may
+  // already have — the notice above says the true thing and offers the retry,
+  // so let it carry this state alone rather than contradict it.
+  const blocked = config.tokenState === "blocked";
+  $("view-connect").hidden = connected || blocked;
   $("view-live").hidden = !connected;
   $("toggle").hidden = !connected;
   $("foot").textContent = connected
@@ -76,11 +171,17 @@ function renderFields() {
   $("token").placeholder = config.hasToken ? "•••••• (in keychain)" : "paste a token instead";
 }
 
+// `enabled` means "the user has not paused it", which is NOT the same as
+// "things are arriving". Saying "live" while every event is being dropped is
+// the same silent lie the notice below exists to end, so the pill defers to
+// whatever renderHealth last found.
+let sharingStuck = false;
+
 function renderToggle() {
   const btn = $("toggle");
   const on = config.enabled;
-  btn.classList.toggle("paused", !on);
-  $("toggle-label").textContent = on ? "live" : "paused";
+  btn.classList.toggle("paused", !on || sharingStuck);
+  $("toggle-label").textContent = !on ? "paused" : sharingStuck ? "stuck" : "live";
   btn.title = on ? "Pause sharing" : "Resume sharing";
 }
 

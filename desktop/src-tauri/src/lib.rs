@@ -85,7 +85,7 @@ struct PopoverGuard {
 /// click landed 1-2s after show(), so 600ms was still letting the popover
 /// dismiss itself. Anything the user does deliberately takes longer than this.
 const OPEN_GRACE: Duration = Duration::from_millis(2000);
-use watcher::{LastReceipt, Receipt};
+use watcher::{DeliveryError, LastReceipt, Receipt};
 
 // ---- IPC commands ---------------------------------------------------------
 
@@ -191,6 +191,44 @@ fn set_show_in_dock(app: AppHandle, show: bool) -> Result<Config, String> {
     Ok(config)
 }
 
+/// Why the helper is not sharing right now, in one shape the UI can render.
+///
+/// Sharing can fail at three separate points and, before this, ALL THREE were
+/// silent: paused, no readable token, and a POST that never lands. The office
+/// just looked empty. Whichever is true, this says so.
+#[tauri::command]
+fn get_sharing_health(app: AppHandle) -> SharingHealth {
+    let view = config::view(&app);
+    let delivery_error = app
+        .try_state::<DeliveryError>()
+        .and_then(|s| s.0.lock().unwrap().clone());
+    SharingHealth {
+        enabled: view.config.enabled,
+        token_state: view.token_state,
+        token_detail: view.token_detail,
+        endpoint: view.config.endpoint,
+        delivery_error,
+    }
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SharingHealth {
+    enabled: bool,
+    token_state: config::TokenState,
+    token_detail: Option<String>,
+    endpoint: String,
+    delivery_error: Option<String>,
+}
+
+/// Read the keychain again without relaunching — the cure for a dismissed
+/// launch prompt, which otherwise silences the helper for the whole run.
+#[tauri::command]
+fn retry_token(app: AppHandle) {
+    log::info!("keychain re-read requested from the popover");
+    config::retry_token_read(&app);
+}
+
 #[tauri::command]
 fn get_last_receipt(app: AppHandle) -> Option<Receipt> {
     app.state::<LastReceipt>().0.lock().unwrap().clone()
@@ -209,6 +247,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_store::Builder::new().build())
         .manage(LastReceipt::default())
+        .manage(DeliveryError::default())
         .manage(PopoverGuard::default())
         .manage(PopoverLabel::default())
         .setup(|app| {
@@ -299,6 +338,8 @@ pub fn run() {
             set_share_all,
             set_muted,
             get_last_receipt,
+            retry_token,
+            get_sharing_health,
             set_show_in_dock,
             pair_begin,
             pair_poll,

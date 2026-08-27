@@ -18,6 +18,17 @@
         </button>
       </header>
 
+      <!-- Says out loud when nothing is leaving this Mac, and WHY. Sharing can
+           fail at three separate points — paused, no readable token, or a POST
+           that never lands — and all three used to be silent: the office simply
+           looked empty. Hidden while sharing is healthy, because a banner that
+           is always on screen stops being read. -->
+      <div class="alert" id="health" hidden>
+        <p class="alert-title" id="health-title"></p>
+        <p class="alert-body" id="health-body"></p>
+        <button class="alert-action" id="health-action" type="button" hidden></button>
+      </div>
+
       <!-- ============ NOT CONNECTED: one button, nothing else ============ -->
       <section class="view" id="view-connect">
         <div class="scene" aria-hidden="true">
