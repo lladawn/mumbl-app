@@ -14,7 +14,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+# macos-private-api: the character window must be TRANSPARENT (it sits in the
+# menubar strip, which has no fixed background). Note this rules out Mac App
+# Store distribution; mumbl ships direct, so the trade is fine.
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-store = "2"
 tauri-plugin-log = "2"
 serde = { version = "1", features = ["derive"] }

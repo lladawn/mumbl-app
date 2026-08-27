@@ -7,7 +7,7 @@
     "frontendDist": "../src"
   },
   "app": {
-    "macOSPrivateApi": false,
+    "macOSPrivateApi": true,
     "withGlobalTauri": true,
     "windows": [
       {
@@ -22,6 +22,22 @@
         "decorations": false,
         "alwaysOnTop": true,
         "shadow": true
+      },
+      {
+        "label": "character",
+        "title": "mumbl",
+        "url": "character.html",
+        "width": 132,
+        "height": 38,
+        "resizable": false,
+        "visible": false,
+        "focus": false,
+        "skipTaskbar": true,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "shadow": false,
+        "acceptFirstMouse": false
       }
     ],
     "security": {

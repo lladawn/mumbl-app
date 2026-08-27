@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>mumbl</title>
+    <style>
+      /* The window is TRANSPARENT and sits in the menubar strip, so nothing here
+         may paint a background — only the figure and its prop are visible.
+         Everything is a hard-edged rectangle, same construction as the office
+         sprites in public/office/office-scene.js. */
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; height: 100%;
+        background: transparent;
+        overflow: hidden;
+        /* belt and braces: the window already ignores cursor events, but this
+           guarantees nothing here can ever be a click target */
+        pointer-events: none;
+        user-select: none;
+      }
+      #stage { position: relative; width: 100%; height: 100%; }
+
+      /* ---- the figure ------------------------------------------------------
+         A head narrower than the shoulders and a gap between the legs is the
+         whole difference between reading as a person and reading as a stack of
+         coloured bars. */
+      #me { position: absolute; left: 8px; bottom: 3px; width: 11px; height: 22px; }
+      #me i { position: absolute; display: block; }
+      .hair { left: 18%; right: 18%; top: 0; height: 16%; background: #4a382c; }
+      .face { left: 22%; right: 22%; top: 14%; height: 22%; background: #e3b48d; }
+      .body { left: 0; right: 0; top: 34%; height: 38%; background: #5fcbbc;
+              transition: background .45s steps(3, end); }
+      .legs { left: 6%; right: 6%; top: 71%; height: 29%;
+              background: linear-gradient(90deg, #6e7e96 0 36%, transparent 36% 64%, #6e7e96 64% 100%); }
+
+      /* ---- the one vignette: coding, a standing kiosk ---------------------- */
+      #prop { position: absolute; left: 26px; bottom: 3px; width: 0; height: 0; opacity: 0; }
+      /* The prop grows once, over 900ms, then STOPS. Nothing loops, nothing
+         idles, nothing breathes. Motion exists only inside a transition. */
+      #prop.up { width: 30px; height: 20px; opacity: 1;
+                 transition: width .5s steps(5, end), height .5s steps(5, end), opacity .3s steps(2, end); }
+      #prop .screen { position: absolute; inset: 0; background: #1e262b; border: 1px solid #2a241d; }
+      #prop .line { position: absolute; height: 2px; }
+      #prop .stem { position: absolute; left: 50%; margin-left: -1px; bottom: -5px; width: 3px; height: 5px; background: #8a9ea8; }
+      #prop .base { position: absolute; left: 50%; margin-left: -7px; bottom: -7px; width: 14px; height: 2px; background: #8a9ea8; }
+
+      @media (prefers-reduced-motion: reduce) {
+        #prop.up { transition: none; }
+        .body { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div id="me">
+        <i class="hair"></i><i class="face"></i><i class="body" id="body"></i><i class="legs"></i>
+      </div>
+      <div id="prop">
+        <span class="screen"></span>
+        <span class="line" style="left:4px; top:4px;  width:14px; background:#4fa5e0"></span>
+        <span class="line" style="left:4px; top:9px;  width:9px;  background:#86cfa6"></span>
+        <span class="line" style="left:7px; top:14px; width:12px; background:#efc08a"></span>
+        <span class="stem"></span><span class="base"></span>
+      </div>
+    </div>
+    <script src="./character.js"></script>
+  </body>
+</html>

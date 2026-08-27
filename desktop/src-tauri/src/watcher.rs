@@ -96,6 +96,28 @@ async fn run(app: AppHandle, mut rx: mpsc::UnboundedReceiver<FocusChange>) {
                         // the same tool we're already emitting, keep the current
                         // heartbeat cadence (no reset).
                         let mapped = resolve(&app, &change.bundle_id);
+
+                        // Tell the on-screen character IMMEDIATELY. This is
+                        // deliberately not on the send path: the character is a
+                        // local thing that must work with no token, no space and
+                        // no network, so it must not wait for the 20s send
+                        // debounce or care whether delivery succeeds. It reuses
+                        // `resolve`, so pausing and per-app muting still gate it
+                        // exactly as they gate sending — and it carries no data
+                        // we were not already deriving from the bundle id.
+                        if let Some(ev) = mapped.as_ref() {
+                            let _ = app.emit(
+                                "focus-shape",
+                                serde_json::json!({
+                                    "tool": ev.tool,
+                                    "label": ev.label,
+                                    "category": ev.category,
+                                }),
+                            );
+                        } else {
+                            let _ = app.emit("focus-shape", serde_json::Value::Null);
+                        }
+
                         match mapped {
                             Some(event) => {
                                 let same = current.as_ref().map(|c| c.tool.as_str())

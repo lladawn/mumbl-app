@@ -25,7 +25,7 @@
 // `mod` if the harness is deleted.
 #[doc(hidden)]
 pub mod catalog;
-mod config;
+pub mod config;
 #[doc(hidden)]
 pub mod network;
 pub mod pairing;
@@ -210,7 +210,7 @@ pub fn run() {
             // intended posture and the only one where the popover actually
             // floats over everything.
             #[cfg(target_os = "macos")]
-            apply_dock_policy(&handle, config::view(&handle).config.show_in_dock);
+            apply_dock_policy(&handle, handle.state::<config::ConfigState>().snapshot().show_in_dock);
 
             // Closing the Settings window should HIDE it (not destroy it), so
             // the tray "Settings…" item can reliably re-show it and closing the
@@ -280,6 +280,28 @@ pub fn run() {
                 });
             } else {
                 log::error!("main webview window not found at setup — popover unavailable");
+            }
+
+            // ---- the character ------------------------------------------------
+            // A second, tiny, transparent window parked in the menubar strip just
+            // right of the notch — the one band of screen a window never covers.
+            //
+            // It has NO CLICK TARGET (set_ignore_cursor_events): every click goes
+            // straight through to whatever is underneath. You cannot be
+            // interrupted by something you cannot interact with, and that is the
+            // whole calm constraint in one call.
+            if let Some(ch) = app.get_webview_window("character") {
+                let _ = ch.set_ignore_cursor_events(true);
+                let _ = ch.set_visible_on_all_workspaces(true);
+                #[cfg(target_os = "macos")]
+                if let Ok(ns) = ch.ns_window() {
+                    platform::float_above_everything(ns);
+                }
+                place_character(&ch);
+                let _ = ch.show();
+                log::info!("character shown in the menubar strip");
+            } else {
+                log::warn!("character window not found at setup");
             }
 
             Ok(())
@@ -457,6 +479,22 @@ fn show_popover(app: &AppHandle, rect: Option<Rect>) {
     }
 }
 
+/// Park the character in the menubar strip, just right of the notch.
+fn place_character(win: &WebviewWindow) {
+    let scale = win.scale_factor().unwrap_or(1.0);
+    let Some((strip_x, strip_h)) = platform::menubar_strip_origin() else { return };
+    let Ok(size) = win.outer_size() else { return };
+
+    // Sit inside the bar, vertically centred in it.
+    let x = ((strip_x + CHARACTER_INSET) * scale).round() as i32;
+    let y = (((strip_h * scale) - size.height as f64) / 2.0).max(0.0).round() as i32;
+    let _ = win.set_position(PhysicalPosition::new(x, y));
+    log::info!("character parked at {x},{y} physical (strip starts at x={strip_x} logical)");
+}
+
+/// Gap between the notch edge and the character.
+const CHARACTER_INSET: f64 = 4.0;
+
 fn hide_popover(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
         let _ = win.hide();
@@ -497,7 +535,7 @@ another app's fullscreen Space"
 }
 
 fn toggle_sharing(app: &AppHandle) {
-    let current = config::view(app).config.enabled;
+    let current = app.state::<config::ConfigState>().snapshot().enabled;
     if let Ok(config) = config::set_enabled(app, !current) {
         let _ = app.emit("config-changed", ());
         log::info!("sharing {}", if config.enabled { "resumed" } else { "paused" });

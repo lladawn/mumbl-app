@@ -20,3 +20,6 @@ pub fn menubar_report() -> Option<String> {
 
 /// Window levels / spaces are a macOS concept; nothing to do elsewhere.
 pub fn float_above_everything(_ns_window: *mut std::ffi::c_void) {}
+
+/// Menubar geometry is a macOS concept.
+pub fn menubar_strip_origin() -> Option<(f64, f64)> { None }

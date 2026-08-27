@@ -183,3 +183,18 @@ pub fn float_above_everything(ns_window: *mut std::ffi::c_void) {
         NSPopUpMenuWindowLevel
     );
 }
+
+/// Logical x where the usable menubar strip begins, i.e. just right of the notch
+/// (or the left edge on a notchless display), plus the strip's height. The
+/// character parks here — the one band of screen a window never covers.
+pub fn menubar_strip_origin() -> Option<(f64, f64)> {
+    let mtm = objc2_foundation::MainThreadMarker::new()?;
+    let screen = NSScreen::mainScreen(mtm)?;
+    let inset = unsafe { screen.safeAreaInsets() }.top;
+    if inset <= 0.0 {
+        // No notch: the whole bar is usable, so start a little in from the left.
+        return Some((12.0, 24.0));
+    }
+    let right = unsafe { screen.auxiliaryTopRightArea() };
+    Some((right.origin.x, right.size.height))
+}
