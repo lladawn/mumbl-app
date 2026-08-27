@@ -495,3 +495,101 @@ Procedural pixel art only; core "you" identity untouched; per-tool/category
 stations not regressed (terminal keeps its coding zone/seat/screen); OG props stay
 plain array-returning functions spread into children (Satori-safe), drawn after
 the desk; no pipeline/reconcile/data-layer changes.
+
+## v4 — the room has people in it, not nine solitary workers
+
+_Direction, 2026-08-27. Branch `feat/office-sim`._
+
+**The note that started it:** a demo should look like a place where people are
+HAVING A GOOD TIME, not a diorama of nine people each parked alone in their own
+work vignette. v2/v3 made every *activity* into a set piece. What they could not
+express is the thing an office actually feels like — that people are **with each
+other**. Nine one-actor scenes, however beautiful, is nine people ignoring each
+other in the same room.
+
+### The unit changes: from vignette to SOCIAL SET-PIECE
+
+A `VIGNETTE` is a one-actor scene painted at whichever booth its actor was given.
+A `SOCIAL` set-piece is the inverse:
+
+| | VIGNETTE | SOCIAL |
+|---|---|---|
+| position | wherever the actor's booth is | **fixed** in the room (the ping-pong table is where the ping-pong table is) |
+| occupants | exactly one | **1–4**, and it must read correctly at every count |
+| lifetime | as long as the actor is there | painted on first occupant, torn down on last |
+| motion | the activity breathing (a vinyl spins) | a **conversation** — the ball crosses and the far paddle answers it |
+
+That last row is the whole design. Two sprites standing near a table is a
+diorama. What makes it a scene is that the motion is *causal between the two
+people*: the ball arrives and the receiving player lunges for it; one laugh puff
+lands and the other answers 2.1s later; a gesture lands across the table.
+`paint()` returns one pose per seat plus a `beat(seatIndex, kind)` the piece
+calls to make whoever is in that seat react — and it is a **no-op on an empty
+seat**, so the rally still animates while only one player has walked over.
+
+### The five pieces
+
+| Piece | Seats | Furniture | Mood | Atmosphere | Motion (layered) |
+|---|---|---|---|---|---|
+| **Ping pong** (rec room) | 2 | the existing table + a chalk scoreboard on a stand | warm amber pool over the table, breathing | paddles held at each end; a score that actually ticks when a rally ends | ball crosses in x, **arcs in y on a faster tween** so it bounces; the receiving paddle swings to meet it; that player **lunges** — three motions, one rhythm |
+| **Café** (café) | 2 | round table + plate of pastries (croissant, iced danish, crumbs) | warm café light on the tiles | a cup per seat, steam offset so they don't pulse in lockstep | speech puffs **alternate** between the two, and the talker bounces |
+| **Sofa** (lounge) | 1 | the coral couch, mug on the arm, book face-down | soft lounge warmth | phone in hand, its light on their face | the sprite is **tilted 10°** — the read is that everyone else in the room is bolt upright; screen light breathes |
+| **Arcade** (rec room) | 1 | the existing cabinet + a stool pulled up, scuffed mat | the cabinet's own violet spill, pulsing | — | screen flicker across the player's face; joystick knocking side to side |
+| **Meeting room** | 4 | the meeting table, a laptop at each place, coffee pot | cool even "room is lit" wash | the **whiteboard fills in** as they talk, then wipes | discussion puffs alternate across the table; each speaker gestures |
+
+Two engine details this pass needed:
+
+- **`pose.depth`.** Draw order is derived from `y`, but sitting *in* a couch means
+  being drawn in front of it — and the `y` that would earn that depth is a `y`
+  that puts you on the floor. A pose can now name its own depth. This is what
+  makes the sofa sprawl work.
+- **`pingPong()` lost its ambient ball.** A table rallying with nobody at it reads
+  as a bug. The ball belongs to the set-piece now and arrives with the players.
+
+### The live office — same taste, only real signal
+
+The same placement engine drives `/office/[handle]`; the demo is just a state
+that happens to contain break/meeting actors. `planPlacement()` runs once per
+state (grouping is a whole-cast decision, so it cannot be made one actor at a
+time inside `addAgent`) and is ordered by a stable hash, so nobody swaps seats
+between polls.
+
+1. **Two or more people on a call at the same time sit together.** One caller is
+   someone on a call at their desk and keeps their own call vignette — grouping
+   one person is not a meeting. Two or more is a meeting, so they go to one
+   table **and their booths are released**: leaving the vignettes behind would
+   put back exactly the row of identical call corners that grouping was meant to
+   remove.
+2. **Idle / not-seen-in-5-minutes actors leave their work vignette** and drift to
+   the lounge, café or rec room. Two or more at once pair up (ping pong, then the
+   café table); one on their own gets somewhere you can plausibly be alone, never
+   half a rally. Their **vignette stays behind, dormant** — the day they had is
+   still on the floor, they are just not sitting in it. That is precisely what
+   "away from the desk" looks like.
+3. **Active actors do not move.**
+
+Recency buckets are the server's (`agentPresence.recencyBucket`: <90s active,
+<5min recently, else idle), duplicated client-side so the room and the API never
+disagree about who is around.
+
+### HONESTY RULE
+
+On a live office the room may only depict what the payload supports: `status`,
+`category`, and how long ago we last heard from someone. "Away from the desk" is
+a faithful rendering of *idle* — it is not a claim that a real person is playing
+table tennis; it is the room admitting nobody is in that chair, and the leisure
+seat is where an absent person is drawn. The renderer never asserts a specific
+leisure activity as a fact about a real person.
+
+`break` and `meeting` are **demo-only categories**. Nothing in the ingest path
+emits them; the sample office is labelled SAMPLE and may be richer. The demo's
+break actors carry no tool and their `currentTask` never names an activity
+("Away from the desk — back in a bit"), because the *renderer* decides which
+leisure seat each one takes and the text has to stay true wherever they land.
+
+### Constraints honored
+
+Procedural pixel art only, no asset pipeline; core "you" identity untouched; no
+work set-piece deleted or regressed (all nine still render, and the lone-caller
+case keeps the call vignette); no ingest/DB/recap changes; `window.MumblOffice.__room`
+is a debug handle for the capture harness only and nothing in the app reads it.
