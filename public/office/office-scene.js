@@ -863,6 +863,380 @@
   };
   VIGNETTE.other = VIGNETTE.focus;
 
+  // --- SOCIAL SET-PIECES (docs/office-visual-design.md §v4) ----------------
+  // The VIGNETTE scenes above are one-actor pieces: a person and the physical
+  // thing they are doing. These are the opposite — fixed places in the room
+  // that hold MORE THAN ONE person and give them something to do TOGETHER.
+  //
+  // Same v2 elevation language (signature furniture + mood light + atmosphere
+  // props + layered motion), with one addition: the motion is a CONVERSATION.
+  // The ball crosses and the far paddle answers it; one laugh follows the
+  // other; a gesture lands and the person opposite leans in. Two sprites
+  // standing near each other is a diorama — a rally is a scene.
+  //
+  // A piece is painted when its first occupant arrives and torn down when the
+  // last one leaves, so an empty office has no phantom ping-pong rally.
+  //
+  // paint(scene, x, y, objs, beat) returns one pose per seat, in seating
+  // order. `beat(seatIndex, kind)` is supplied by the room: the piece calls it
+  // to make whoever is sitting in that seat react ("lunge" / "laugh" /
+  // "gesture"), and it is a no-op when that seat is empty — so a scene reads
+  // correctly whether it has one occupant or all of them.
+
+  // A small cream speech blob. Used for the café laughter and the meeting
+  // back-and-forth; alternating `say()` calls are what make it read as a
+  // conversation rather than two people talking at a wall.
+  function chatPuff(scene, x, y, objs, depth) {
+    const bg = scene.add.rectangle(x, y, 34, 17, 0xFFF6E4, 0.97)
+      .setDepth(depth).setStrokeStyle(2, 0xD8C9A8, 1).setAlpha(0);
+    const tx = scene.add.text(x, y, "", {
+      fontFamily: "ui-monospace, Menlo, monospace", fontSize: "9px", color: "#5A6B66",
+    }).setOrigin(0.5).setDepth(depth + 1).setResolution(3).setAlpha(0);
+    objs.push(bg, tx);
+    return {
+      say(text) {
+        tx.setText(text);
+        bg.width = 14 + text.length * 6;
+        scene.tweens.killTweensOf([bg, tx]);
+        bg.setPosition(x, y + 7); tx.setPosition(x, y + 7);
+        bg.setAlpha(0); tx.setAlpha(0);
+        scene.tweens.add({ targets: [bg, tx], alpha: 1, y, duration: 220, ease: "Back.easeOut" });
+        scene.tweens.add({ targets: [bg, tx], alpha: 0, duration: 320, delay: 1450 });
+      },
+    };
+  }
+
+  // a repeating timer that also cleans itself up with the scene
+  function loopEvery(scene, objs, delay, fn) {
+    const ev = scene.time.addEvent({ delay, loop: true, callback: fn });
+    objs.push({ destroy: () => ev.remove() });
+    return ev;
+  }
+
+  const SOCIAL = {
+    // ── PING PONG: the most kinetic thing in the room. A real rally — the ball
+    // crosses the net, the receiving paddle swings to meet it, and the player
+    // on that side lunges into the shot. Three layered motions (ball arc,
+    // paddle swing, player lunge) locked to one rhythm, plus a chalk scoreboard
+    // that actually ticks when a rally ends.
+    pingpong: {
+      at: { x: 1160, y: 790 }, seats: 2, kind: "leisure",
+      paint(scene, x, y, objs, beat) {
+        const g = scene.add.graphics().setDepth(y - 60); objs.push(g);
+
+        // MOOD — a warm pool of rec-room light over the whole table
+        const pool = scene.add.ellipse(x, y + 6, 330, 170, V.amber, 0.15).setDepth(y - 62);
+        scene.tweens.add({ targets: pool, alpha: 0.26, duration: 2400, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+        objs.push(pool);
+
+        // PROP — chalk scoreboard on a stand, behind the table
+        const bx = x, by = y - 132;
+        g.fillStyle(V.metalDk, 1); g.fillRect(bx - 3, by + 36, 6, 34);
+        g.fillStyle(V.metalDk, 1); g.fillRect(bx - 16, y - 62, 32, 5);
+        g.fillStyle(0x3A4A44, 1); g.fillRect(bx - 42, by - 2, 84, 40);
+        g.fillStyle(0x2C3A35, 1); g.fillRect(bx - 38, by + 2, 76, 32);
+        g.fillStyle(0xFFF6E4, 0.5); g.fillRect(bx - 1, by + 6, 2, 24);
+        const scoreStyle = { fontFamily: "ui-monospace, Menlo, monospace", fontSize: "13px", color: "#E8F3EC" };
+        const score = [0, 0];
+        const sTx = [
+          scene.add.text(bx - 19, by + 18, "0", scoreStyle).setOrigin(0.5).setDepth(y - 58).setResolution(3),
+          scene.add.text(bx + 19, by + 18, "0", scoreStyle).setOrigin(0.5).setDepth(y - 58).setResolution(3),
+        ];
+        objs.push(sTx[0], sTx[1]);
+
+        // PADDLES — held at the near edge of each half, they swing to meet the ball
+        const mkPaddle = (px) => {
+          const pad = scene.add.rectangle(px, y - 6, 10, 15, V.coral)
+            .setDepth(y + 33).setStrokeStyle(1, 0x8A5E38, 1);
+          objs.push(pad); return pad;
+        };
+        const padL = mkPaddle(x - 96), padR = mkPaddle(x + 96);
+
+        // THE BALL — x carries it across the net, a second faster tween arcs it
+        // in y, so it bounces instead of sliding.
+        const ball = scene.add.rectangle(x - 78, y - 12, 6, 6, 0xFFFBF0).setDepth(y + 34);
+        objs.push(ball);
+        const arc = scene.tweens.add({
+          targets: ball, y: y - 40, duration: 330, yoyo: true, repeat: -1, ease: "Sine.easeOut",
+        });
+        objs.push({ destroy: () => arc.remove() });
+
+        const swing = (pad, dir) => {
+          scene.tweens.killTweensOf(pad);
+          pad.setAngle(-34 * dir);
+          scene.tweens.add({ targets: pad, angle: 30 * dir, duration: 200, yoyo: true, ease: "Sine.easeOut" });
+        };
+        let rallies = 0;
+        const point = () => {
+          // every few rallies somebody wins the point and the chalk changes
+          if (++rallies % 7) return;
+          const w = Math.random() < 0.5 ? 0 : 1;
+          score[w] = (score[w] + 1) % 22;
+          sTx[w].setText(String(score[w]));
+          scene.tweens.add({ targets: sTx[w], scale: 1.5, duration: 160, yoyo: true, ease: "Sine.easeOut" });
+        };
+
+        const rally = scene.tweens.add({
+          targets: ball, x: x + 78, duration: 660, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
+          onYoyo: () => { swing(padR, -1); beat(1, "lunge"); },
+          onRepeat: () => { swing(padL, 1); beat(0, "lunge"); point(); },
+        });
+        objs.push({ destroy: () => rally.remove() });
+
+        return [
+          { px: x - 126, py: y + 6, sit: false, flip: false },
+          { px: x + 126, py: y + 6, sit: false, flip: true },
+        ];
+      },
+    },
+
+    // ── CAFÉ: two people at a round table with a plate of pastries between
+    // them, talking. The read is the CONVERSATION — the puffs alternate, and
+    // whoever is talking bounces, so your eye ping-pongs between them.
+    cafe: {
+      at: { x: 250, y: 720 }, seats: 2, kind: "leisure",
+      paint(scene, x, y, objs, beat) {
+        const g = scene.add.graphics().setDepth(y + 17); objs.push(g);
+
+        // MOOD — warm café light pooling on the tiles
+        const pool = scene.add.ellipse(x, y + 10, 250, 130, 0xF8DFA0, 0.17).setDepth(y - 40);
+        scene.tweens.add({ targets: pool, alpha: 0.28, duration: 3000, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+        objs.push(pool);
+
+        // PROPS — a plate of pastries in the middle, a cup in front of each
+        g.fillStyle(0xFFFFFF, 1); g.fillEllipse(x, y - 8, 40, 20);
+        g.fillStyle(0xEFE3CE, 1); g.fillEllipse(x, y - 9, 32, 15);
+        // croissant: three tapering lumps
+        g.fillStyle(0xE8B96A, 1);
+        g.fillEllipse(x - 8, y - 12, 16, 9); g.fillEllipse(x - 13, y - 10, 8, 7); g.fillEllipse(x - 3, y - 10, 8, 7);
+        g.fillStyle(0xF6D79A, 1); g.fillEllipse(x - 8, y - 14, 11, 4);
+        // a pink-iced danish
+        g.fillStyle(0xE2A77A, 1); g.fillEllipse(x + 8, y - 10, 15, 10);
+        g.fillStyle(0xF6BCD1, 1); g.fillEllipse(x + 8, y - 12, 9, 6);
+        g.fillStyle(0xFFFFFF, 0.7); g.fillRect(x + 5, y - 13, 7, 1);
+        // crumbs
+        g.fillStyle(0xD8B681, 0.9);
+        g.fillRect(x - 20, y - 2, 2, 2); g.fillRect(x + 17, y - 4, 2, 2); g.fillRect(x + 12, y + 1, 2, 2);
+        // two cups, one per seat
+        [[-30, 0xFFF6E4], [30, 0xFFF6E4]].forEach(([dx, col]) => {
+          g.fillStyle(0xCBA87C, 1); g.fillEllipse(x + dx, y - 2, 15, 8);
+          g.fillStyle(col, 1); g.fillRect(x + dx - 6, y - 14, 12, 11);
+          g.fillStyle(0xE3D6BC, 1); g.fillRect(x + dx - 6, y - 14, 12, 3);
+          g.fillStyle(0x6F4E32, 1); g.fillRect(x + dx - 4, y - 13, 8, 2);
+        });
+        // steam off both cups, offset so they don't pulse in lockstep
+        [-30, 30].forEach((dx, i) => {
+          const st = scene.add.rectangle(x + dx, y - 18, 2, 7, 0xFFFFFF, 0.5).setDepth(y + 18);
+          scene.tweens.add({
+            targets: st, y: y - 36, alpha: 0, duration: 2100, repeat: -1, delay: i * 900, ease: "Sine.easeOut",
+          });
+          objs.push(st);
+        });
+
+        // THE CONVERSATION — puffs alternate, and the talker bounces
+        const puffs = [
+          chatPuff(scene, x - 62, y - 54, objs, 1180),
+          chatPuff(scene, x + 62, y - 54, objs, 1180),
+        ];
+        const lines = [["ha! no way", "and then?"], ["ha ha", "you didn't"]];
+        let turn = 0;
+        loopEvery(scene, objs, 2100, () => {
+          const i = turn % 2;
+          puffs[i].say(lines[i][Math.floor(turn / 2) % 2]);
+          beat(i, "laugh");
+          turn++;
+        });
+
+        return [
+          { px: x - 52, py: y + 2, sit: true, flip: false },
+          { px: x + 52, py: y + 2, sit: true, flip: true },
+        ];
+      },
+    },
+
+    // ── SOFA: one person genuinely OFF. Sprawled back into the couch (the
+    // sprite is tilted, which is the whole read — everyone else in the room is
+    // bolt upright), phone lighting their face, mug going cold on the arm.
+    sofa: {
+      at: { x: 1210, y: 150 }, seats: 1, kind: "leisure",
+      paint(scene, x, y, objs) {
+        const g = scene.add.graphics().setDepth(y + 24); objs.push(g);
+        // seated 8px lower than px/py (placeInScene), so py is set from the
+        // seat cushion up: feet land on the front edge, head clears the back.
+        const px = x + 46, py = y - 12, seatY = py + 8, sitDepth = y + 34;
+
+        // MOOD — soft lounge warmth
+        const pool = scene.add.ellipse(x, y + 16, 240, 110, 0xF4B3A6, 0.16).setDepth(y - 40);
+        scene.tweens.add({ targets: pool, alpha: 0.26, duration: 3400, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+        objs.push(pool);
+
+        // PROPS — mug parked on the couch arm, a book face-down on the seat
+        g.fillStyle(0xCBA87C, 1); g.fillEllipse(x - 74, y - 12, 14, 7);
+        g.fillStyle(0xFFF6E4, 1); g.fillRect(x - 80, y - 23, 12, 11);
+        g.fillStyle(0xE3D6BC, 1); g.fillRect(x - 80, y - 23, 12, 3);
+        g.fillStyle(0x6F4E32, 1); g.fillRect(x - 78, y - 22, 8, 2);
+        g.fillStyle(0xCFBBF0, 1); g.fillRect(x - 56, y + 4, 20, 12);
+        g.fillStyle(0xFFFBF0, 1); g.fillRect(x - 54, y + 6, 16, 8);
+        const steam = scene.add.rectangle(x - 74, y - 27, 2, 6, 0xFFFFFF, 0.45).setDepth(y + 25);
+        scene.tweens.add({ targets: steam, y: y - 44, alpha: 0, duration: 2600, repeat: -1, ease: "Sine.easeOut" });
+        objs.push(steam);
+
+        // the phone in their hands + the light it throws on their face
+        // depth must beat the sprite's own (seatY + 30) or it reads as a
+        // glow behind their back instead of a screen in their hands.
+        const phone = scene.add.rectangle(px + 5, seatY - 6, 8, 12, 0x2E3A44).setDepth(sitDepth + 2);
+        const lit = scene.add.rectangle(px + 5, seatY - 6, 6, 9, 0xBEE7F7, 0.9).setDepth(sitDepth + 3);
+        const face = scene.add.ellipse(px + 1, seatY - 20, 24, 18, 0xBEE7F7, 0.22).setDepth(sitDepth + 1);
+        objs.push(phone, lit, face);
+        scene.tweens.add({ targets: [lit, face], alpha: 0.42, duration: 1500, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+
+        return [{ px, py, sit: true, flip: true, tilt: 10, noBob: true, depth: sitDepth }];
+      },
+    },
+
+    // ── ARCADE: one person hunched into the cabinet. The cabinet was already
+    // in the rec room and already blinking; what makes it a scene is the
+    // player's shoulders in front of it and the screen light flickering across
+    // their face on the same beat as the attract-mode blip.
+    arcade: {
+      at: { x: 1330, y: 660 }, seats: 1, kind: "leisure",
+      paint(scene, x, y, objs) {
+        const g = scene.add.graphics().setDepth(y - 40); objs.push(g);
+        const px = x - 2, py = y + 28;   // close enough to overlap the cabinet base
+
+        // MOOD — the cabinet's own violet spill on the floor around it
+        const pool = scene.add.ellipse(x, y + 20, 150, 90, 0xC6ACE8, 0.2).setDepth(y - 42);
+        scene.tweens.add({ targets: pool, alpha: 0.34, duration: 1300, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+        objs.push(pool);
+
+        // PROP — a second stool pulled up, and a scuffed floor mat
+        g.fillStyle(0xE0CBA6, 0.5); g.fillEllipse(x, y + 34, 96, 40);
+        g.fillStyle(0x9BD8B4, 1); g.fillRect(x + 44, y + 2, 20, 13);
+        g.fillStyle(0xFFFFFF, 0.3); g.fillRect(x + 44, y + 2, 20, 4);
+        g.fillStyle(0x8A9EA8, 1); g.fillRect(x + 52, y + 15, 4, 12);
+
+        // the screen light flickering across the player's face
+        const wash = scene.add.ellipse(px, py - 26, 26, 18, 0x9BE8D8, 0.24).setDepth(py + 33);
+        objs.push(wash);
+        scene.tweens.add({
+          targets: wash, alpha: 0.5, duration: 220, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
+        });
+        // joystick knocking side to side under their hands
+        const stick = scene.add.rectangle(x - 12, y - 34, 5, 5, 0xF0A79E).setDepth(py + 34);
+        objs.push(stick);
+        scene.tweens.add({
+          targets: stick, x: x - 4, duration: 380, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
+        });
+
+        return [{ px, py, sit: false, flip: false }];
+      },
+    },
+
+    // ── MEETING ROOM: people actually IN the meeting instead of nine separate
+    // call vignettes. Seats are paired directly across the table, laptops open
+    // in front of each, and the talking alternates — one gestures, the other
+    // answers — so the table reads as a discussion, not a waiting room.
+    meeting: {
+      at: { x: 245, y: 245 }, seats: 4, kind: "meeting",
+      paint(scene, x, y, objs, beat) {
+        const g = scene.add.graphics().setDepth(y + 41); objs.push(g);
+
+        // MOOD — the room lights up, cool and even, the way a lit meeting room does
+        const pool = scene.add.ellipse(x, y + 6, 330, 210, V.sky, 0.15).setDepth(y - 60);
+        scene.tweens.add({ targets: pool, alpha: 0.27, duration: 2600, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+        objs.push(pool);
+
+        // PROPS — an open laptop at each of the four places, lids catching the light
+        const seatX = [-30, -30, 32, 32];
+        [[-30, -1], [-30, 1], [32, -1], [32, 1]].forEach(([dx, side]) => {
+          const ly = y + side * 22;
+          g.fillStyle(V.metalDk, 1); g.fillRect(x + dx - 15, ly - 3, 30, 4);
+          g.fillStyle(V.metal, 1); g.fillRect(x + dx - 14, ly - 16, 28, 14);
+          g.fillStyle(0x3B4A56, 1); g.fillRect(x + dx - 12, ly - 14, 24, 11);
+          g.fillStyle(0x8FC4E4, 0.85); g.fillRect(x + dx - 10, ly - 12, 20, 4);
+          g.fillStyle(0x8FC4E4, 0.5); g.fillRect(x + dx - 10, ly - 7, 13, 2);
+        });
+        // a coffee pot and cups in the middle of the table
+        g.fillStyle(0x5A6B66, 1); g.fillRect(x - 6, y - 12, 13, 15);
+        g.fillStyle(0x3A4A44, 1); g.fillRect(x - 4, y - 10, 9, 11);
+        g.fillStyle(0x5A6B66, 1); g.fillRect(x + 7, y - 8, 4, 7);
+        g.fillStyle(0xFFF6E4, 1); g.fillRect(x - 22, y - 6, 9, 8); g.fillRect(x + 14, y - 6, 9, 8);
+
+        // ATMOSPHERE — the whiteboard behind them fills in while they talk
+        const wb = scene.add.graphics().setDepth(94); objs.push(wb);
+        const strokes = [[168, 66, 24, 3], [168, 74, 40, 3], [216, 66, 30, 3], [168, 82, 18, 3], [216, 76, 22, 3]];
+        let drawn = 0;
+        loopEvery(scene, objs, 1700, () => {
+          if (drawn >= strokes.length) { wb.clear(); drawn = 0; return; }
+          const [sx, sy, sw, sh] = strokes[drawn++];
+          wb.fillStyle(drawn % 2 ? 0x6E9FD8 : 0xF0A79E, 0.9); wb.fillRect(sx, sy, sw, sh);
+        });
+
+        // THE DISCUSSION — alternating, so it reads as back-and-forth
+        const puffs = [
+          chatPuff(scene, x - 30, y - 104, objs, 1180),
+          chatPuff(scene, x + 32, y + 108, objs, 1180),
+        ];
+        const lines = [["so if we ship…", "two weeks?"], ["agreed", "let's do it"]];
+        let turn = 0;
+        loopEvery(scene, objs, 2400, () => {
+          const i = turn % 2;
+          puffs[i].say(lines[i][Math.floor(turn / 2) % 2]);
+          beat(i, "gesture");
+          turn++;
+        });
+
+        return [
+          { px: x + seatX[0], py: y - 52, sit: true, flip: false },
+          { px: x + seatX[1], py: y + 62, sit: true, flip: true },
+          { px: x + seatX[2], py: y - 52, sit: true, flip: false },
+          { px: x + seatX[3], py: y + 62, sit: true, flip: true },
+        ];
+      },
+    },
+  };
+
+  // Which fixed seat each away/meeting actor takes, in fill order. Ping pong
+  // first because two idle people is exactly the excuse for a rally; a person
+  // on their own does NOT get a ping-pong partner drawn for them.
+  const LEISURE_SLOTS = [
+    { key: "pingpong", seat: 0 }, { key: "pingpong", seat: 1 },
+    { key: "cafe", seat: 0 }, { key: "cafe", seat: 1 },
+    { key: "sofa", seat: 0 }, { key: "arcade", seat: 0 },
+  ];
+  const SOLO_SLOTS = [{ key: "sofa", seat: 0 }, { key: "arcade", seat: 0 }];
+
+  // Same buckets the server uses (agentPresence.recencyBucket) so the room and
+  // the API never disagree about who is around.
+  const ACTIVE_MS = 90 * 1000, STALE_MS = 5 * 60 * 1000;
+  function recencyOf(a) {
+    const t = a && a.lastSeenAt ? Date.parse(a.lastSeenAt) : NaN;
+    if (!Number.isFinite(t)) return "active";
+    const age = Date.now() - t;
+    if (age < ACTIVE_MS) return "active";
+    if (age < STALE_MS) return "recently";
+    return "idle";
+  }
+
+  // HONESTY RULE. On a live office we only ever claim what the data says: the
+  // actor is idle, or we have not heard from them in a while. "Away from the
+  // desk" is a faithful rendering of that — it is not a claim that they are
+  // playing table tennis, it is the room admitting nobody is in that chair.
+  // `break` is a demo-only category (the sample office is labelled SAMPLE and
+  // may be richer); nothing in the ingest path emits it.
+  function isAwayFromDesk(a) {
+    if (!a) return false;
+    if (a.category === "break") return true;
+    if (a.status === "idle") return true;
+    return recencyOf(a) === "idle";
+  }
+  // Physically in the meeting room. `meeting` is the demo-only category; the
+  // LIVE rule is the one below it — two or more people on a call at the same
+  // moment are in a meeting together, and belong at one table.
+  function isInMeetingRoom(a) { return a && a.category === "meeting"; }
+  function isOnCall(a) { return a && a.category === "call"; }
+
+
   // --- Per-APP (tool) identity (docs/office-visual-design.md §2a) ----------
   // Owner direction: the office should read as the SPECIFIC app, not a vague
   // category. The ingest `tool` field already carries the app id (from the
@@ -1148,6 +1522,8 @@
         this.freeDesks = DESKS.slice();
         this.overflow = new Set();  // actors present but with no free desk → "+N more"
         this.overflowTag = null;
+        this.social = new Map();    // key → painted social set-piece + its occupants
+        this.plan = new Map();      // externalId → { key, seat } for whoever is not at a booth
         this.solids = [];
         this.near = null;
         this.openAgent = null;
@@ -1187,6 +1563,10 @@
         if (!this.ready) { this.pendingState = state; return; }
         const actors = (state && state.actors) || [];
         const seen = new Set();
+        // Work out the room's social arrangement first: grouping is a decision
+        // about the WHOLE cast (two people on a call belong at one table), so it
+        // cannot be made one actor at a time inside addAgent.
+        this.plan = this.planPlacement(actors);
 
         actors.forEach((a) => {
           if (a.stale) return; // a stale actor has walked out; skip it
@@ -1213,6 +1593,7 @@
           }
         }
         this.renderOverflowTag();
+        this.applyPlan();
 
         this.buildTerminal();
         if (this.openAgent && this.byId.has(this.openAgent.externalId)) {
@@ -1256,8 +1637,12 @@
       }
 
       addAgent(a) {
-        const desk = this.deskFor(a);
-        if (!desk) { this.overflow.add(a.externalId); return; } // seats full → counted, shown as "+N more"
+        const spot = (this.plan && this.plan.get(a.externalId)) || null;
+        // Someone whose whole presence IS a social scene (in the meeting room,
+        // on a break) has no work corner to leave behind, so they must not eat
+        // one of the nine booths — otherwise a busy office starves its own desks.
+        const desk = this.needsBooth(a, spot) ? this.deskFor(a) : null;
+        if (this.needsBooth(a, spot) && !desk) { this.overflow.add(a.externalId); return; }
         // tool + category are part of the texture key so an app change re-skins
         // the sprite accent (makePerson caches by key).
         const key = this.actorTexKey(a);
@@ -1301,6 +1686,7 @@
       }
 
       removeAgent(agent) {
+        this.releaseSpot(agent);
         this.byId.delete(agent.externalId);
         const i = this.agents.indexOf(agent);
         if (i >= 0) this.agents.splice(i, 1);
@@ -1717,8 +2103,8 @@
         g.fillStyle(C.red, 1); g.fillRect(x + 40, y + 12, 14, 10);
         g.fillStyle(0x3A2617, 1); g.fillRect(x + 52, y + 15, 8, 4);
         this.solid(x, y, 180, 92);
-        const ball = this.add.rectangle(x - 50, y - 20, 5, 5, 0xF0E2C8).setDepth(y + 31);
-        this.tweens.add({ targets: ball, x: x + 50, y: y + 16, duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+        // No ball here: a table rallying with nobody at it reads as a bug. The
+        // ball belongs to SOCIAL.pingpong and arrives with the players.
       }
 
       arcade(x, y) {
@@ -1989,11 +2375,12 @@
 
         // Labels start at the booth centre; placeInScene re-anchors them to the
         // pose once the vignette is drawn. Hidden until the actor arrives.
-        const pillBg = this.add.rectangle(desk.x, desk.y - 42, 74, 17, 0xFFF6E4, 0.95).setDepth(1200).setStrokeStyle(2, STATUS_COL[status] || STATUS_COL.idle);
-        const pillTx = this.add.text(desk.x, desk.y - 42, status.toUpperCase(), {
+        const anchor = desk || { x: startX, y: startY - 60 };
+        const pillBg = this.add.rectangle(anchor.x, anchor.y - 42, 74, 17, 0xFFF6E4, 0.95).setDepth(1200).setStrokeStyle(2, STATUS_COL[status] || STATUS_COL.idle);
+        const pillTx = this.add.text(anchor.x, anchor.y - 42, status.toUpperCase(), {
           fontFamily: "ui-monospace, Menlo, monospace", fontSize: "9px", color: STATUS_INK[status] || STATUS_INK.idle,
         }).setOrigin(0.5).setDepth(1201).setResolution(3);
-        const nameTx = this.add.text(desk.x, desk.y + 26, data.name, {
+        const nameTx = this.add.text(anchor.x, anchor.y + 26, data.name, {
           fontFamily: "ui-monospace, Menlo, monospace", fontSize: "10px", color: "#22312E",
         }).setOrigin(0.5).setDepth(1201).setResolution(3);
         nameTx.setStroke("#FFF6E4", 4);
@@ -2004,12 +2391,16 @@
           category: data.category || null, tool: data.tool || null, object: data.object || null,
           currentTask: data.currentTask, events: data.events || [],
           spr, shadow, pillBg, pillTx, nameTx, desk, badge: null, station: null, pose: null, seated: false,
+          spot: null, socialPose: null, placedAt: null, walking: false,
         };
         // Draw the vignette FIRST so we know where the actor stands/sits in it.
-        this.setStationProp(agent, desk);
-        this.setCategoryBadge(agent, desk);
-        const pose = agent.pose || { px: desk.x, py: desk.y, sit: false };
-        const destY = pose.sit ? pose.py + 8 : pose.py;
+        if (desk) { this.setStationProp(agent, desk); this.setCategoryBadge(agent, desk); }
+        // The work corner is drawn when they have one — an actor who is away from their
+        // desk leaves the vignette behind, dormant, which is exactly what "away
+        // from the desk" looks like. Only the PERSON goes somewhere else.
+        this.claimSpot(agent);
+        const pose = this.effectivePose(agent);
+        const destY = this.poseY(pose);
 
         spr.setDepth(700);
         this.tweens.add({
@@ -2019,8 +2410,10 @@
             agent.seated = true;
             this.placeInScene(agent);              // snap into the scene + move labels
             this.tweens.add({ targets: [pillBg, pillTx, nameTx], alpha: 1, duration: 300 });
-            ui.toast(data.name + " is on it.");
-            if (!pose.sit) this.bob(spr);          // standing actors bob; seated stay put
+            ui.toast(data.name + (agent.spot ? " is away from the desk." : " is on it."));
+            // A social occupant's motion comes from the set-piece it is in (a
+            // rally lunge, a laugh bounce), so an idle bob would fight it.
+            if (!pose.sit && !pose.noBob && !agent.spot) this.bob(spr);
           },
         });
 
@@ -2086,15 +2479,220 @@
         return pose;
       }
 
+      // ---------- who stands where (the social arrangement) ----------
+      // Grouping is a whole-cast decision, so it happens once per state, not
+      // per actor. Everything here is driven by signal the payload actually
+      // carries — status, category and lastSeenAt — never by invention.
+      planPlacement(actors) {
+        const live = (actors || []).filter((a) => a && !a.stale);
+        // stable order, so the same person keeps the same seat between polls
+        const order = live.slice().sort((a, b) => {
+          const ha = hashString(a.externalId), hb = hashString(b.externalId);
+          return ha === hb ? String(a.externalId).localeCompare(String(b.externalId)) : ha - hb;
+        });
+        const plan = new Map();
+
+        // 1. THE MEETING TABLE. People physically in the meeting room always sit
+        //    here. On a LIVE office the rule that earns its keep is the second
+        //    one: two or more people on a call AT THE SAME TIME are in a meeting
+        //    with each other, so they sit at one table instead of being rendered
+        //    as N identical call vignettes in N different corners. A single
+        //    caller is just someone on a call at their desk — they keep their
+        //    own vignette, which is the honest read.
+        const inRoom = order.filter(isInMeetingRoom);
+        const onCall = order.filter((a) => isOnCall(a) && !isAwayFromDesk(a));
+        const table = inRoom.concat(onCall.length >= 2 ? onCall : []);
+        table.slice(0, SOCIAL.meeting.seats).forEach((a, i) => {
+          plan.set(a.externalId, { key: "meeting", seat: i });
+        });
+
+        // 2. AWAY FROM THE DESK. Idle actors, and actors we have not heard from
+        //    in a while, drift out of their work corner into the lounge, café or
+        //    rec room. Their vignette stays behind — the day they had is still
+        //    on the floor, they are just not sitting in it. Two or more at once
+        //    can pair up; one on their own gets somewhere you can plausibly be
+        //    alone, never half a ping-pong rally.
+        const away = order.filter((a) => !plan.has(a.externalId) && isAwayFromDesk(a));
+        const slots = away.length >= 2 ? LEISURE_SLOTS : SOLO_SLOTS;
+        away.forEach((a, i) => {
+          const slot = slots[i];
+          if (slot) plan.set(a.externalId, { key: slot.key, seat: slot.seat });
+          // anyone past the last leisure seat simply stays in their own corner
+        });
+
+        // 3. Everyone else is working, and stays exactly where they were.
+        return plan;
+      }
+
+      // Paint a set-piece the first time someone needs it. Idempotent.
+      ensureSocial(key) {
+        const existing = this.social.get(key);
+        if (existing) return existing;
+        const def = SOCIAL[key];
+        if (!def) return null;
+        const objs = [];
+        const st = { key, def, objs, occupants: new Array(def.seats).fill(null), poses: [] };
+        this.social.set(key, st);
+        st.poses = def.paint(this, def.at.x, def.at.y, objs, (i, kind) => this.socialBeat(st, i, kind)) || [];
+        return st;
+      }
+
+      // A set-piece asking whoever is in seat `i` to react. No-op on an empty
+      // seat, so the rally still animates while only one player has arrived.
+      socialBeat(st, i, kind) {
+        const agent = st.occupants[i];
+        if (!agent || !agent.spr || !agent.seated || agent.walking) return;
+        const pose = st.poses[i];
+        if (!pose) return;
+        const spr = agent.spr, baseX = pose.px, baseY = this.poseY(pose);
+        const dx = kind === "lunge" ? (pose.flip ? -9 : 9) : 0;
+        const dy = kind === "lunge" ? 2 : -4;
+        this.tweens.killTweensOf(spr);
+        spr.setPosition(baseX, baseY);
+        this.tweens.add({
+          targets: spr, x: baseX + dx, y: baseY + dy,
+          duration: kind === "lunge" ? 170 : 250, yoyo: true, ease: "Sine.easeOut",
+          onUpdate: () => {
+            spr.setDepth(spr.y + 30);
+            if (agent.shadow) agent.shadow.setPosition(spr.x, spr.y + 28).setDepth(spr.y + 29);
+          },
+          onComplete: () => {
+            spr.setPosition(baseX, baseY).setDepth(baseY + 30);
+            if (agent.shadow) agent.shadow.setPosition(baseX, baseY + 28).setDepth(baseY + 29);
+          },
+        });
+      }
+
+      // Does this actor need a work booth drawn for them?
+      //  · no social seat            → yes, their own corner is all they have
+      //  · seated in the MEETING room → no. The meeting IS the activity, and
+      //    leaving their call vignette behind would put back exactly the row of
+      //    identical call corners that grouping them was meant to remove.
+      //  · away from the desk        → yes: the vignette stays, dormant, and the
+      //    person walks out of it. That IS what "away from the desk" looks like.
+      //  · a break/meeting actor     → no work corner exists to leave.
+      needsBooth(a, spot) {
+        if (!spot) return true;
+        const def = SOCIAL[spot.key];
+        if (def && def.kind === "meeting") return false;
+        return !(a.category === "break" || a.category === "meeting");
+      }
+
+      // Give an actor a booth, or take one away, when their arrangement changed.
+      reconcileBooth(agent) {
+        const need = this.needsBooth(agent, agent.spot);
+        if (need && !agent.desk) {
+          const desk = this.deskFor(agent);
+          if (!desk) return;
+          agent.desk = desk;
+          this.setStationProp(agent, desk);
+          this.setCategoryBadge(agent, desk);
+        } else if (!need && agent.desk) {
+          if (agent.station) { agent.station.forEach((o) => o && o.destroy()); agent.station = null; }
+          if (agent.badge) { agent.badge.bg.destroy(); agent.badge.tx.destroy(); agent.badge = null; }
+          this.freeDesks.push(agent.desk);
+          agent.desk = null; agent.pose = null;
+        }
+      }
+
+      claimSpot(agent) {
+        const spot = (this.plan && this.plan.get(agent.externalId)) || null;
+        agent.spot = spot;
+        agent.socialPose = null;
+        if (!spot) return;
+        const st = this.ensureSocial(spot.key);
+        if (!st) { agent.spot = null; return; }
+        st.occupants[spot.seat] = agent;
+        agent.socialPose = st.poses[spot.seat] || null;
+      }
+
+      releaseSpot(agent) {
+        if (!agent.spot) return;
+        const st = this.social.get(agent.spot.key);
+        if (st && st.occupants[agent.spot.seat] === agent) st.occupants[agent.spot.seat] = null;
+        agent.spot = null; agent.socialPose = null;
+      }
+
+      // Re-seat the whole room against the current plan, tear down set-pieces
+      // nobody is in any more, and walk anyone whose place changed.
+      applyPlan() {
+        for (const st of this.social.values()) st.occupants.fill(null);
+        for (const [, agent] of this.byId) this.claimSpot(agent);
+
+        for (const [key, st] of Array.from(this.social)) {
+          if (st.occupants.some((o) => o)) continue;
+          st.objs.forEach((o) => o && o.destroy());
+          this.social.delete(key);
+          for (const [, ag] of this.byId) {
+            if (ag.spot && ag.spot.key === key) { ag.spot = null; ag.socialPose = null; }
+          }
+        }
+
+        for (const [, agent] of this.byId) this.reconcileBooth(agent);
+
+        for (const [, agent] of this.byId) {
+          if (!agent.seated || !agent.spr || agent.walking) continue;
+          const want = this.effectivePose(agent);
+          const at = agent.placedAt;
+          if (at && at.px === want.px && at.py === want.py) continue;
+          this.walkTo(agent, want);
+        }
+      }
+
+      // Where an actor actually stands: their social seat if they have one,
+      // otherwise the pose their own work vignette put them in.
+      effectivePose(agent) {
+        return agent.socialPose
+          || agent.pose
+          || { px: agent.desk ? agent.desk.x : W / 2, py: agent.desk ? agent.desk.y : H / 2, sit: false };
+      }
+      poseY(p) { return p.sit ? p.py + 8 : p.py; }
+
+      // Walk between two places in the room — used when someone goes idle and
+      // leaves their desk, or comes back to it.
+      walkTo(agent, pose) {
+        const spr = agent.spr, shadow = agent.shadow;
+        const destY = this.poseY(pose);
+        this.tweens.killTweensOf(spr);
+        spr.setAngle(0);
+        spr.setFlipX(pose.px < spr.x);
+        agent.walking = true;
+        const dist = Phaser.Math.Distance.Between(spr.x, spr.y, pose.px, destY);
+        this.tweens.add({
+          targets: spr, x: pose.px, y: destY,
+          duration: Math.min(2400, 420 + dist * 3), ease: "Sine.easeInOut",
+          onUpdate: () => {
+            spr.setDepth(spr.y + 30);
+            if (shadow) shadow.setPosition(spr.x, spr.y + 28).setDepth(spr.y + 29);
+            const ly = spr.y - (pose.sit ? 40 : 52);
+            if (agent.pillBg) agent.pillBg.setPosition(spr.x, ly);
+            if (agent.pillTx) agent.pillTx.setPosition(spr.x, ly);
+            if (agent.nameTx) agent.nameTx.setPosition(spr.x, spr.y + 28);
+            if (agent.badge) { agent.badge.bg.setPosition(spr.x + 34, ly + 4); agent.badge.tx.setPosition(spr.x + 34, ly + 4); }
+          },
+          onComplete: () => {
+            agent.walking = false;
+            this.placeInScene(agent);
+            if (!pose.sit && !pose.noBob && !agent.spot) this.bob(spr);
+          },
+        });
+      }
+
       // Move a seated actor onto its vignette's pose anchor, facing the scene,
       // sitting a touch lower on a chair/cushion. Keeps labels above the head.
       placeInScene(agent) {
-        const p = agent.pose || { px: agent.desk.x, py: agent.desk.y, sit: false };
-        const py = p.sit ? p.py + 8 : p.py;
-        agent.spr.setPosition(p.px, py).setDepth(py + 30);
+        const p = this.effectivePose(agent);
+        const py = this.poseY(p);
+        // Draw order normally follows y, but someone sitting IN a couch has to
+        // beat the couch's own depth or they vanish behind the backrest, and the
+        // y that would earn that depth is a y that puts them on the floor.
+        const dep = p.depth != null ? p.depth : py + 30;
+        agent.spr.setPosition(p.px, py).setDepth(dep);
+        agent.spr.setAngle(p.tilt || 0);      // only the sofa sprawl tilts
         if (typeof p.flip === "boolean") agent.spr.setFlipX(p.flip);
         agent.spr.setScale(p.sit ? 2.7 : 3);
-        if (agent.shadow) agent.shadow.setPosition(p.px, py + 28).setDepth(py + 29);
+        agent.placedAt = { px: p.px, py: p.py };
+        if (agent.shadow) agent.shadow.setPosition(p.px, py + 28).setDepth(dep - 1);
         const labelY = py - (p.sit ? 40 : 52);
         if (agent.pillBg) agent.pillBg.setPosition(p.px, labelY);
         if (agent.pillTx) agent.pillTx.setPosition(p.px, labelY);
@@ -2310,6 +2908,14 @@
           observer.observe(parent);
         });
       }
+
+      // A handle for the capture harness (scripts/screenshot-office-demo.mjs).
+      // The room is a 1440×960 world seen through a 960×600 camera that follows
+      // the player, so a screenshot can only ever prove the corner the player
+      // happens to be standing in. The harness needs to move the camera to show
+      // that the rec room, lounge, café and meeting room are all populated.
+      // Debug-only: nothing in the app reads it.
+      window.MumblOffice.__room = function () { return game.scene.getScene("room"); };
 
       return {
         applyState: function applyState(state) {
