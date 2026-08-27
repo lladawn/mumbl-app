@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, Wry};
+use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_store::{Store, StoreExt};
 
 const STORE_FILE: &str = "mumbl-helper.json";
@@ -128,9 +128,16 @@ pub struct ConfigState {
     /// heartbeat, which turned into a password prompt every minute or two. The
     /// hot path must never touch the keychain — it reads this instead.
     ///
-    /// `None` means "not loaded yet"; the load is lazy-once (see `token`), and
-    /// `write_token` refreshes it so a Save takes effect without a re-read.
-    token: Mutex<Option<String>>,
+    /// `loaded` distinguishes "not read yet" from "read, and there is no token".
+    /// Without it a machine with no token would re-read the keychain on every
+    /// send, which is exactly the prompt storm this cache exists to stop.
+    token: Mutex<TokenCache>,
+}
+
+#[derive(Default)]
+struct TokenCache {
+    loaded: bool,
+    value: Option<String>,
 }
 
 impl ConfigState {
@@ -196,18 +203,41 @@ appearing over fullscreen apps); turn it back on from Advanced if you want the D
     }
     persist(app, &config)?;
 
-    // The ONE keychain read of this run. Doing it here means any OS
-    // authorization prompt happens at launch (where "Always Allow" makes
-    // sense to the user), never mid-session on a heartbeat.
-    let token = read_token_from_keychain();
-    log::info!(
-        "ingest token {} — cached for this run, keychain not read again",
-        if token.is_some() { "loaded from keychain" } else { "not set in keychain" }
-    );
-
     app.manage(ConfigState {
         inner: Mutex::new(config),
-        token: Mutex::new(token),
+        token: Mutex::new(TokenCache::default()),
+    });
+
+    // Read the keychain OFF THE STARTUP PATH. It used to happen right here, and
+    // because an unsigned build triggers an OS authorization prompt, the whole
+    // app — tray, popover and character — sat frozen behind a modal dialog until
+    // somebody clicked it. The character is supposed to be the one thing that
+    // works with no token, no space and no network; blocking its launch on a
+    // credential it never uses was exactly backwards.
+    //
+    // Still eager, just not blocking: the prompt appears at launch (where
+    // "Always Allow" makes sense) while the UI comes up immediately. `token()`
+    // takes the same lock, so a send that lands mid-read waits for this one read
+    // rather than starting a second and prompting twice.
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        let Some(state) = handle.try_state::<ConfigState>() else { return };
+        let mut cache = state.token.lock().unwrap();
+        if cache.loaded {
+            return;
+        }
+        cache.value = read_token_from_keychain();
+        cache.loaded = true;
+        let found = cache.value.is_some();
+        log::info!(
+            "ingest token {} — cached for this run, keychain not read again",
+            if found { "loaded from keychain" } else { "not set in keychain" }
+        );
+        drop(cache);
+        // The UI rendered "not connected" while the read was in flight; correct it.
+        if found {
+            let _ = handle.emit("config-changed", ());
+        }
     });
     Ok(())
 }
@@ -215,9 +245,25 @@ appearing over fullscreen apps); turn it back on from Advanced if you want the D
 pub fn view(app: &AppHandle) -> ConfigView {
     let config = app.state::<ConfigState>().snapshot();
     ConfigView {
-        has_token: token(app).map(|t| !t.is_empty()).unwrap_or(false),
+        has_token: has_token_now(app),
         config,
     }
+}
+
+/// Non-blocking "is a token set?" for the UI.
+///
+/// Deliberately `try_lock`: if the startup keychain read is still in flight
+/// (i.e. the OS prompt is on screen) this reports `false` and returns
+/// immediately rather than freezing the popover behind a modal dialog. The read
+/// emits `config-changed` when it lands, so the UI corrects itself a moment
+/// later. A momentarily wrong "not connected" beats a hung window.
+fn has_token_now(app: &AppHandle) -> bool {
+    let Some(state) = app.try_state::<ConfigState>() else { return false };
+    let found = match state.token.try_lock() {
+        Ok(cache) => cache.value.as_deref().map(|t| !t.is_empty()).unwrap_or(false),
+        Err(_) => false,
+    };
+    found
 }
 
 pub fn apply_patch(app: &AppHandle, patch: ConfigPatch) -> Result<ConfigView, String> {
@@ -325,7 +371,9 @@ fn entry() -> Result<keyring::Entry, String> {
 pub fn write_token(app: &AppHandle, token: &str) -> Result<(), String> {
     entry()?.set_password(token).map_err(|e| e.to_string())?;
     if let Some(state) = app.try_state::<ConfigState>() {
-        *state.token.lock().unwrap() = Some(token.to_string());
+        let mut cache = state.token.lock().unwrap();
+        cache.value = Some(token.to_string());
+        cache.loaded = true;
     }
     log::info!("ingest token saved to keychain and cached");
     Ok(())
@@ -342,21 +390,14 @@ pub fn write_token(app: &AppHandle, token: &str) -> Result<(), String> {
 /// with a token present.
 pub fn token(app: &AppHandle) -> Option<String> {
     let state = app.try_state::<ConfigState>()?;
-    {
-        let cached = state.token.lock().unwrap();
-        if cached.is_some() {
-            return cached.clone();
-        }
+    // Blocks only if the startup read is still in flight, which is the point:
+    // waiting on that one read is how we avoid starting a second one.
+    let mut cache = state.token.lock().unwrap();
+    if !cache.loaded {
+        cache.value = read_token_from_keychain();
+        cache.loaded = true;
     }
-    // Cache empty: nothing was in the keychain at launch. Re-checking is cheap
-    // and cannot prompt while the item does not exist; the moment one does
-    // exist we memoize it and never read again.
-    let fresh = read_token_from_keychain();
-    if fresh.is_some() {
-        log::info!("ingest token loaded from keychain (cached for this run)");
-        *state.token.lock().unwrap() = fresh.clone();
-    }
-    fresh
+    cache.value.clone()
 }
 
 /// The ONLY place that talks to the keychain for a read. Everything else goes
