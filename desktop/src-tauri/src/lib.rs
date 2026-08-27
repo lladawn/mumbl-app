@@ -40,7 +40,26 @@ use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, Rect, WebviewWindow,
 };
 
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
 use config::{Config, ConfigPatch, ConfigView};
+
+/// Guards the popover against dismissing itself the moment it opens.
+///
+/// Clicking a status item hands focus back to whatever app was in front, so the
+/// window reliably gets `Focused(false)` a beat after `show()` — which closed
+/// the popover instantly, over and over, every time the user clicked the icon.
+/// A blur only counts once the window has ACTUALLY held focus, and never inside
+/// a short grace period after opening.
+#[derive(Default)]
+struct PopoverGuard {
+    shown_at: Mutex<Option<Instant>>,
+    focused_once: Mutex<bool>,
+}
+
+/// How long after opening to ignore a blur outright.
+const OPEN_GRACE: Duration = Duration::from_millis(600);
 use watcher::{LastReceipt, Receipt};
 
 // ---- IPC commands ---------------------------------------------------------
@@ -165,6 +184,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_store::Builder::new().build())
         .manage(LastReceipt::default())
+        .manage(PopoverGuard::default())
         .setup(|app| {
             let handle = app.handle().clone();
             config::init(&handle)?;
@@ -202,9 +222,30 @@ pub fn run() {
                     // A popover dismisses itself the moment you click away —
                     // that is the whole difference between a popover and a
                     // window, and it is why this is not just a resized window.
+                    tauri::WindowEvent::Focused(true) => {
+                        if let Some(g) = win_for_events.app_handle().try_state::<PopoverGuard>() {
+                            *g.focused_once.lock().unwrap() = true;
+                        }
+                    }
                     tauri::WindowEvent::Focused(false) => {
+                        let app = win_for_events.app_handle();
+                        let Some(guard) = app.try_state::<PopoverGuard>() else { return };
+                        let opened_just_now = guard
+                            .shown_at
+                            .lock()
+                            .unwrap()
+                            .map(|t| t.elapsed() < OPEN_GRACE)
+                            .unwrap_or(false);
+                        let held_focus = *guard.focused_once.lock().unwrap();
+                        // Losing focus before we ever had it (or within the grace
+                        // window) is the status-item click handing focus back, not
+                        // the user clicking away.
+                        if opened_just_now || !held_focus {
+                            log::info!("ignoring blur right after open (status-item focus hand-back)");
+                            return;
+                        }
                         let _ = win_for_events.hide();
-                        log::info!("popover auto-hidden (focus moved to another app)");
+                        log::info!("popover auto-hidden (user clicked away)");
                     }
                     _ => {}
                 });
@@ -382,6 +423,10 @@ fn show_popover(app: &AppHandle, rect: Option<Rect>) {
     // Fall back to asking the tray for its own frame — this is the path taken
     // when the popover is opened from the menu or on launch rather than a click.
     let rect = rect.or_else(|| app.tray_by_id("mumbl-tray").and_then(|t| t.rect().ok().flatten()));
+    if let Some(guard) = app.try_state::<PopoverGuard>() {
+        *guard.shown_at.lock().unwrap() = Some(Instant::now());
+        *guard.focused_once.lock().unwrap() = false;
+    }
     position_popover(&win, rect);
     let _ = win.show();
     let _ = win.set_focus();
