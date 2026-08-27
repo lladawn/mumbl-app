@@ -1,207 +1,343 @@
+/* mumbl helper — menubar popover.
+ *
+ * Same design system as the web app (styles.css :root in the repo root): the
+ * Press Start 2P bitmap face for anything short, Courier for body copy, 2px
+ * ink-dark edges, hard offset shadows with NO blur, and zero border-radius.
+ * The office palette (paper / gold / mint / clay / sky) is lifted from
+ * public/office/office-scene.js so the popover reads as a window onto the same
+ * place, not a settings dialog bolted to the side of it.
+ *
+ * The bitmap face is vendored locally: the webview CSP is `font-src 'self'`, so
+ * a Google Fonts link would silently fail to load and quietly fall back.
+ */
+@font-face {
+  font-family: "Press Start 2P";
+  src: url("./fonts/PressStart2P-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
 :root {
-  --bg: #f6f4ef;
-  --card: #fffefb;
-  --ink: #2b2a27;
-  --muted: #8a867d;
-  --line: #e7e3da;
-  --accent: #6b8f71;
-  --accent-ink: #ffffff;
-  --danger: #b4675a;
-  --live: #6b8f71;
-  --off: #c7c2b8;
+  color-scheme: light;
+  --ink: #161412;
+  --edge: #2a241d;
+  --muted: #6d6760;
+  --paper: #fbf4e8;
+  --panel: #fffaf2;
+  --line: #ddd8cf;
+  --gold: #f8dda0;
+  --gold-ink: #79570e;
+  --mint: #d9f2df;
+  --mint-ink: #1f5d3a;
+  --clay: #edcec4;
+  --clay-ink: #8a352b;
+  --sky: #bee7f7;
+  --wall: #c7e9e5;
+  --floor: #ddba88;
+  --desk: #f0d5a8;
+  --lilac: #cfbbf0;
+  --display: "Press Start 2P", "Courier New", ui-monospace, monospace;
+  --body: "Courier New", "DejaVu Sans Mono", ui-monospace, monospace;
+  --sh-sm: 3px 3px 0 var(--edge);
+  --sh: 4px 4px 0 var(--edge);
 }
 
 * { box-sizing: border-box; }
+/* `display` on a component beats the UA [hidden] rule, so state it once here
+   rather than remembering it per component (the live/paused chip lost this). */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
 
 body {
-  margin: 0;
-  font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font: 12px/1.5 var(--body);
   color: var(--ink);
-  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  /* the popover is dragged by nothing — it is anchored, so kill the rubber-band */
+  overscroll-behavior: none;
+  user-select: none;
+  cursor: default;
 }
 
-.wrap { padding: 14px; max-width: 460px; margin: 0 auto; }
-
-.top {
+/* The whole popover is one hard-edged pixel panel. */
+.pane {
+  height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.brand { display: flex; align-items: center; gap: 6px; }
-.brand strong { font-size: 15px; }
-.dot {
-  width: 9px; height: 9px; border-radius: 50%;
-  background: var(--off);
-  box-shadow: 0 0 0 3px rgba(107, 143, 113, 0.12);
-}
-.dot.on { background: var(--live); }
-
-.muted { color: var(--muted); }
-.fine { font-size: 11px; }
-
-/* First-run guide — a numbered path to a live office, shown until a token is set. */
-.setup { background: linear-gradient(180deg, #f2f6f0, var(--card)); border-color: #d8e5d6; }
-.steps { margin: 0; padding-left: 18px; }
-.steps li { margin: 0 0 5px; font-size: 12.5px; }
-.steps li:last-child { margin-bottom: 0; }
-
-/* Status & permissions card. */
-.status-grid { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.status-line { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; line-height: 1.4; }
-.status-line .tick {
-  flex: 0 0 16px; width: 16px; height: 16px; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 700; margin-top: 1px;
-  background: var(--off); color: #fff;
-}
-.status-line.good .tick { background: var(--accent); }
-.status-line.todo .tick { background: var(--danger); }
-.status-line.paused .tick { background: #c9a24a; }
-.status-line.idle .tick { background: var(--off); }
-.status-line.todo .st-text { color: var(--ink); }
-
-.card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 12px 14px;
-  margin-bottom: 12px;
-}
-.card h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
-
-label { display: block; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
-input {
-  width: 100%;
-  margin-top: 3px;
-  padding: 7px 9px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--ink);
-  font: inherit;
-}
-input:focus { outline: 2px solid rgba(107, 143, 113, 0.35); border-color: var(--accent); }
-
-/* Custom checkbox. The generic `input` rule above (background/border/padding)
-   suppresses WKWebView's native checked glyph — it renders as a blank white
-   square that never visibly ticks. We draw our own box + checkmark so the
-   checked state is unmistakable regardless of the native control. */
-input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-  margin: 0;
-  padding: 0;
-  border: 1.5px solid var(--line);
-  border-radius: 4px;
-  background: #fff;
-  position: relative;
-  cursor: pointer;
-  vertical-align: middle;
-}
-input[type="checkbox"]:checked,
-input[type="checkbox"].is-checked {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-input[type="checkbox"]:checked::after,
-input[type="checkbox"].is-checked::after {
-  content: "";
-  position: absolute;
-  left: 4.5px;
-  top: 1.5px;
-  width: 4px;
-  height: 8px;
-  border: solid #fff;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-input[type="checkbox"]:focus { outline: 2px solid rgba(107, 143, 113, 0.35); }
-
-.row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
-
-/* Transient Save confirmation next to the Save button. */
-.save-status {
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0;
-  transition: opacity 0.6s ease;
-  color: var(--muted);
-}
-.save-status.show { opacity: 1; }
-.save-status.ok { color: var(--accent); }
-.save-status.err {
-  color: var(--danger);
-  font-weight: 500;
-  opacity: 1; /* errors stay visible */
+  flex-direction: column;
+  background: var(--paper);
+  border: 2px solid var(--edge);
+  /* a 1px inner highlight fakes the beveled edge of a pixel-art panel */
+  box-shadow: inset 0 0 0 1px #fff8ec;
+  overflow: hidden;
 }
 
-/* Saved-state cue under the token field. */
-.token-cue {
-  display: block;
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.token-cue.ok { color: var(--accent); }
+/* ---------- title bar ---------- */
 
-/* Master "Share all my apps" toggle. */
-.share-all { margin-bottom: 8px; }
-.share-all .switch {
+.bar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0;
-  color: var(--ink);
-  font-size: 13px;
+  padding: 9px 10px;
+  background: var(--gold);
+  border-bottom: 2px solid var(--edge);
+}
+
+.tile {
+  width: 20px; height: 20px;
+  display: grid; place-items: center;
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  font: 400 9px/1 var(--display);
+  color: var(--gold-ink);
+}
+
+.wordmark {
+  flex: 1;
+  font: 400 10px/1 var(--display);
+  color: var(--edge);
+}
+
+/* live / paused chip */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 8px;
+  background: var(--mint);
+  border: 2px solid var(--edge);
+  font: 400 7px/1 var(--display);
+  color: var(--mint-ink);
   cursor: pointer;
 }
-.share-all .switch input[type="checkbox"] { width: auto; margin: 0; }
-.share-all p { margin: 4px 0 0; }
+.chip.paused { background: var(--clay); color: var(--clay-ink); }
+.chip:active { transform: translate(1px, 1px); }
 
-button {
-  border: 1px solid var(--line);
-  background: #fff;
+.dot {
+  width: 6px; height: 6px;
+  background: var(--mint-ink);
+  box-shadow: 0 0 0 2px rgba(31, 93, 58, 0.22);
+}
+.chip.paused .dot { background: var(--clay-ink); box-shadow: 0 0 0 2px rgba(138, 53, 43, 0.22); }
+
+/* ---------- views ---------- */
+
+.view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 14px 4px;
+}
+.view[hidden] { display: none; }
+
+/* ---------- the empty-desk vignette (pure CSS pixel art) ---------- */
+
+.scene {
+  position: relative;
+  height: 104px;
+  margin: 0 0 14px;
+  border: 2px solid var(--edge);
+  background: var(--floor);
+  overflow: hidden;
+}
+.scene-wall { position: absolute; inset: 0 0 46px 0; background: var(--wall); }
+.scene-wall::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 3px; background: #a6d8d4;
+}
+.scene-window {
+  position: absolute; left: 18px; top: 12px; width: 74px; height: 34px;
+  background: var(--sky); border: 2px solid #fff8ec;
+}
+.scene-window i { position: absolute; background: #dcf3fc; }
+.scene-window i:nth-child(1) { left: 0; top: 0; right: 0; height: 11px; }
+.scene-window i:nth-child(2) { left: 50%; top: 0; bottom: 0; width: 3px; background: #fff8ec; }
+.scene-desk {
+  position: absolute; left: 128px; bottom: 16px; width: 118px; height: 12px;
+  background: var(--desk); box-shadow: 0 12px 0 0 #e3c094;
+}
+.scene-screen {
+  position: absolute; left: 152px; bottom: 27px; width: 52px; height: 30px;
+  background: #9fb3be; border: 2px solid var(--edge);
+}
+.scene-screen::after {
+  content: ""; position: absolute; left: 5px; top: 5px; width: 26px; height: 4px;
+  background: rgba(255, 255, 255, 0.45);
+}
+/* a little pixel person, waiting for a desk to be assigned */
+.scene-person { position: absolute; left: 96px; bottom: 8px; width: 18px; height: 34px; }
+.scene-person span { position: absolute; display: block; }
+.p-hair { left: 3px; top: 0; width: 12px; height: 6px; background: #4a382c; }
+.p-face { left: 4px; top: 5px; width: 10px; height: 7px; background: #e3b48d; }
+.p-body { left: 1px; top: 12px; width: 16px; height: 13px; background: #5fcbbc; }
+.p-legs { left: 4px; top: 25px; width: 10px; height: 9px; background: #6e7e96; }
+
+/* ---------- connect view ---------- */
+
+.title {
+  margin: 0 0 8px;
+  font: 400 12px/1.5 var(--display);
+  color: var(--edge);
+  word-spacing: -0.1em;
+}
+.lede { margin: 0 0 14px; color: var(--muted); font-size: 12px; }
+
+.btn-primary {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 14px;
+  background: var(--gold);
+  border: 2px solid var(--edge);
+  box-shadow: var(--sh);
   color: var(--ink);
-  border-radius: 8px;
-  padding: 7px 12px;
-  font: inherit;
+  font: 400 10px/1.4 var(--display);
+  cursor: pointer;
+  transition: transform .08s steps(2), box-shadow .08s steps(2);
+}
+.btn-primary:hover { transform: translate(1px, 1px); box-shadow: var(--sh-sm); }
+.btn-primary:active { transform: translate(4px, 4px); box-shadow: none; }
+.btn-primary:disabled { opacity: .55; box-shadow: var(--sh-sm); cursor: progress; }
+
+.btn-ghost {
+  min-height: 30px; padding: 0 12px;
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  box-shadow: var(--sh-sm);
+  font: 400 8px/1 var(--display);
+  color: var(--ink);
   cursor: pointer;
 }
-button:hover { background: #f3f0ea; }
-button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-button.primary:hover { filter: brightness(1.05); }
-button.toggle.paused { color: var(--danger); border-color: var(--danger); }
+.btn-ghost:active { transform: translate(2px, 2px); box-shadow: none; }
 
-.receipt {
-  border: 1px dashed var(--line);
-  border-radius: 8px;
+.hint { margin: 10px 0 0; font-size: 11px; color: var(--muted); }
+
+/* pairing state */
+.pairing { margin-top: 14px; text-align: center; }
+.pairing[hidden] { display: none; }
+.pair-code {
+  padding: 10px;
+  background: var(--panel);
+  border: 2px dashed var(--edge);
+  font: 400 13px/1 var(--display);
+  letter-spacing: 2px;
+}
+.pair-status-err { color: var(--clay-ink); }
+
+/* ---------- live view ---------- */
+
+.eyebrow {
+  margin: 0 0 8px;
+  font: 400 7px/1 var(--display);
+  letter-spacing: .04em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.receipt-card {
+  padding: 11px;
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  box-shadow: var(--sh-sm);
+}
+.receipt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+.receipt b { font-size: 12px; }
+.pill {
+  padding: 3px 6px;
+  background: var(--sky);
+  border: 2px solid var(--edge);
+  font: 400 7px/1 var(--display);
+}
+.muted { color: var(--muted); }
+
+.assure {
+  display: flex; gap: 8px; align-items: flex-start;
+  margin-top: 12px; padding: 9px 10px;
+  background: var(--mint);
+  border: 2px solid var(--edge);
+}
+.assure p { margin: 0; font-size: 11px; line-height: 1.45; color: var(--mint-ink); }
+.tick { font-size: 12px; color: var(--mint-ink); }
+
+/* share-all switch */
+.share-all { margin-top: 14px; }
+.switch { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.switch-box {
+  width: 16px; height: 16px; flex: 0 0 auto;
+  background: var(--panel);
+  border: 2px solid var(--edge);
+}
+/* driven by an explicit class as well as :checked — WebKit does not reliably
+   repaint a custom checkbox whose checked PROPERTY is set before first paint */
+.switch input:checked + .switch-box,
+.switch input.is-checked + .switch-box {
+  background: var(--mint-ink);
+  box-shadow: inset 0 0 0 2px var(--panel);
+}
+.switch-text { font: 400 8px/1.4 var(--display); }
+
+/* ---------- disclosures ---------- */
+
+.disclose { margin-top: 14px; border: 2px solid var(--edge); background: var(--panel); }
+.disclose > summary {
   padding: 8px 10px;
-  background: #faf8f3;
-  min-height: 34px;
+  font: 400 8px/1 var(--display);
+  cursor: pointer;
+  list-style: none;
+  display: flex; align-items: center; gap: 6px;
 }
-.receipt .pill {
-  display: inline-block;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: rgba(107, 143, 113, 0.14);
-  color: var(--accent);
-  font-size: 11px;
-  margin-right: 5px;
+.disclose > summary::-webkit-details-marker { display: none; }
+.disclose > summary::before { content: "▸"; font-size: 9px; }
+.disclose[open] > summary::before { content: "▾"; }
+.disclose > summary:hover { background: var(--gold); }
+.count { margin-left: auto; color: var(--muted); font-size: 7px; }
+
+.advanced { margin: 0 14px 12px; flex: 0 0 auto; }
+.adv-body { padding: 10px; border-top: 2px solid var(--edge); }
+
+.field { display: block; margin-bottom: 9px; }
+.field span { display: block; margin-bottom: 4px; font-size: 10px; color: var(--muted); }
+.field input {
+  width: 100%; padding: 7px 8px;
+  background: var(--paper);
+  border: 2px solid var(--edge);
+  font: 12px/1.3 var(--body);
+  color: var(--ink);
+  user-select: text;
+}
+.field input:focus { outline: 2px solid var(--gold); outline-offset: 0; }
+
+.row { display: flex; align-items: center; gap: 9px; }
+.save-status { font-size: 11px; opacity: 0; transition: opacity .15s; }
+.save-status.show { opacity: 1; }
+.save-status.ok { color: var(--mint-ink); }
+.save-status.err { color: var(--clay-ink); }
+
+/* app allowlist */
+.allowlist { max-height: 168px; overflow-y: auto; padding: 8px 10px; border-top: 2px solid var(--edge); }
+.item { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.item input { position: absolute; opacity: 0; width: 0; height: 0; }
+.item label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 11px; flex: 1; }
+.item .box { width: 14px; height: 14px; flex: 0 0 auto; background: var(--paper); border: 2px solid var(--edge); }
+.item input:checked + label .box,
+.item input.is-checked + label .box { background: var(--mint-ink); box-shadow: inset 0 0 0 2px var(--paper); }
+.item .cat { margin-left: auto; color: var(--muted); font-size: 10px; }
+
+.foot {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border-top: 2px solid var(--edge);
+  background: var(--panel);
+  font-size: 10px;
+  color: var(--muted);
 }
 
-.allowlist { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
-.allowlist .item {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 2px;
-}
-.allowlist .item label { margin: 0; color: var(--ink); font-size: 12px; }
-.allowlist .item .cat { color: var(--muted); font-size: 10px; }
-.allowlist input[type="checkbox"] { width: auto; margin: 0; }
-
-.foot { margin-top: 4px; text-align: center; }
+/* thin, on-brand scrollbars — the default macOS overlay bar looks alien
+   against a hard-edged pixel panel */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-thumb { background: var(--line); border: 2px solid var(--panel); }
+::-webkit-scrollbar-track { background: transparent; }

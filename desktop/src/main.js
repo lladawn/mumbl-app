@@ -11,8 +11,14 @@ const $ = (id) => document.getElementById(id);
 
 // ---- state ----------------------------------------------------------------
 
-let config = null; // { endpoint, slug, name, enabled, shareAll, allowlist:{id:bool}, muted:{id:bool}, hasToken }
-let catalog = []; // default classification table [{bundleId, tool, category, object, label}]
+let config = null; // { endpoint, slug, name, enabled, shareAll, allowlist, muted, hasToken }
+let catalog = []; // default classification table
+let pairTimer = null; // interval id while a pairing is in flight
+
+// How long to wait for the human to click Authorize before giving up. Long
+// enough to find the browser tab and sign in if the session lapsed.
+const PAIR_TIMEOUT_MS = 3 * 60 * 1000;
+const PAIR_POLL_MS = 2000;
 
 // ---- boot -----------------------------------------------------------------
 
@@ -20,61 +26,63 @@ async function boot() {
   catalog = await invoke("get_catalog");
   config = await invoke("get_config");
 
-  renderConfig();
-  renderShareAll();
-  renderAllowlist();
-  renderToggle();
-  renderStatus();
+  renderAll();
   await refreshReceipt();
-
   wire();
 
   // The Rust core emits a receipt every time an event leaves the machine.
   await listen("receipt", (e) => paintReceipt(e.payload));
   await listen("config-changed", async () => {
     config = await invoke("get_config");
-    renderConfig();
-    renderShareAll();
-    renderAllowlist();
-    renderToggle();
-    renderStatus();
+    renderAll();
   });
+}
+
+function renderAll() {
+  renderView();
+  renderFields();
+  renderShareAll();
+  renderAllowlist();
+  renderToggle();
 }
 
 // ---- render ---------------------------------------------------------------
 
-function renderConfig() {
+// The single most important decision this UI makes: a machine that has no token
+// sees ONE button, and nothing else. Everything operational is hidden until
+// there is actually an office to talk about.
+function renderView() {
+  const connected = !!config.hasToken;
+  $("view-connect").hidden = connected;
+  $("view-live").hidden = !connected;
+  $("toggle").hidden = !connected;
+  $("foot").textContent = connected
+    ? `${config.name || "this Mac"} · install ${config.installId?.slice(0, 8) || "—"}`
+    : "nothing is being shared yet";
+}
+
+// Advanced only — the main flow never asks for these.
+function renderFields() {
   $("endpoint").value = config.endpoint || "";
-  $("slug").value = config.slug || "";
   $("name").value = config.name || "";
   $("token").value = "";
-  $("token").placeholder = config.hasToken
-    ? "•••••••• (stored in keychain)"
-    : "paste your space ingest token";
-  const cue = $("token-cue");
-  if (cue) {
-    if (config.hasToken) {
-      cue.textContent = "token stored in keychain ✓";
-      cue.classList.add("ok");
-    } else {
-      cue.textContent = "";
-      cue.classList.remove("ok");
-    }
-  }
-  $("foot").textContent = `install id ${config.installId?.slice(0, 8) || "—"}`;
+  $("token").placeholder = config.hasToken ? "•••••• (in keychain)" : "paste a token instead";
+}
+
+function renderToggle() {
+  const btn = $("toggle");
+  const on = config.enabled;
+  btn.classList.toggle("paused", !on);
+  $("toggle-label").textContent = on ? "live" : "paused";
+  btn.title = on ? "Pause sharing" : "Resume sharing";
 }
 
 // Sync a checkbox's checked state. WKWebView with a custom (appearance:none)
 // checkbox can fail to recalc the `:checked` style when only the .checked
-// PROPERTY is set programmatically before first paint; mirroring the ATTRIBUTE
-// forces the pseudo-class to match. Set both.
+// PROPERTY is set programmatically before first paint; driving an explicit
+// class we style directly keeps it honest.
 function setChecked(el, on) {
   el.checked = on;
-  el.toggleAttribute("checked", on);
-  // WebKit doesn't reliably repaint the `:checked` style for a custom
-  // (appearance:none) checkbox set programmatically before first paint, so we
-  // also drive an explicit `is-checked` class we style directly. Keep it in
-  // sync with real user toggles too.
   el.classList.toggle("is-checked", on);
   if (!el.dataset.checkSync) {
     el.dataset.checkSync = "1";
@@ -82,82 +90,12 @@ function setChecked(el, on) {
   }
 }
 
-// The master "Share all my apps" toggle + its helper/privacy copy.
 function renderShareAll() {
   const shareAll = config.shareAll !== false; // default ON
   setChecked($("share-all"), shareAll);
   $("share-all-help").textContent = shareAll
-    ? "Everything you use shows up; untick individual apps below to hide them."
-    : "Only the apps you tick below are shared. Nothing else leaves this machine.";
-  $("privacy-copy").textContent = shareAll
-    ? "All your apps are shared as shapes by default — untick any you want to keep private. Only the app category ever leaves, never titles or content."
-    : "Only ticked apps are shared, as shapes. Only the app category ever leaves, never titles or content.";
-  document.body.classList.toggle("opt-in", !shareAll);
-}
-
-// Status & permissions card + the first-run guide. Both are derived purely from
-// the existing config (hasToken / enabled) — no new IPC needed. The permission
-// line is static-true: the helper only reads the frontmost app via the public
-// NSWorkspace notification, so there is genuinely nothing to grant.
-function renderStatus() {
-  const hasToken = !!config.hasToken;
-  const enabled = !!config.enabled;
-
-  const tokenLine = $("st-token");
-  if (tokenLine) {
-    setStatusLine(
-      tokenLine,
-      hasToken,
-      hasToken
-        ? "Ingest token set — securely stored in your macOS keychain."
-        : "No ingest token yet — paste one below and Save to connect.",
-      hasToken ? "good" : "todo"
-    );
-  }
-
-  const sharingLine = $("st-sharing");
-  if (sharingLine) {
-    if (!hasToken) {
-      setStatusLine(sharingLine, false, "Sharing starts once a token is set.", "idle");
-    } else {
-      setStatusLine(
-        sharingLine,
-        enabled,
-        enabled
-          ? "Sharing is on — focused apps light up your office."
-          : "Sharing is paused — nothing is leaving this machine.",
-        enabled ? "good" : "paused"
-      );
-    }
-  }
-
-  // First-run guide: only while there is no token.
-  const guide = $("setup-guide");
-  if (guide) guide.hidden = hasToken;
-}
-
-// Paint one status line: tick glyph + text + state class (good/todo/paused/idle).
-function setStatusLine(el, on, text, state) {
-  el.classList.remove("good", "todo", "paused", "idle");
-  el.classList.add(state);
-  const tick = el.querySelector(".tick");
-  if (tick) tick.textContent = on ? "✓" : state === "paused" ? "⏸" : "•";
-  const txt = el.querySelector(".st-text");
-  if (txt) txt.textContent = text;
-}
-
-function renderToggle() {
-  const btn = $("toggle");
-  const dot = $("live-dot");
-  if (config.enabled) {
-    btn.textContent = "Pause sharing";
-    btn.classList.remove("paused");
-    dot.classList.add("on");
-  } else {
-    btn.textContent = "Resume sharing";
-    btn.classList.add("paused");
-    dot.classList.remove("on");
-  }
+    ? "Everything you use shows up — untick an app below to hide it."
+    : "Only the apps you tick below are shared.";
 }
 
 function renderAllowlist() {
@@ -166,9 +104,11 @@ function renderAllowlist() {
   const shareAll = config.shareAll !== false;
   const allow = config.allowlist || {};
   const muted = config.muted || {};
+
   for (const app of catalog) {
     const item = document.createElement("div");
     item.className = "item";
+
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.id = `al-${app.bundleId}`;
@@ -181,12 +121,22 @@ function renderAllowlist() {
       setChecked(cb, !!allow[app.bundleId]);
       cb.addEventListener("change", () => setAllow(app.bundleId, cb.checked));
     }
+
     const label = document.createElement("label");
     label.htmlFor = cb.id;
-    label.innerHTML = `${escapeHtml(app.label)} <span class="cat">${escapeHtml(app.category)}</span>`;
+    const box = document.createElement("span");
+    box.className = "box";
+    const text = document.createElement("span");
+    text.textContent = app.label;
+    const cat = document.createElement("span");
+    cat.className = "cat";
+    cat.textContent = app.category;
+    label.append(box, text, cat);
+
     item.append(cb, label);
     host.append(item);
   }
+  $("app-count").textContent = `${catalog.length} known`;
 }
 
 function paintReceipt(receipt) {
@@ -196,16 +146,98 @@ function paintReceipt(receipt) {
     return;
   }
   const when = new Date(receipt.occurredAt).toLocaleTimeString();
-  const ok = receipt.delivered ? "sent" : "attempted (offline?)";
+  const ok = receipt.delivered ? "sent" : "not delivered";
   host.innerHTML =
     `<span class="pill">${escapeHtml(receipt.category)}</span>` +
     `<b>${escapeHtml(receipt.tool)}</b>` +
-    `<span class="muted"> · ${escapeHtml(receipt.status)} · ${when} · ${ok}</span>`;
+    `<span class="muted">${escapeHtml(receipt.status)} · ${when} · ${ok}</span>`;
 }
 
 async function refreshReceipt() {
-  const last = await invoke("get_last_receipt");
-  paintReceipt(last);
+  paintReceipt(await invoke("get_last_receipt"));
+}
+
+// ---- pairing --------------------------------------------------------------
+
+function pairStatus(text, isError) {
+  const el = $("pair-status");
+  el.textContent = text;
+  el.classList.toggle("pair-status-err", !!isError);
+}
+
+function stopPairing() {
+  if (pairTimer) clearInterval(pairTimer);
+  pairTimer = null;
+  $("pairing").hidden = true;
+  $("connect").disabled = false;
+  $("connect").textContent = "Connect my office";
+}
+
+// The pairing service isn't deployed yet. Say so plainly and put the fallback
+// one click away rather than leaving the user staring at a spinner.
+async function pairUnavailable(detail) {
+  stopPairing();
+  $("pairing").hidden = false;
+  $("pair-cancel").hidden = true;
+  $("pair-code").textContent = "· · · ·";
+  const needs = await invoke("pair_required_backend").catch(() => "");
+  pairStatus(
+    `One-click connect isn’t live yet — paste a token under Advanced instead. (needs ${needs})`,
+    true
+  );
+  $("advanced").open = true;
+  $("token").focus();
+  console.warn("pairing unavailable:", detail);
+}
+
+async function startPairing() {
+  const btn = $("connect");
+  btn.disabled = true;
+  btn.textContent = "Opening browser…";
+  $("pair-cancel").hidden = false;
+  $("pairing").hidden = false;
+  pairStatus("Waiting for you to authorize in the browser…");
+
+  let code;
+  try {
+    const started = await invoke("pair_begin");
+    code = started.code;
+    $("pair-code").textContent = code;
+  } catch (err) {
+    await pairUnavailable(err);
+    return;
+  }
+
+  const deadline = Date.now() + PAIR_TIMEOUT_MS;
+  pairTimer = setInterval(async () => {
+    if (Date.now() > deadline) {
+      stopPairing();
+      $("pairing").hidden = false;
+      pairStatus("That took a while — hit Connect to try again.", true);
+      return;
+    }
+    let res;
+    try {
+      res = await invoke("pair_poll", { code });
+    } catch (err) {
+      await pairUnavailable(err);
+      return;
+    }
+    if (res.state === "authorized") {
+      stopPairing();
+      // config-changed from the Rust side already refreshed us into the live
+      // view; this is just the confirmation beat.
+      config = await invoke("get_config");
+      renderAll();
+    } else if (res.state === "expired") {
+      stopPairing();
+      $("pairing").hidden = false;
+      pairStatus("That code expired — hit Connect for a fresh one.", true);
+    } else if (res.state === "unavailable") {
+      await pairUnavailable(res.detail);
+    }
+    // "pending" → keep waiting
+  }, PAIR_POLL_MS);
 }
 
 // ---- actions --------------------------------------------------------------
@@ -214,6 +246,12 @@ function wire() {
   $("toggle").addEventListener("click", async () => {
     config = await invoke("set_enabled", { enabled: !config.enabled });
     renderToggle();
+  });
+
+  $("connect").addEventListener("click", startPairing);
+  $("pair-cancel").addEventListener("click", () => {
+    stopPairing();
+    pairStatus("");
   });
 
   $("share-all").addEventListener("change", async (e) => {
@@ -229,25 +267,20 @@ function wire() {
     status.textContent = "saving…";
     btn.disabled = true;
     try {
-      // Await the async IPC result and reflect it into local state.
       config = await invoke("save_config", {
         patch: {
           endpoint: $("endpoint").value.trim() || null,
-          slug: $("slug").value.trim() || null,
+          slug: null,
           name: $("name").value.trim() || null,
           // empty token means "leave the stored one untouched"
           token: $("token").value.trim() || null,
         },
       });
-      renderConfig(); // repaints token cue → "token stored in keychain ✓"
-      // Clear, transient green confirmation next to Save, then fade out.
+      renderAll();
       status.className = "save-status ok show";
       status.textContent = "Saved ✓";
-      setTimeout(() => {
-        status.classList.remove("show");
-      }, 1800);
+      setTimeout(() => status.classList.remove("show"), 1800);
     } catch (err) {
-      // On failure surface the error text (persists until next save).
       status.className = "save-status err show";
       status.textContent = String(err);
     } finally {
@@ -273,5 +306,5 @@ function escapeHtml(s) {
 }
 
 boot().catch((e) => {
-  document.body.innerHTML = `<pre style="padding:16px;color:#b4675a">${escapeHtml(e)}</pre>`;
+  document.body.innerHTML = `<pre style="padding:16px;color:#8a352b">${escapeHtml(e)}</pre>`;
 });

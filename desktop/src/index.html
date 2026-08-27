@@ -7,107 +7,104 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="wrap">
-      <header class="top">
-        <div class="brand">
-          <span class="dot" id="live-dot"></span>
-          <strong>mumbl</strong>
-          <span class="muted">office helper</span>
-        </div>
-        <button id="toggle" class="toggle" type="button">Pause sharing</button>
+    <!-- The popover is a fixed 360x540 pane anchored under the menubar icon, so
+         everything below is sized to that, not to a resizable window. -->
+    <div class="pane">
+      <header class="bar">
+        <span class="tile" aria-hidden="true">m</span>
+        <span class="wordmark">mumbl</span>
+        <button id="toggle" class="chip" type="button" title="Pause or resume sharing">
+          <span class="dot" id="live-dot"></span><span id="toggle-label">live</span>
+        </button>
       </header>
 
-      <!-- First-run guide: shows only until a token is saved. -->
-      <section class="card setup" id="setup-guide" hidden>
-        <h2>Get your office running</h2>
-        <ol class="steps">
-          <li>Paste your space <b>ingest token</b> below and hit Save.</li>
-          <li>Keep working — the apps you use light up your office automatically.</li>
-          <li>Watch <b>“What’s leaving this machine”</b> to see exactly what’s shared.</li>
-        </ol>
-      </section>
-
-      <!-- Status & permissions: the "what does it need to run" answer, up front. -->
-      <section class="card status-card">
-        <h2>Status &amp; permissions</h2>
-        <ul class="status-grid">
-          <li id="st-perms" class="status-line good">
-            <span class="tick">✓</span>
-            <span><b>No special macOS permissions needed.</b>
-            No Accessibility, Screen Recording, or Input Monitoring — mumbl only
-            reads which app is frontmost.</span>
-          </li>
-          <li id="st-token" class="status-line">
-            <span class="tick"></span>
-            <span class="st-text">Checking ingest token…</span>
-          </li>
-          <li id="st-sharing" class="status-line">
-            <span class="tick"></span>
-            <span class="st-text">Checking sharing…</span>
-          </li>
-        </ul>
-      </section>
-
-      <section class="card">
-        <h2>What’s leaving this machine</h2>
-        <div class="receipt" id="receipt">
-          <em class="muted">Nothing sent yet.</em>
+      <!-- ============ NOT CONNECTED: one button, nothing else ============ -->
+      <section class="view" id="view-connect">
+        <div class="scene" aria-hidden="true">
+          <div class="scene-wall"></div>
+          <div class="scene-window"><i></i><i></i></div>
+          <div class="scene-desk"></div>
+          <div class="scene-screen"></div>
+          <div class="scene-person">
+            <span class="p-hair"></span><span class="p-face"></span>
+            <span class="p-body"></span><span class="p-legs"></span>
+          </div>
         </div>
-        <p class="fine muted">
-          A live receipt of the last event that left this machine. Only
-          <b>shape</b> ever leaves — the app’s category, never window titles,
-          URLs, keystrokes, or content.
-        </p>
-      </section>
 
-      <section class="card">
-        <h2>Connection</h2>
-        <label>
-          Ingest endpoint URL
-          <input id="endpoint" type="url" placeholder="https://mumbl.wtf/api/agents/ingest" />
-        </label>
-        <label>
-          Space slug <span class="muted">(optional, for your reference)</span>
-          <input id="slug" type="text" placeholder="my-space" />
-        </label>
-        <label>
-          Display name <span class="muted">(shown in your office)</span>
-          <input id="name" type="text" placeholder="Disha's Mac" />
-        </label>
-        <label>
-          Ingest token
-          <input id="token" type="password" placeholder="paste your space ingest token" autocomplete="off" />
-          <span id="token-cue" class="token-cue"></span>
-        </label>
-        <div class="row">
-          <button id="save" class="primary" type="button">Save</button>
-          <span id="save-status" class="save-status"></span>
+        <h1 class="title">Your desk is empty.</h1>
+        <p class="lede">
+          Connect this Mac and the apps you use turn into a little office you can
+          walk around.
+        </p>
+
+        <button id="connect" class="btn-primary" type="button">Connect my office</button>
+
+        <p class="hint" id="connect-hint">
+          Opens mumbl.wtf — you’re already signed in, just hit&nbsp;authorize.
+        </p>
+
+        <!-- Pairing in flight -->
+        <div class="pairing" id="pairing" hidden>
+          <div class="pair-code" id="pair-code">····</div>
+          <p class="hint" id="pair-status">Waiting for you to authorize in the browser…</p>
+          <button id="pair-cancel" class="btn-ghost" type="button">Cancel</button>
         </div>
-        <p class="fine muted">
-          The token is stored in the OS keychain, never in a plaintext file.
-        </p>
       </section>
 
-      <section class="card">
-        <h2>Apps</h2>
+      <!-- ============ CONNECTED: what's happening right now ============ -->
+      <section class="view" id="view-live" hidden>
+        <div class="receipt-card">
+          <h2 class="eyebrow">Leaving this machine</h2>
+          <div class="receipt" id="receipt"><em class="muted">Nothing sent yet.</em></div>
+        </div>
+
+        <div class="assure">
+          <span class="tick" aria-hidden="true">✓</span>
+          <p>Only the app <b>category</b> leaves. Never titles, URLs, keystrokes
+          or content. No macOS permissions needed.</p>
+        </div>
+
         <div class="share-all">
           <label class="switch" for="share-all">
             <input id="share-all" type="checkbox" />
-            <span><b>Share all my apps</b></span>
+            <span class="switch-box" aria-hidden="true"></span>
+            <span class="switch-text">Share all my apps</span>
           </label>
-          <p id="share-all-help" class="fine muted">
-            Everything you use shows up; untick individual apps below to hide them.
-          </p>
+          <p class="hint" id="share-all-help"></p>
         </div>
-        <p class="fine muted" id="privacy-copy">
-          All your apps are shared as shapes by default — untick any you want to
-          keep private. Only the app category ever leaves, never titles or content.
-        </p>
-        <div class="allowlist" id="allowlist"></div>
+
+        <details class="disclose">
+          <summary>Apps<span class="count" id="app-count"></span></summary>
+          <div class="allowlist" id="allowlist"></div>
+        </details>
       </section>
 
-      <footer class="foot muted fine" id="foot"></footer>
-    </main>
+      <!-- ============ Always available, always collapsed ============ -->
+      <details class="disclose advanced" id="advanced">
+        <summary>Advanced</summary>
+        <div class="adv-body">
+          <label class="field">
+            <span>Ingest token</span>
+            <input id="token" type="password" placeholder="paste a token instead" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Endpoint</span>
+            <input id="endpoint" type="url" placeholder="https://mumbl.wtf/api/agents/ingest" />
+          </label>
+          <label class="field">
+            <span>Shown in your office as</span>
+            <input id="name" type="text" placeholder="this Mac" />
+          </label>
+          <div class="row">
+            <button id="save" class="btn-ghost" type="button">Save</button>
+            <span id="save-status" class="save-status"></span>
+          </div>
+          <p class="hint">Token is kept in the macOS keychain, never on disk.</p>
+        </div>
+      </details>
+
+      <footer class="foot" id="foot"></footer>
+    </div>
     <script type="module" src="./main.js"></script>
   </body>
 </html>
