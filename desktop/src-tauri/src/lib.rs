@@ -203,11 +203,12 @@ pub fn run() {
                 let _ = tx.send(change);
             });
 
-            // Dock icon or not. A menubar-only (`Accessory`) app is the intended
-            // posture, but a menubar icon that cannot be found leaves the user
-            // with no way in at all — which has happened repeatedly on a
-            // notched MacBook with a full bar. So the Dock icon is ON by
-            // default and the user can switch it off from the popover.
+            // Dock icon or not — and this is load-bearing, not cosmetic. A Dock
+            // icon means ActivationPolicy::Regular, and a Regular app cannot
+            // draw over another app's fullscreen Space at ANY window level. So
+            // the default is Accessory (menubar-only), which is both the
+            // intended posture and the only one where the popover actually
+            // floats over everything.
             #[cfg(target_os = "macos")]
             apply_dock_policy(&handle, config::view(&handle).config.show_in_dock);
 
@@ -484,11 +485,15 @@ fn apply_dock_policy(app: &AppHandle, show_in_dock: bool) {
         ActivationPolicy::Accessory
     };
     let _ = app.set_activation_policy(policy);
-    log::info!(
-        "dock icon {} — the app is reachable from {}",
-        if show_in_dock { "ON" } else { "OFF" },
-        if show_in_dock { "the Dock, Cmd-Tab and the menubar" } else { "the menubar only" }
-    );
+    if show_in_dock {
+        log::warn!(
+            "dock icon ON (policy=Regular) — reachable from the Dock and Cmd-Tab, but the \
+popover can NO LONGER appear over fullscreen apps; a Regular app cannot draw over \
+another app's fullscreen Space"
+        );
+    } else {
+        log::info!("dock icon OFF (policy=Accessory) — popover can float over fullscreen apps");
+    }
 }
 
 fn toggle_sharing(app: &AppHandle) {

@@ -50,14 +50,28 @@ pub struct Config {
     /// Also show a Dock icon, so the app is reachable when the menubar icon
     /// cannot be found.
     ///
-    /// Defaults to TRUE. That is a deliberate reversal: this is a menubar app
-    /// and a Dock icon is not the intended posture, but "I can't find the
-    /// icon" has now stranded the user three separate times on a notched
-    /// MacBook with a full menubar. An app you cannot open is worse than an
-    /// app with an extra Dock tile, so the safe default wins and the user can
-    /// turn it off once they have parked the menubar icon somewhere stable.
-    #[serde(rename = "showInDock", default = "default_true")]
+    /// DEFAULTS TO FALSE, and the reason is not taste — it is that a Dock icon
+    /// costs the popover its ability to appear over a fullscreen app.
+    ///
+    /// A Dock icon means `ActivationPolicy::Regular`, and a Regular app CANNOT
+    /// draw over another app's fullscreen Space no matter what window level or
+    /// collection behaviour it asks for. Measured directly, same window, same
+    /// level 101, same CanJoinAllSpaces|FullScreenAuxiliary, only the policy
+    /// changed:
+    ///     regular   -> never appears on screen at all
+    ///     accessory -> appears at stack index 0, over the fullscreen app
+    ///
+    /// This briefly defaulted to true as a workaround for a menubar icon the
+    /// user could not find. That workaround silently broke the more important
+    /// behaviour, so the default goes back to the correct posture for a menubar
+    /// app and the escape hatch stays available with its cost spelled out.
+    #[serde(rename = "showInDock", default)]
     pub show_in_dock: bool,
+    /// One-shot marker for the `show_in_dock` default correction below. Not a
+    /// user setting — it exists so the correction runs exactly once and never
+    /// overrides a choice the user makes afterwards.
+    #[serde(rename = "dockDefaultCorrected", default)]
+    pub dock_default_corrected: bool,
     /// Opt-OUT set (used when `share_all` is true): bundle_id -> muted.
     /// A bundle id mapped to `true` here is hidden even though share-all is on.
     #[serde(default)]
@@ -75,7 +89,8 @@ impl Default for Config {
             enabled: true,
             install_id: uuid::Uuid::new_v4().to_string(),
             share_all: true,
-            show_in_dock: true,
+            show_in_dock: false,
+            dock_default_corrected: true,
             allowlist: BTreeMap::new(),
             muted: BTreeMap::new(),
         }
@@ -154,6 +169,24 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
     if config.install_id.is_empty() {
         config.install_id = uuid::Uuid::new_v4().to_string();
     }
+    // ONE-SHOT CORRECTION. `show_in_dock` briefly shipped defaulting to TRUE and
+    // that value is now sitting in users' config files — including for people
+    // who never chose it. It is not a harmless preference: a Dock icon means
+    // ActivationPolicy::Regular, and a Regular app cannot draw over another
+    // app's fullscreen Space, so the popover silently stopped floating over
+    // everything. Clear it once, then never touch it again, so anyone who
+    // genuinely wants the Dock icon can switch it on and have it stick.
+    if !config.dock_default_corrected {
+        if config.show_in_dock {
+            log::info!(
+                "correcting the show_in_dock default to OFF (it blocked the popover from \
+appearing over fullscreen apps); turn it back on from Advanced if you want the Dock icon"
+            );
+        }
+        config.show_in_dock = false;
+        config.dock_default_corrected = true;
+    }
+
     // Derive the display name instead of asking for it. Only ever filled when
     // blank, so a name the user set by hand is never overwritten.
     if config.name.as_deref().unwrap_or("").trim().is_empty() {
