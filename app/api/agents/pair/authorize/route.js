@@ -8,7 +8,6 @@ import {
   normalizePairingCode,
   registerPairingCode,
   resolvePairableSpace,
-  stashAuthorizedToken,
 } from "../../../../../src/server/devicePairing";
 
 /**
@@ -95,9 +94,8 @@ export async function POST(request) {
     if (result.status === "expired") return Response.json({ error: "this code expired — click Connect again" }, { status: 410 });
     if (result.status === "spent") return Response.json({ error: "this code was already used" }, { status: 409 });
 
-    // The plaintext exists only in this response's lifetime; the row holds an
-    // HMAC. Hand it to the claim path out-of-band, then forget it.
-    if (result.token) stashAuthorizedToken(code, result.token);
+    // The token is already on the row, encrypted — the claim will be served by
+    // a different lambda, so there is nothing to hand over in-process here.
 
     return ok({
       authorized: true,

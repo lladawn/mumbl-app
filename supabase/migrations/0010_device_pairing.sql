@@ -32,6 +32,18 @@ create table agent_pairing_codes (
   device_name text not null default 'Unknown device',
   created_at timestamptz not null default now(),
   expires_at timestamptz not null,
+  -- THE ONE-TIME TOKEN, ENCRYPTED AT REST (encryptContentFields, AES-256-GCM
+  -- with a server-side content key). It cannot live in process memory: this
+  -- app runs on Vercel, so the authorize POST and the helper's claim poll
+  -- routinely land on DIFFERENT lambdas and an in-memory handoff fails by
+  -- default rather than exceptionally. It is wiped the instant it is claimed,
+  -- so the window in which any ciphertext exists is one human click wide.
+  --
+  -- Note the asymmetry with code_hash above, and keep it: the CODE is stored
+  -- one-way (HMAC) because we only ever need to recognise it, while the TOKEN
+  -- must be handed back verbatim exactly once, so it is stored reversibly and
+  -- deleted rather than hashed.
+  encrypted_payload jsonb not null default '{}'::jsonb,
   -- set when a signed-in human authorizes; until then a claim gets 202
   authorized_at timestamptz,
   authorized_by_user_id uuid references auth.users(id) on delete set null,
