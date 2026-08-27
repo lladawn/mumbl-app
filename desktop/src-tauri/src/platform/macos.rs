@@ -18,7 +18,10 @@ use std::sync::Arc;
 use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
-use objc2_app_kit::{NSRunningApplication, NSScreen, NSWorkspace};
+use objc2_app_kit::{
+    NSPopUpMenuWindowLevel, NSRunningApplication, NSScreen, NSWindow,
+    NSWindowCollectionBehavior, NSWorkspace,
+};
 use objc2_foundation::{ns_string, NSNotification, NSRunLoop, NSString};
 
 use super::FocusChange;
@@ -143,4 +146,40 @@ this one first — Cmd-drag it rightward to give it a stable slot.",
         right.origin.x + right.size.width,
         right.origin.x,
     ))
+}
+
+/// Make the popover float above EVERYTHING, fullscreen apps included.
+///
+/// `alwaysOnTop` alone is not enough on macOS, and the reason is worth stating:
+/// it raises the window's LEVEL, but a fullscreen app lives on its own SPACE,
+/// and level says nothing about spaces. A normal always-on-top window simply
+/// stays behind on the Space it was created in. Two separate things are needed:
+///
+///   - level `NSPopUpMenuWindowLevel` (101) puts it above ordinary windows AND
+///     above the menubar (25), which is where a menubar popover belongs.
+///   - collection behaviour `CanJoinAllSpaces` makes it follow the user to
+///     whichever Space is active instead of being pinned to one,
+///     `FullScreenAuxiliary` grants permission to sit over a fullscreen app at
+///     all, and `Stationary` stops it sliding around during Space transitions.
+///
+/// SAFETY: `ns_window` hands back the real NSWindow this webview is hosted in;
+/// we only set two of its properties, on the main thread.
+pub fn float_above_everything(ns_window: *mut std::ffi::c_void) {
+    if ns_window.is_null() {
+        log::warn!("no NSWindow handle — popover cannot be raised over fullscreen apps");
+        return;
+    }
+    unsafe {
+        let window: &NSWindow = &*(ns_window as *const NSWindow);
+        window.setLevel(NSPopUpMenuWindowLevel);
+        window.setCollectionBehavior(
+            NSWindowCollectionBehavior::CanJoinAllSpaces
+                | NSWindowCollectionBehavior::FullScreenAuxiliary
+                | NSWindowCollectionBehavior::Stationary,
+        );
+    }
+    log::info!(
+        "popover raised: level {} (above the menubar) + joins all spaces + allowed over fullscreen",
+        NSPopUpMenuWindowLevel
+    );
 }

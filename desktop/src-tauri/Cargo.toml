@@ -50,6 +50,11 @@ objc2-app-kit = { version = "0.2", features = [
   # NSScreen: read the notch geometry at boot so "I can't see the tray icon"
   # is answerable from the log instead of by guesswork.
   "NSScreen",
+  # NSWindow: raise the popover above every other app, including fullscreen
+  # ones — see platform::macos::float_above_everything.
+  "NSWindow",
+  "NSResponder",
+  "NSApplication",
 ] }
 block2 = "0.5"
 

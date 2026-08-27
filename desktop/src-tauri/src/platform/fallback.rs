@@ -17,3 +17,6 @@ where
 pub fn menubar_report() -> Option<String> {
     None
 }
+
+/// Window levels / spaces are a macOS concept; nothing to do elsewhere.
+pub fn float_above_everything(_ns_window: *mut std::ffi::c_void) {}

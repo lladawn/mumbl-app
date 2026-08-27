@@ -18,10 +18,10 @@ pub struct FocusChange {
 mod macos;
 
 #[cfg(target_os = "macos")]
-pub use macos::{menubar_report, start_focus_watcher};
+pub use macos::{float_above_everything, menubar_report, start_focus_watcher};
 
 #[cfg(not(target_os = "macos"))]
 mod fallback;
 
 #[cfg(not(target_os = "macos"))]
-pub use fallback::{menubar_report, start_focus_watcher};
+pub use fallback::{float_above_everything, menubar_report, start_focus_watcher};

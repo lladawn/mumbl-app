@@ -215,6 +215,15 @@ pub fn run() {
             // the tray "Settings…" item can reliably re-show it and closing the
             // window never quits the app.
             if let Some(win) = app.get_webview_window("main") {
+                // Raise it above every other app, fullscreen ones included.
+                #[cfg(target_os = "macos")]
+                if let Ok(ns) = win.ns_window() {
+                    platform::float_above_everything(ns);
+                }
+                // Follow the user across Spaces rather than staying pinned to
+                // the one the popover happened to be created on.
+                let _ = win.set_visible_on_all_workspaces(true);
+
                 let win_for_events = win.clone();
                 win.on_window_event(move |event| match event {
                     // Closing hides rather than destroys, so the tray can always
@@ -432,6 +441,14 @@ fn show_popover(app: &AppHandle, rect: Option<Rect>) {
         *guard.focused_once.lock().unwrap() = false;
     }
     position_popover(&win, rect);
+    // Re-assert the level/space behaviour on every open: macOS can reset a
+    // window's collection behaviour across Space transitions, and a popover
+    // that quietly stops clearing fullscreen apps is exactly the kind of
+    // regression that goes unnoticed until someone complains.
+    #[cfg(target_os = "macos")]
+    if let Ok(ns) = win.ns_window() {
+        platform::float_above_everything(ns);
+    }
     let _ = win.show();
     let _ = win.set_focus();
     if rect.is_none() {
