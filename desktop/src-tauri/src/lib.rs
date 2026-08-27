@@ -191,6 +191,31 @@ fn set_show_in_dock(app: AppHandle, show: bool) -> Result<Config, String> {
     Ok(config)
 }
 
+/// Is this endpoint a development server on this machine?
+///
+/// Host-based, not a substring match on the whole URL: a path or query that
+/// merely contains "localhost" is not a local endpoint, and a real deployment
+/// should never be misreported as one.
+fn is_local_endpoint(endpoint: &str) -> bool {
+    let host = endpoint
+        .split("://")
+        .nth(1)
+        .unwrap_or(endpoint)
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or("")
+        .rsplit('@')
+        .next()
+        .unwrap_or("");
+    // An IPv6 literal is bracketed and full of colons, so the port has to come
+    // off the brackets, not off the first colon.
+    let host = match host.strip_prefix('[') {
+        Some(rest) => rest.split(']').next().unwrap_or(""),
+        None => host.split(':').next().unwrap_or(""),
+    };
+    matches!(host, "localhost" | "127.0.0.1" | "::1" | "0.0.0.0") || host.ends_with(".local")
+}
+
 /// Why the helper is not sharing right now, in one shape the UI can render.
 ///
 /// Sharing can fail at three separate points and, before this, ALL THREE were
@@ -203,6 +228,7 @@ fn get_sharing_health(app: AppHandle) -> SharingHealth {
         .try_state::<DeliveryError>()
         .and_then(|s| s.0.lock().unwrap().clone());
     SharingHealth {
+        local_endpoint: is_local_endpoint(&view.config.endpoint),
         enabled: view.config.enabled,
         token_state: view.token_state,
         token_detail: view.token_detail,
@@ -214,6 +240,12 @@ fn get_sharing_health(app: AppHandle) -> SharingHealth {
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SharingHealth {
+    /// Pointed at a dev server on this machine rather than at mumbl.
+    ///
+    /// Worth saying out loud even when delivery is fine: a local endpoint only
+    /// answers while `npm run dev` is running, so the office goes quiet the
+    /// moment that stops — with nothing obviously broken to look at.
+    local_endpoint: bool,
     enabled: bool,
     token_state: config::TokenState,
     token_detail: Option<String>,
@@ -719,5 +751,45 @@ fn toggle_sharing(app: &AppHandle) {
     if let Ok(config) = config::set_enabled(app, !current) {
         let _ = app.emit("config-changed", ());
         log::info!("sharing {}", if config.enabled { "resumed" } else { "paused" });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_local_endpoint;
+
+    #[test]
+    fn local_hosts_are_recognised() {
+        for url in [
+            "http://127.0.0.1:3000/api/agents/ingest",
+            "http://localhost:3000/api/agents/ingest",
+            "https://localhost/api/agents/ingest",
+            "http://[::1]:3000/api/agents/ingest",
+            "http://0.0.0.0:8080/api/agents/ingest",
+            "http://dishas-mac.local:3000/api/agents/ingest",
+        ] {
+            assert!(is_local_endpoint(url), "expected local: {url}");
+        }
+    }
+
+    #[test]
+    fn real_deployments_are_not_local() {
+        for url in [
+            "https://mumbl.wtf/api/agents/ingest",
+            "https://staging.mumbl.wtf/api/agents/ingest",
+        ] {
+            assert!(!is_local_endpoint(url), "expected remote: {url}");
+        }
+    }
+
+    /// The reason this is host-based rather than a substring match: a hosted
+    /// deployment whose PATH mentions localhost is not a local endpoint, and
+    /// telling someone to start a dev server they don't run would be worse than
+    /// saying nothing.
+    #[test]
+    fn localhost_elsewhere_in_the_url_does_not_count() {
+        assert!(!is_local_endpoint("https://mumbl.wtf/localhost/ingest"));
+        assert!(!is_local_endpoint("https://mumbl.wtf/api/ingest?from=localhost"));
+        assert!(!is_local_endpoint("https://not-localhost.example.com/api/ingest"));
     }
 }

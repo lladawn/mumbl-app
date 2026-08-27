@@ -74,6 +74,11 @@ function renderAll() {
 // silences the helper for the entire run, and the only cure used to be quitting
 // and reopening — which nobody would think to do, because nothing told them
 // anything was wrong. So that state gets its own button.
+// When this popover opened, so "still checking" can be told apart from "stuck
+// waiting on a prompt nobody has answered".
+const openedAt = Date.now();
+let loadingRecheck = null;
+
 async function renderHealth() {
   const box = $("health");
   if (!box) return;
@@ -90,6 +95,7 @@ async function renderHealth() {
   const action = $("health-action");
   action.hidden = true;
   action.disabled = false;
+  box.classList.remove("alert-note");
 
   // "Still checking" is not a problem, and neither is a machine that has simply
   // never connected — that one already has a whole view of its own.
@@ -126,10 +132,34 @@ async function renderHealth() {
   }
 
   if (health.deliveryError) {
-    title.textContent = "Can\u2019t reach your office";
+    // A local endpoint that isn't answering has a specific, fixable cause, and
+    // saying "your office is unreachable" would send someone looking in
+    // completely the wrong place.
+    if (health.localEndpoint) {
+      title.textContent = "Your dev server isn\u2019t running";
+      body.textContent =
+        `This Mac is pointed at ${health.endpoint}, which only answers while ` +
+        "your local server is up. Start it and activity starts arriving again \u2014 " +
+        "nothing else is wrong.";
+    } else {
+      title.textContent = "Can\u2019t reach your office";
+      body.textContent =
+        `Events are being dropped \u2014 ${health.endpoint} isn\u2019t answering. ` +
+        "Nothing is lost that was already sent; new activity just isn\u2019t arriving.";
+    }
+    box.hidden = false;
+    return;
+  }
+
+  // Delivering fine, but to a dev server. Not a problem right now — and exactly
+  // the thing that will look like an unexplained outage the moment that server
+  // stops. Said quietly, in a different colour from the real faults.
+  if (health.localEndpoint) {
+    box.classList.add("alert-note");
+    title.textContent = "Sending to a local dev server";
     body.textContent =
-      `Events are being dropped \u2014 ${health.endpoint} isn\u2019t answering. ` +
-      "Nothing is lost that was already sent; new activity just isn\u2019t arriving.";
+      `Activity is going to ${health.endpoint}, not to mumbl. It only arrives ` +
+      "while that server is running.";
     box.hidden = false;
     return;
   }

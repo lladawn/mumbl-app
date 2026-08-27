@@ -380,3 +380,9 @@ body {
 }
 .alert-action:hover { transform: translate(1px, 1px); box-shadow: none; }
 .alert-action:disabled { opacity: .55; cursor: progress; }
+
+/* A note, not a fault. "You are pointed at a dev server" is worth knowing and
+   is not something going wrong, so it must not wear the same clay as a real
+   failure — otherwise the colour that means "act now" stops meaning anything. */
+.alert.alert-note { background: var(--gold); }
+.alert.alert-note .alert-title { color: var(--gold-ink); }
