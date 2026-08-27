@@ -29,8 +29,9 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "http://fake.local";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "fake-service-key";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "fake-anon-key";
 process.env.MUMBL_TOKEN_HASH_SECRET = "test-hash-secret";
+process.env.MUMBL_CONTENT_ENCRYPTION_KEY = "test-content-encryption-key";
 
-const { db, reset } = await import("./fake-supabase.mjs");
+const { db, reset, setRateLimit } = await import("./fake-supabase.mjs");
 const { setUser } = await import("./fake-auth.mjs");
 
 // THE REAL SHIPPED HANDLERS — not a re-implementation.
@@ -128,23 +129,58 @@ r = await get(authorize, `code=WHOS-PACE&name=Mac`);
 let body = await r.json();
 check("signed-in user gets THEIR OWN space, never a chosen one", body.space?.slug === "acme", JSON.stringify(body.space));
 
-console.log("\n5. ADOPTION of an ownerless space whose slug is the user's handle");
+console.log("\n5. NO IMPLICIT OWNERSHIP — handle-squatting is not a route in");
 seed();
-setUser("user-2");                       // handle 'zoe', space 'zoe' is unowned
-r = await get(authorize, `code=ADOP-T123&name=Mac`);
+setUser("user-2");                       // handle 'zoe', space 'zoe' exists and is UNOWNED
+r = await get(authorize, `code=SQUA-T123&name=Mac`);
 body = await r.json();
-check("user-2 resolves to the space named after their handle", body.space?.slug === "zoe", JSON.stringify(body.space));
-check("adoption stamped ownership", db.agent_spaces.find((s) => s.slug === "zoe").owner_user_id === "user-2");
-setUser("user-1");
-r = await get(authorize, `code=ADOP-T456&name=Mac`);
-body = await r.json();
-check("a DIFFERENT user cannot then adopt it", body.space?.slug === "acme", JSON.stringify(body.space));
+check("a matching profile handle does NOT grant the space", body.space === null, JSON.stringify(body.space));
+check("the unowned space stayed unowned", db.agent_spaces.find((s) => s.slug === "zoe").owner_user_id === null);
+r = await authorize.POST(new Request("http://localhost:3000/api/agents/pair/authorize", {
+  method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify({ code: "SQUA-T123", name: "Mac" }),
+}));
+check("POST for a user with no owned space -> 409", r.status === 409, `got ${r.status}`);
+check("nothing was minted", db.agent_device_tokens.length === 0);
 
-seed();
-setUser("user-3");                        // no owned space, no profile handle
-r = await get(authorize, `code=NONE-1234&name=Mac`);
+// explicit binding (what scripts/agent-space-bind-owner.mjs does) is the only way in
+db.agent_spaces.find((s) => s.slug === "zoe").owner_user_id = "user-2";
+r = await get(authorize, `code=BOUN-D123&name=Mac`);
 body = await r.json();
-check("user with no office -> space:null, nothing minted", body.space === null && db.agent_device_tokens.length === 0, JSON.stringify(body));
+check("once explicitly bound, the owner sees it", body.space?.slug === "zoe", JSON.stringify(body.space));
+
+console.log("\n6. CROSS-INSTANCE HANDOFF (Vercel: authorize and claim hit different lambdas)");
+seed();
+await get(authorize, `code=VERC-EL01&name=Mac`);
+await authorize.POST(new Request("http://localhost:3000/api/agents/pair/authorize", {
+  method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify({ code: "VERC-EL01", name: "Mac" }),
+}));
+const row = db.agent_pairing_codes[0];
+check("the token is persisted, not held in process memory", Boolean(row.encrypted_payload?.device_token));
+check("it is NOT stored in plaintext",
+  !JSON.stringify(row.encrypted_payload).includes(db.agent_device_tokens[0]?.plaintext || "%%none%%")
+  && typeof row.encrypted_payload.device_token === "object");
+// a genuinely separate module instance — same database, no shared process state
+const claimOtherLambda = await import("../../app/api/agents/pair/claim/route.js?instance=2");
+r = await claimOtherLambda.POST(new Request("http://localhost:3000/api/agents/pair/claim", {
+  method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify({ code: "VERC-EL01" }),
+}));
+const other = await r.json();
+check("a DIFFERENT instance can complete the claim", r.status === 200 && Boolean(other.token), `${r.status} ${JSON.stringify(other)}`);
+check("that token authenticates ingest", (await resolveSpaceByIngestToken(getSupabaseAdmin(), other.token))?.slug === "acme");
+check("the ciphertext is wiped on claim", !db.agent_pairing_codes[0].encrypted_payload?.device_token);
+
+console.log("\n7. RATE LIMITING on the unauthenticated claim");
+seed();
+setRateLimit(false);
+r = await post(claim, { code: "ANYT-HING" });
+check("limiter trips -> 429, not a 4xx the client reads as 'expired'", r.status === 429, `got ${r.status}`);
+check("429 carries retry-after", r.headers.get("retry-after") === "60", r.headers.get("retry-after"));
+setRateLimit(true);
+r = await post(claim, { code: "ANYT-HING" });
+check("normal traffic passes through the limiter", r.status === 404, `got ${r.status}`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
