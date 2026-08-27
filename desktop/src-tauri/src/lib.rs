@@ -59,7 +59,11 @@ struct PopoverGuard {
 }
 
 /// How long after opening to ignore a blur outright.
-const OPEN_GRACE: Duration = Duration::from_millis(600);
+///
+/// Measured, not guessed: the observed focus hand-backs after a status-item
+/// click landed 1-2s after show(), so 600ms was still letting the popover
+/// dismiss itself. Anything the user does deliberately takes longer than this.
+const OPEN_GRACE: Duration = Duration::from_millis(2000);
 use watcher::{LastReceipt, Receipt};
 
 // ---- IPC commands ---------------------------------------------------------
