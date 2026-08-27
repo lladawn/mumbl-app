@@ -54,15 +54,62 @@ export function isValidAgentStatus(value) {
 
 export async function resolveSpaceByIngestToken(supabase, token) {
   if (!token) return null;
+  const tokenHash = hashToken(token);
+
+  // A paired DEVICE token is tried first, because it is the credential we want
+  // people to be holding: scoped to one machine and revocable on its own. The
+  // space-wide token below is the legacy shape — one secret for the whole
+  // space, revocable only by breaking every reporter at once — and it stays
+  // accepted so existing Claude Code hooks and MCP setups keep working.
+  //
+  // Both resolve to the same { id, slug, name }, so /api/agents/ingest does not
+  // need to know which kind it was handed. That is the point of resolving here:
+  // ingest-only is expressed by this being the ONLY thing a device token can
+  // unlock — nothing in the read path consults agent_device_tokens.
+  const device = await resolveSpaceByDeviceToken(supabase, tokenHash);
+  if (device) return device;
 
   const { data, error } = await supabase
     .from("agent_spaces")
     .select("id, slug, name")
-    .eq("ingest_token_hash", hashToken(token))
+    .eq("ingest_token_hash", tokenHash)
     .maybeSingle();
 
   if (error) throw error;
   return data || null;
+}
+
+async function resolveSpaceByDeviceToken(supabase, tokenHash) {
+  const { data, error } = await supabase
+    .from("agent_device_tokens")
+    .select("id, space_id, agent_spaces ( id, slug, name )")
+    .eq("token_hash", tokenHash)
+    .is("revoked_at", null)          // REVOCABLE: a stamped row stops resolving
+    .maybeSingle();
+
+  // The pairing tables arrive in migration 0010. An environment that has not
+  // run it yet must keep ingesting on the legacy token rather than 500, so a
+  // missing relation falls through instead of throwing.
+  if (error) {
+    if (isMissingPairingTable(error)) return null;
+    throw error;
+  }
+  if (!data?.agent_spaces) return null;
+
+  // Last-seen is what the device list renders as "active 2 minutes ago"; it is
+  // best-effort and must never fail an ingest.
+  supabase
+    .from("agent_device_tokens")
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq("id", data.id)
+    .then(null, () => {});
+
+  return data.agent_spaces;
+}
+
+function isMissingPairingTable(error) {
+  const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
+  return error?.code === "42P01" || message.includes("agent_device_tokens");
 }
 
 /**
