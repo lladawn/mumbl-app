@@ -25,6 +25,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
 const OUT_DIR = join(ROOT, "outputs", "office-screens");
 const OUT_PATH = join(OUT_DIR, "live-demo-office.png");
+// The room is a 1440×960 world behind a 960×600 camera that follows the
+// player, so no single walk-around shot can show that the meeting room, café,
+// lounge and rec room are all populated at once. This one pulls the camera
+// back over the whole floor.
+const WIDE_PATH = join(OUT_DIR, "office-life-demo.png");
 const URL = "http://127.0.0.1:3000/office/demo";
 
 const FORCE_HEADLESS = process.argv.includes("--headless");
@@ -119,6 +124,39 @@ async function capture(headless) {
     if (canvasEl) {
       await canvasEl.screenshot({ path: OUT_PATH });
       console.log(`  ✓ Canvas screenshot → ${OUT_PATH}`);
+
+      // Whole-floor shot: stop the camera following the player and zoom out far
+      // enough that all four social set-pieces and all nine work vignettes are
+      // in frame together. Uses the debug handle exposed by office-scene.js.
+      try {
+        const wide = await page.evaluate(() => {
+          if (!window.MumblOffice || !window.MumblOffice.__room) return null;
+          const room = window.MumblOffice.__room();
+          if (!room) return null;
+          const cam = room.cameras.main;
+          cam.stopFollow(); cam.setZoom(0.62); cam.centerOn(720, 470);
+          const social = {};
+          for (const [k, st] of room.social) social[k] = st.occupants.filter(Boolean).map((o) => o.name);
+          return { social, atBooth: room.agents.filter((a) => !a.spot).length };
+        });
+        if (wide) {
+          await page.waitForTimeout(1800);
+          await canvasEl.screenshot({ path: WIDE_PATH });
+          console.log(`  ✓ Whole-floor screenshot → ${WIDE_PATH}`);
+          console.log("    social set-pieces:", JSON.stringify(wide.social));
+          console.log("    actors at their own booth:", wide.atBooth);
+          await page.evaluate(() => {
+            const room = window.MumblOffice.__room();
+            const cam = room.cameras.main;
+            cam.setZoom(1); cam.startFollow(room.player, true, 0.09, 0.09, 0, 120);
+          });
+          await page.waitForTimeout(600);
+        } else {
+          console.log("  ⚠  no __room handle — skipping the whole-floor shot");
+        }
+      } catch (e) {
+        console.log("  ⚠  whole-floor shot failed:", e.message);
+      }
 
       // Second shot: pan LEFT + DOWN to frame the front-row vignettes
       // (browsing perch / corkboard wall / zen corner) and prove the scene is
