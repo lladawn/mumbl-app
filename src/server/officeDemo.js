@@ -18,6 +18,20 @@
  *   browsing→ Chrome  (reading perch: laptop, article cards, scrolling feed)
  *   review  → GitHub  (inspection station: diff screen, corkboard, magnifier)
  *   focus   → other   (quiet nook: plant, mug, soft breathing glow)
+ *
+ * …plus an AMBIENT CAST, so the sample office reads as a place where people are
+ * having a good time rather than a diorama of nine solitary workers. These are
+ * not workers at stations; they are people in the room:
+ *   break   → 6 people away from their desks (the renderer seats them at the
+ *             ping-pong table, the café table, the sofa and the arcade)
+ *   meeting → 2 people physically in the meeting room, talking to each other
+ *
+ * `break` and `meeting` are DEMO-ONLY categories. Nothing in the ingest path
+ * emits them: a live office earns the same scenes from real signal instead —
+ * idle/stale actors drift away from the desk, and two-or-more simultaneous
+ * `call` actors get grouped at the meeting table. See the HONESTY RULE in
+ * public/office/office-scene.js. The sample office is labelled SAMPLE and may
+ * be richer; it must never be a template for asserting things about real people.
  */
 
 export const DEMO_SLUG = "demo";
@@ -222,6 +236,107 @@ export function demoSpaceState(slug = DEMO_SLUG) {
       ],
     },
 
+    // ── AMBIENT CAST ────────────────────────────────────────────────────
+    // No tool, no task claim about work: these people are on a break, and the
+    // status/category says exactly that. Their currentTask never names a
+    // specific activity, because the renderer — not the seed — decides which
+    // leisure seat each one takes, and the text must stay true wherever they land.
+    {
+      externalId: "demo:bo", name: "Bo", role: "Engineering",
+      status: "idle", source: "desktop", tool: null, category: "break",
+      task: "Away from the desk — back in a bit", seenMinutes: 2,
+      look: {
+        hair: "#2E2A26", skin: "#8A5F3C", shirt: "#F0A79E", pants: "#5E6E86", glow: null,
+        hairStyle: "short", outfit: "plain", accessory: "none", accent: "#F0A79E", build: "broad",
+      },
+      log: ["closed the laptop", "stretched", "away from the desk"],
+    },
+    {
+      externalId: "demo:nadia", name: "Nadia", role: "Design",
+      status: "idle", source: "desktop", tool: null, category: "break",
+      task: "Away from the desk — back in a bit", seenMinutes: 3,
+      look: {
+        hair: "#4A382C", skin: "#E3B48D", shirt: "#9BD8B4", pants: "#7A7189", glow: null,
+        hairStyle: "curly", outfit: "stripes", accessory: "none", accent: "#9BD8B4", build: "slim",
+      },
+      log: ["saved the file", "away from the desk"],
+    },
+    {
+      externalId: "demo:omar", name: "Omar", role: "Support",
+      status: "idle", source: "desktop", tool: null, category: "break",
+      task: "On a break", seenMinutes: 2,
+      look: {
+        hair: "#332C26", skin: "#A0714B", shirt: "#F8DFA0", pants: "#6E7E96", glow: null,
+        hairStyle: "cap", outfit: "collar", accessory: "none", accent: "#F8DFA0",
+      },
+      log: ["cleared the queue", "on a break"],
+    },
+    {
+      externalId: "demo:pia", name: "Pia", role: "Data",
+      status: "idle", source: "desktop", tool: null, category: "break",
+      task: "On a break", seenMinutes: 4,
+      look: {
+        hair: "#6B4426", skin: "#F0D2AC", shirt: "#C6B0EC", pants: "#8A7358", glow: null,
+        hairStyle: "bun", outfit: "apron", accessory: "none", accent: "#C6B0EC", build: "slim",
+      },
+      log: ["query finished", "on a break"],
+    },
+    {
+      externalId: "demo:hana", name: "Hana", role: "Marketing",
+      status: "idle", source: "desktop", tool: null, category: "break",
+      task: "Away from the desk", seenMinutes: 5,
+      look: {
+        hair: "#7A4A22", skin: "#F0D2AC", shirt: "#BEE7F7", pants: "#7A7189", glow: null,
+        hairStyle: "long", outfit: "hoodie", accessory: "none", accent: "#BEE7F7",
+      },
+      log: ["scheduled the post", "away from the desk"],
+    },
+    {
+      externalId: "demo:kwame", name: "Kwame", role: "Engineering",
+      status: "idle", source: "desktop", tool: null, category: "break",
+      task: "Away from the desk", seenMinutes: 3,
+      look: {
+        hair: "#2E2A26", skin: "#6E4526", shirt: "#7FD8CC", pants: "#5E6E86", glow: null,
+        hairStyle: "beanie", outfit: "vest", accessory: "none", accent: "#7FD8CC",
+      },
+      log: ["pushed the branch", "away from the desk"],
+    },
+
+    // ── in the MEETING ROOM: two people talking to each other, in the room,
+    // not two people on two separate laptops. No tool — being in a meeting is
+    // not an app. (Theo stays at his own booth: he is on a REMOTE call, which
+    // is a different thing, and his call vignette is one of the work set-pieces.)
+    {
+      externalId: "demo:ines", name: "Ines", role: "Engineering",
+      status: "working", source: "desktop", tool: null, category: "meeting",
+      task: "Design review with Gus — walking through the migration plan", seenMinutes: 0,
+      look: {
+        hair: "#3A322C", skin: "#B5835B", shirt: "#F6BCD1", pants: "#6E7E96", glow: null,
+        hairStyle: "bun", outfit: "collar", accessory: "glasses", accent: "#F6BCD1", build: "slim",
+      },
+      log: [
+        "booked the meeting room",
+        "walked through the migration plan",
+        "whiteboarded the cutover order",
+        "open question: backfill window",
+      ],
+    },
+    {
+      externalId: "demo:gus", name: "Gus", role: "Product",
+      status: "working", source: "desktop", tool: null, category: "meeting",
+      task: "Design review with Ines — agreeing the cutover order", seenMinutes: 0,
+      look: {
+        hair: "#403830", skin: "#C89370", shirt: "#8FD6AE", pants: "#7A7189", glow: null,
+        hairStyle: "short", outfit: "vest", accessory: "none", accent: "#8FD6AE", build: "broad",
+      },
+      log: [
+        "joined the design review",
+        "pushed back on the backfill window",
+        "agreed: two-phase cutover",
+        "action: Ines to write it up",
+      ],
+    },
+
     // ── focus: other — quiet nook (plant, mug, soft breathing glow)
     {
       externalId: "demo:felix",
@@ -232,7 +347,7 @@ export function demoSpaceState(slug = DEMO_SLUG) {
       tool: "other",
       category: "other",
       task: "Heads-down on the rate-limiter — no notifications until 3pm",
-      seenMinutes: 8,
+      seenMinutes: 4,
       look: {
         hair: "#332C26", skin: "#A0714B", shirt: "#EAD9C4", pants: "#5E6E86", glow: "#F5EEDE",
         hairStyle: "short", outfit: "plain", accessory: "none", accent: "#C7D2CE",
