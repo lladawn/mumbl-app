@@ -142,6 +142,13 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
     if config.install_id.is_empty() {
         config.install_id = uuid::Uuid::new_v4().to_string();
     }
+    // Derive the display name instead of asking for it. Only ever filled when
+    // blank, so a name the user set by hand is never overwritten.
+    if config.name.as_deref().unwrap_or("").trim().is_empty() {
+        let derived = default_display_name();
+        log::info!("display name auto-filled from this Mac: {derived:?}");
+        config.name = Some(derived);
+    }
     persist(app, &config)?;
 
     // The ONE keychain read of this run. Doing it here means any OS
@@ -223,6 +230,34 @@ pub fn set_muted(app: &AppHandle, bundle_id: String, muted: bool) -> Result<Conf
     config.muted.insert(bundle_id, muted);
     persist(app, &config)?;
     Ok(config.clone())
+}
+
+/// The name this machine should show up as in the office, derived from macOS
+/// rather than asked for. `scutil --get ComputerName` returns the friendly name
+/// the user already chose in System Settings ("Disha's MacBook Pro"), which is
+/// exactly the label they'd have typed. Falls back to the network hostname and
+/// finally to a generic, so this never blocks setup.
+pub fn default_display_name() -> String {
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(out) = std::process::Command::new("/usr/sbin/scutil")
+            .arg("--get")
+            .arg("ComputerName")
+            .output()
+        {
+            let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !name.is_empty() {
+                return name;
+            }
+        }
+        if let Ok(out) = std::process::Command::new("/bin/hostname").arg("-s").output() {
+            let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !name.is_empty() {
+                return name;
+            }
+        }
+    }
+    "My Mac".to_string()
 }
 
 // ---- keychain -------------------------------------------------------------

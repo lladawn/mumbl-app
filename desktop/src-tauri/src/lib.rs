@@ -28,6 +28,7 @@ pub mod catalog;
 mod config;
 #[doc(hidden)]
 pub mod network;
+pub mod pairing;
 #[doc(hidden)]
 pub mod platform;
 #[doc(hidden)]
@@ -35,8 +36,8 @@ pub mod watcher;
 
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
-    tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Emitter, Manager, PhysicalPosition, Rect, WebviewWindow,
 };
 
 use config::{Config, ConfigPatch, ConfigView};
@@ -88,6 +89,55 @@ fn set_muted(app: AppHandle, bundle_id: String, muted: bool) -> Result<Config, S
     config::set_muted(&app, bundle_id, muted)
 }
 
+/// Kick off web pairing: mint a code, open the browser at the authorize page.
+/// Returns the code so the UI can show it (and so `pair_poll` can be driven).
+#[tauri::command]
+fn pair_begin(app: AppHandle) -> Result<serde_json::Value, String> {
+    let config = config::view(&app).config;
+    let origin = pairing::origin_for(&config.endpoint);
+    let code = pairing::new_code();
+    let name = config
+        .name
+        .clone()
+        .unwrap_or_else(config::default_display_name);
+    let url = pairing::authorize_url(&origin, &code, &name);
+    log::info!("pairing started: opening {origin}/pair for {name:?}");
+    pairing::open_in_browser(&url)?;
+    Ok(serde_json::json!({ "code": code, "url": url, "origin": origin }))
+}
+
+/// One poll of the claim endpoint. The frontend owns the retry cadence so it can
+/// show a countdown and let the user cancel; the Rust side stays stateless.
+#[tauri::command]
+async fn pair_poll(app: AppHandle, code: String) -> Result<serde_json::Value, String> {
+    let config = config::view(&app).config;
+    let origin = pairing::origin_for(&config.endpoint);
+    let result = pairing::claim(&origin, &code).await;
+
+    // On success persist immediately — the token goes to the keychain via the
+    // same path a manual Save uses, so there is one storage rule, not two.
+    if let pairing::ClaimResult::Authorized { token, slug, endpoint } = &result {
+        config::apply_patch(
+            &app,
+            config::ConfigPatch {
+                endpoint: endpoint.clone(),
+                slug: slug.clone(),
+                name: None,
+                token: Some(token.clone()),
+            },
+        )?;
+        let _ = app.emit("config-changed", ());
+        log::info!("pairing complete — token stored, office connected");
+    }
+    serde_json::to_value(result).map_err(|e| e.to_string())
+}
+
+/// What the backend still owes us, surfaced in the UI when pairing is stubbed.
+#[tauri::command]
+fn pair_required_backend() -> &'static str {
+    pairing::REQUIRED_BACKEND
+}
+
 #[tauri::command]
 fn get_last_receipt(app: AppHandle) -> Option<Receipt> {
     app.state::<LastReceipt>().0.lock().unwrap().clone()
@@ -133,23 +183,40 @@ pub fn run() {
             // the tray "Settings…" item can reliably re-show it and closing the
             // window never quits the app.
             if let Some(win) = app.get_webview_window("main") {
-                let win_for_close = win.clone();
-                win.on_window_event(move |event| {
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let win_for_events = win.clone();
+                win.on_window_event(move |event| match event {
+                    // Closing hides rather than destroys, so the tray can always
+                    // bring the popover back and closing never quits the app.
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
                         api.prevent_close();
-                        let _ = win_for_close.hide();
-                        log::info!("settings window close intercepted — hidden, not destroyed");
+                        let _ = win_for_events.hide();
                     }
+                    // A popover dismisses itself the moment you click away —
+                    // that is the whole difference between a popover and a
+                    // window, and it is why this is not just a resized window.
+                    tauri::WindowEvent::Focused(false) => {
+                        let _ = win_for_events.hide();
+                        log::info!("popover auto-hidden (focus moved to another app)");
+                    }
+                    _ => {}
                 });
 
-                // Show + focus the Settings window on launch so the config UI
-                // appears immediately (the window is `visible:false` in
-                // tauri.conf.json). No tray-hunting required.
-                let _ = win.show();
-                let _ = win.set_focus();
-                log::info!("settings window shown on launch");
+                // First run has nothing to click yet and the menubar icon can be
+                // hidden under the notch on a crowded bar, so open the popover
+                // once on launch — anchored under the tray icon like any other
+                // open, not floating in the middle of the screen.
+                let handle_for_launch = handle.clone();
+                std::thread::spawn(move || {
+                    // The tray needs a beat to acquire its menubar slot before
+                    // rect() reports a real frame to anchor against.
+                    std::thread::sleep(std::time::Duration::from_millis(400));
+                    let _ = handle_for_launch.clone().run_on_main_thread(move || {
+                        show_popover(&handle_for_launch, None);
+                        log::info!("popover opened on launch (anchored under the tray icon)");
+                    });
+                });
             } else {
-                log::error!("main webview window not found at setup — settings UI unavailable");
+                log::error!("main webview window not found at setup — popover unavailable");
             }
 
             Ok(())
@@ -163,6 +230,9 @@ pub fn run() {
             set_share_all,
             set_muted,
             get_last_receipt,
+            pair_begin,
+            pair_poll,
+            pair_required_backend,
         ])
         .build(tauri::generate_context!())
         .expect("error while building mumbl helper")
@@ -202,14 +272,22 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
-            "open" => show_settings(app),
+            "open" => show_popover(app, None),
             "toggle" => toggle_sharing(app),
             "quit" => app.exit(0),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
-                show_settings(tray.app_handle());
+            // Click fires for BOTH press and release; acting on Up only stops a
+            // single click from toggling the popover twice.
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                rect,
+                ..
+            } = event
+            {
+                toggle_popover(tray.app_handle(), Some(rect));
             }
         })
         .build(app)?;
@@ -220,10 +298,80 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-fn show_settings(app: &AppHandle) {
+/// Park the window directly under the menubar icon, dropdown-style.
+///
+/// `rect` is the tray item's own frame, handed to us by the click event (and
+/// available from `TrayIcon::rect()` when we open the popover without a click).
+/// Everything is done in PHYSICAL pixels: the tray rect and the window position
+/// are both physical, so converting through logical coordinates would only
+/// introduce a rounding error on a Retina display.
+fn position_popover(win: &WebviewWindow, rect: Option<Rect>) {
+    let scale = win.scale_factor().unwrap_or(1.0);
+    let Ok(size) = win.outer_size() else { return };
+
+    let Some(rect) = rect else { return };
+    let tray = rect.position.to_physical::<f64>(scale);
+    let tray_size = rect.size.to_physical::<f64>(scale);
+
+    // Centre the popover on the icon, then nudge it below the menubar.
+    let mut x = tray.x + tray_size.width / 2.0 - size.width as f64 / 2.0;
+    let y = tray.y + tray_size.height + GAP_BELOW_MENUBAR;
+
+    // Keep it fully on screen — an icon near the right edge would otherwise
+    // push half the popover off the display.
+    if let Ok(Some(monitor)) = win.current_monitor() {
+        let mon = monitor.position();
+        let mon_size = monitor.size();
+        let min_x = mon.x as f64 + EDGE_MARGIN;
+        let max_x = (mon.x + mon_size.width as i32) as f64 - size.width as f64 - EDGE_MARGIN;
+        if max_x > min_x {
+            x = x.clamp(min_x, max_x);
+        }
+    }
+
+    let (x, y) = (x.round() as i32, y.round() as i32);
+    // Logged HERE, not after show(): reading outer_position() back straight
+    // after set_position() races the move and reports the window's previous
+    // (centred default) spot, which reads as a bug when nothing is wrong.
+    log::info!(
+        "popover anchored to tray icon at {x},{y} physical ({}x{})",
+        size.width, size.height
+    );
+    let _ = win.set_position(PhysicalPosition::new(x, y));
+}
+
+/// Gap between the bottom of the menubar and the top of the popover.
+const GAP_BELOW_MENUBAR: f64 = 6.0;
+/// Keep this much clear of the screen edge when the tray icon sits near it.
+const EDGE_MARGIN: f64 = 8.0;
+
+fn show_popover(app: &AppHandle, rect: Option<Rect>) {
+    let Some(win) = app.get_webview_window("main") else { return };
+    // Fall back to asking the tray for its own frame — this is the path taken
+    // when the popover is opened from the menu or on launch rather than a click.
+    let rect = rect.or_else(|| app.tray_by_id("mumbl-tray").and_then(|t| t.rect().ok().flatten()));
+    position_popover(&win, rect);
+    let _ = win.show();
+    let _ = win.set_focus();
+    if rect.is_none() {
+        log::warn!("popover shown WITHOUT a tray rect — falling back to its last position");
+    }
+}
+
+fn hide_popover(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
-        let _ = win.show();
-        let _ = win.set_focus();
+        let _ = win.hide();
+    }
+}
+
+/// Clicking the menubar icon opens the popover, clicking again dismisses it —
+/// the behaviour every other menubar app has.
+fn toggle_popover(app: &AppHandle, rect: Option<Rect>) {
+    let Some(win) = app.get_webview_window("main") else { return };
+    if win.is_visible().unwrap_or(false) {
+        hide_popover(app);
+    } else {
+        show_popover(app, rect);
     }
 }
 

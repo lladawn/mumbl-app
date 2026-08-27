@@ -13,16 +13,19 @@
       {
         "label": "main",
         "title": "mumbl office helper",
-        "width": 480,
-        "height": 720,
-        "resizable": true,
+        "width": 360,
+        "height": 470,
+        "resizable": false,
         "visible": false,
-        "focus": false,
-        "skipTaskbar": true
+        "focus": true,
+        "skipTaskbar": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "shadow": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
     }
   },
   "bundle": {
