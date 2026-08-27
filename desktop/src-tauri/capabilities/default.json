@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions for the mumbl helper tray UI. IPC only — no filesystem, no shell.",
-  "windows": ["main"],
+  "description": "Permissions for the mumbl helper tray UI. IPC only — no filesystem, no shell. `popover-*` is the same popover under a rebuilt label: reaching a fullscreen Space needs a NEW window and `destroy()` frees a label asynchronously, so each rebuild takes a fresh one (see rebuild_popover).",
+  "windows": ["main", "popover-*", "character"],
   "permissions": [
     "core:default",
     "core:event:default",

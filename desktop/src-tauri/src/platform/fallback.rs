@@ -26,3 +26,13 @@ pub fn menubar_strip_origin() -> Option<(f64, f64)> { None }
 
 /// No menubar to track off macOS.
 pub fn menubar_visible() -> bool { true }
+
+pub fn present_above_everything(_ns_window: *mut std::ffi::c_void) {}
+
+pub fn window_state(_ns_window: *mut std::ffi::c_void) -> String {
+    "n/a on this platform".to_string()
+}
+
+pub fn window_on_active_space(_ns_window: *mut std::ffi::c_void) -> bool {
+    true
+}

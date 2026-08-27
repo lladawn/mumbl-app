@@ -45,6 +45,27 @@ use std::time::{Duration, Instant};
 
 use config::{Config, ConfigPatch, ConfigView};
 
+/// Which window is the popover right now.
+///
+/// It is not always the one from tauri.conf.json: reaching a fullscreen Space
+/// requires building a NEW window (see `rebuild_popover`), and `destroy()` frees
+/// a label asynchronously — reusing "main" immediately fails with "a webview
+/// with label `main` already exists". So each rebuild takes a fresh label and
+/// this is where the current one lives.
+struct PopoverLabel(Mutex<String>);
+
+impl Default for PopoverLabel {
+    fn default() -> Self {
+        Self(Mutex::new("main".to_string()))
+    }
+}
+
+/// The popover window, whatever it is currently called.
+fn popover_window(app: &AppHandle) -> Option<WebviewWindow> {
+    let label = app.try_state::<PopoverLabel>()?.0.lock().unwrap().clone();
+    app.get_webview_window(&label)
+}
+
 /// Guards the popover against dismissing itself the moment it opens.
 ///
 /// Clicking a status item hands focus back to whatever app was in front, so the
@@ -189,6 +210,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .manage(LastReceipt::default())
         .manage(PopoverGuard::default())
+        .manage(PopoverLabel::default())
         .setup(|app| {
             let handle = app.handle().clone();
             config::init(&handle)?;
@@ -216,54 +238,7 @@ pub fn run() {
             // the tray "Settings…" item can reliably re-show it and closing the
             // window never quits the app.
             if let Some(win) = app.get_webview_window("main") {
-                // Raise it above every other app, fullscreen ones included.
-                #[cfg(target_os = "macos")]
-                if let Ok(ns) = win.ns_window() {
-                    platform::float_above_everything(ns);
-                }
-                // Follow the user across Spaces rather than staying pinned to
-                // the one the popover happened to be created on.
-                let _ = win.set_visible_on_all_workspaces(true);
-
-                let win_for_events = win.clone();
-                win.on_window_event(move |event| match event {
-                    // Closing hides rather than destroys, so the tray can always
-                    // bring the popover back and closing never quits the app.
-                    tauri::WindowEvent::CloseRequested { api, .. } => {
-                        api.prevent_close();
-                        let _ = win_for_events.hide();
-                    }
-                    // A popover dismisses itself the moment you click away —
-                    // that is the whole difference between a popover and a
-                    // window, and it is why this is not just a resized window.
-                    tauri::WindowEvent::Focused(true) => {
-                        if let Some(g) = win_for_events.app_handle().try_state::<PopoverGuard>() {
-                            *g.focused_once.lock().unwrap() = true;
-                        }
-                    }
-                    tauri::WindowEvent::Focused(false) => {
-                        let app = win_for_events.app_handle();
-                        let Some(guard) = app.try_state::<PopoverGuard>() else { return };
-                        let opened_just_now = guard
-                            .shown_at
-                            .lock()
-                            .unwrap()
-                            .map(|t| t.elapsed() < OPEN_GRACE)
-                            .unwrap_or(false);
-                        let held_focus = *guard.focused_once.lock().unwrap();
-                        // Losing focus before we ever had it (or within the grace
-                        // window) is the status-item click handing focus back, not
-                        // the user clicking away.
-                        if opened_just_now || !held_focus {
-                            log::info!("ignoring blur right after open (status-item focus hand-back)");
-                            return;
-                        }
-                        let _ = win_for_events.hide();
-                        log::info!("popover auto-hidden (user clicked away)");
-                    }
-                    _ => {}
-                });
-
+                wire_popover(&win);
                 // First run has nothing to click yet and the menubar icon can be
                 // hidden under the notch on a crowded bar, so open the popover
                 // once on launch — anchored under the tray icon like any other
@@ -456,6 +431,116 @@ fn position_popover(win: &WebviewWindow, rect: Option<Rect>) {
     let _ = win.set_position(PhysicalPosition::new(x, y));
 }
 
+/// Everything a popover window needs to behave like a popover, applied fresh
+/// each time one is created. Extracted because the window is REBUILT when it
+/// cannot reach the user's current Space (see `rebuild_popover`), and a rebuilt
+/// window with no event wiring would never dismiss itself.
+fn wire_popover(win: &WebviewWindow) {
+    // Raise it above every other app, fullscreen ones included.
+    #[cfg(target_os = "macos")]
+    if let Ok(ns) = win.ns_window() {
+        platform::float_above_everything(ns);
+    }
+    // Follow the user across Spaces rather than staying pinned to the one the
+    // popover happened to be created on.
+    let _ = win.set_visible_on_all_workspaces(true);
+
+    let win_for_events = win.clone();
+    win.on_window_event(move |event| match event {
+            // Closing hides rather than destroys, so the tray can always
+            // bring the popover back and closing never quits the app.
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                api.prevent_close();
+                let _ = win_for_events.hide();
+            }
+            // A popover dismisses itself the moment you click away —
+            // that is the whole difference between a popover and a
+            // window, and it is why this is not just a resized window.
+            tauri::WindowEvent::Focused(true) => {
+                if let Some(g) = win_for_events.app_handle().try_state::<PopoverGuard>() {
+                    *g.focused_once.lock().unwrap() = true;
+                }
+            }
+            tauri::WindowEvent::Focused(false) => {
+                let app = win_for_events.app_handle();
+                let Some(guard) = app.try_state::<PopoverGuard>() else { return };
+                let opened_just_now = guard
+                    .shown_at
+                    .lock()
+                    .unwrap()
+                    .map(|t| t.elapsed() < OPEN_GRACE)
+                    .unwrap_or(false);
+                let held_focus = *guard.focused_once.lock().unwrap();
+                // Losing focus before we ever had it (or within the grace
+                // window) is the status-item click handing focus back, not
+                // the user clicking away.
+                if opened_just_now || !held_focus {
+                    log::info!("ignoring blur right after open (status-item focus hand-back)");
+                    return;
+                }
+                let _ = win_for_events.hide();
+                log::info!("popover auto-hidden (user clicked away)");
+            }
+        _ => {}
+    });
+}
+
+/// Destroy the popover window and build an identical one.
+///
+/// THIS IS THE FIX FOR "the popover does not appear over fullscreen apps", and
+/// it is not the fix anyone would guess. A window Tauri creates from
+/// tauri.conf.json is pinned to the Space it was born on, PERMANENTLY. No
+/// property changes that: measured on the live window, level 25/101/1000,
+/// six collection-behaviour combinations, style-mask changes, dropping the
+/// window delegate, re-ordering across run-loop turns, and swapping the window's
+/// class to NSPanel ALL leave `isOnActiveSpace` false while a fullscreen app is
+/// frontmost. In the same process, at the same instant, a window created
+/// *while that Space is active* joins it immediately — a plain NSWindow and a
+/// freshly built Tauri window both do.
+///
+/// So the only thing that works is to build a new window. The webview reloads,
+/// which is why this is done ONLY when the window could not reach the user —
+/// never on an ordinary open.
+fn rebuild_popover(app: &AppHandle) -> Option<WebviewWindow> {
+    if let Some(old) = popover_window(app) {
+        let _ = old.destroy();
+    }
+    // A fresh label every time: `destroy()` releases the old one asynchronously,
+    // so reusing it in the same breath fails outright.
+    static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
+    let label = format!(
+        "popover-{}",
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    );
+    let built = tauri::WebviewWindowBuilder::new(
+        app,
+        &label,
+        tauri::WebviewUrl::App("index.html".into()),
+    )
+    .title("mumbl office helper")
+    .inner_size(360.0, 470.0)
+    .resizable(false)
+    .decorations(false)
+    .always_on_top(true)
+    .shadow(true)
+    .skip_taskbar(true)
+    .visible(false)
+    .build();
+    match built {
+        Ok(win) => {
+            if let Some(state) = app.try_state::<PopoverLabel>() {
+                *state.0.lock().unwrap() = label;
+            }
+            wire_popover(&win);
+            Some(win)
+        }
+        Err(e) => {
+            log::error!("could not rebuild the popover window: {e}");
+            None
+        }
+    }
+}
+
 /// Gap between the bottom of the menubar and the top of the popover.
 const GAP_BELOW_MENUBAR: f64 = 6.0;
 /// Keep this much clear of the screen edge when the tray icon sits near it.
@@ -464,7 +549,10 @@ const EDGE_MARGIN: f64 = 8.0;
 const MENUBAR_FALLBACK_Y: f64 = 26.0;
 
 fn show_popover(app: &AppHandle, rect: Option<Rect>) {
-    let Some(win) = app.get_webview_window("main") else { return };
+    let Some(win) = popover_window(app).or_else(|| rebuild_popover(app)) else {
+        log::error!("no popover window and none could be built");
+        return;
+    };
     // Fall back to asking the tray for its own frame — this is the path taken
     // when the popover is opened from the menu or on launch rather than a click.
     let rect = rect.or_else(|| app.tray_by_id("mumbl-tray").and_then(|t| t.rect().ok().flatten()));
@@ -472,19 +560,54 @@ fn show_popover(app: &AppHandle, rect: Option<Rect>) {
         *guard.shown_at.lock().unwrap() = Some(Instant::now());
         *guard.focused_once.lock().unwrap() = false;
     }
-    position_popover(&win, rect);
-    // Re-assert the level/space behaviour on every open: macOS can reset a
-    // window's collection behaviour across Space transitions, and a popover
-    // that quietly stops clearing fullscreen apps is exactly the kind of
-    // regression that goes unnoticed until someone complains.
+
+    present_popover(&win, rect);
+
+    // Did it actually land where the user is looking? A popover summoned while a
+    // fullscreen app is frontmost lands on the Space the window was BORN on,
+    // which is not the one in front of the user — see `rebuild_popover` for why
+    // no property fixes that. Rebuilding is the only thing that does, so do it
+    // here and only here: on the open that would otherwise have shown nothing.
     #[cfg(target_os = "macos")]
-    if let Ok(ns) = win.ns_window() {
-        platform::float_above_everything(ns);
+    {
+        let reachable = win
+            .ns_window()
+            .map(|ns| platform::window_on_active_space(ns))
+            .unwrap_or(true);
+        if !reachable {
+            log::info!("popover landed on another Space — rebuilding it on this one");
+            if let Some(fresh) = rebuild_popover(app) {
+                present_popover(&fresh, rect);
+                if let Ok(ns) = fresh.ns_window() {
+                    log::info!("popover rebuilt — {}", platform::window_state(ns));
+                }
+            }
+        } else if let Ok(ns) = win.ns_window() {
+            log::info!("popover presented — {}", platform::window_state(ns));
+        }
     }
-    let _ = win.show();
-    let _ = win.set_focus();
+
     if rect.is_none() {
         log::warn!("popover shown WITHOUT a tray rect — falling back to its last position");
+    }
+}
+
+/// Position, show, focus, and force forward — the sequence every open uses.
+///
+/// Order matters. Setting level/collection-behaviour BEFORE `show()` was the
+/// original bug: it made the window eligible to sit over a fullscreen app, then
+/// `show()`/`set_focus()` ordered it front THROUGH APP ACTIVATION, and an
+/// Accessory app cannot activate over another app's fullscreen Space. The log
+/// said "raised to 101" the whole time, because a level is not a guarantee of
+/// being on screen. `present_above_everything` runs last and calls
+/// `orderFrontRegardless`, which bypasses activation entirely.
+fn present_popover(win: &WebviewWindow, rect: Option<Rect>) {
+    position_popover(win, rect);
+    let _ = win.show();
+    let _ = win.set_focus();
+    #[cfg(target_os = "macos")]
+    if let Ok(ns) = win.ns_window() {
+        platform::present_above_everything(ns);
     }
 }
 
@@ -505,15 +628,22 @@ fn place_character(win: &WebviewWindow) {
 const CHARACTER_INSET: f64 = 4.0;
 
 fn hide_popover(app: &AppHandle) {
-    if let Some(win) = app.get_webview_window("main") {
+    if let Some(win) = popover_window(app) {
         let _ = win.hide();
+        // Log every hide, not just the auto-hide. A popover that vanishes with
+        // nothing in the log is indistinguishable from one that never appeared,
+        // and that ambiguity cost real time chasing this bug.
+        log::info!("popover hidden");
     }
 }
 
 /// Clicking the menubar icon opens the popover, clicking again dismisses it —
 /// the behaviour every other menubar app has.
 fn toggle_popover(app: &AppHandle, rect: Option<Rect>) {
-    let Some(win) = app.get_webview_window("main") else { return };
+    let Some(win) = popover_window(app) else {
+        show_popover(app, rect);
+        return;
+    };
     if win.is_visible().unwrap_or(false) {
         hide_popover(app);
     } else {

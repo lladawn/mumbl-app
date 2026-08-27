@@ -20,7 +20,7 @@ mod macos;
 #[cfg(target_os = "macos")]
 pub use macos::{
     float_above_everything, menubar_report, menubar_strip_origin, menubar_visible,
-    start_focus_watcher,
+    present_above_everything, start_focus_watcher, window_on_active_space, window_state,
 };
 
 #[cfg(not(target_os = "macos"))]
@@ -29,5 +29,5 @@ mod fallback;
 #[cfg(not(target_os = "macos"))]
 pub use fallback::{
     float_above_everything, menubar_report, menubar_strip_origin, menubar_visible,
-    start_focus_watcher,
+    present_above_everything, start_focus_watcher, window_on_active_space, window_state,
 };

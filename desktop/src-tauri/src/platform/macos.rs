@@ -241,3 +241,80 @@ pub fn menubar_visible() -> bool {
     }
     false
 }
+
+/// What the window server actually thinks of this window, right now.
+///
+/// Setting a level and a collection behaviour is not the same as the window
+/// being drawn — the popover bug was invisible for exactly this reason: the
+/// code logged "raised to 101" while the window sat off-screen. `isOnActiveSpace`
+/// is the property that answers the real question ("can the user see it"), and
+/// it is the one worth logging.
+pub fn window_state(ns_window: *mut std::ffi::c_void) -> String {
+    if ns_window.is_null() {
+        return "no NSWindow handle".to_string();
+    }
+    unsafe {
+        let window: &NSWindow = &*(ns_window as *const NSWindow);
+        format!(
+            "level={} behavior={} visible={} key={} onActiveSpace={} hidesOnDeactivate={} canHide={}",
+            window.level(),
+            window.collectionBehavior().0,
+            window.isVisible(),
+            window.isKeyWindow(),
+            window.isOnActiveSpace(),
+            window.hidesOnDeactivate(),
+            window.canHide(),
+        )
+    }
+}
+
+/// Raise AND actually put the window on screen, in that order.
+///
+/// `float_above_everything` only sets properties. That is enough at setup time,
+/// but not at the moment a hidden popover is summoned: `show()` +
+/// `makeKeyAndOrderFront` run through the app's activation, and an Accessory app
+/// cannot reliably activate over another app's fullscreen Space — the window
+/// ends up correctly configured and still not drawn.
+///
+/// `orderFrontRegardless` is the one call that does not go through activation:
+/// it orders the window front whether or not this app is (or can become) the
+/// active app. Combined with level 101 + `CanJoinAllSpaces` + `FullScreenAuxiliary`
+/// it is what actually gets a menubar popover onto a fullscreen Space.
+///
+/// Order matters: set the properties FIRST, order front SECOND. Ordering a
+/// window front before it has permission to sit on a fullscreen Space just
+/// strands it on the Space it was created on.
+pub fn present_above_everything(ns_window: *mut std::ffi::c_void) {
+    if ns_window.is_null() {
+        log::warn!("no NSWindow handle — popover cannot be presented over fullscreen apps");
+        return;
+    }
+    float_above_everything(ns_window);
+    unsafe {
+        let window: &NSWindow = &*(ns_window as *const NSWindow);
+        // A window that hides on deactivate is ordered out the moment this app
+        // stops being active — and an Accessory app summoned over another app's
+        // fullscreen Space is never active. That failure is invisible from the
+        // code's side: we set the level, log "raised", and the window server
+        // quietly drops the window with no event of ours to log.
+        window.setHidesOnDeactivate(false);
+        // Likewise, Hide Others / Cmd-H must not take the popover with it.
+        window.setCanHide(false);
+        window.orderFrontRegardless();
+    }
+}
+
+/// Is this window on the Space the user is actually looking at?
+///
+/// This is the ONLY property that answers "can the user see it". Level and
+/// collection behaviour describe what the window is *allowed* to do; this one
+/// says what the window server actually did.
+pub fn window_on_active_space(ns_window: *mut std::ffi::c_void) -> bool {
+    if ns_window.is_null() {
+        return false;
+    }
+    unsafe {
+        let window: &NSWindow = &*(ns_window as *const NSWindow);
+        window.isOnActiveSpace()
+    }
+}
