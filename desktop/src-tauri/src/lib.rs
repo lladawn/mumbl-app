@@ -191,6 +191,27 @@ fn set_show_in_dock(app: AppHandle, show: bool) -> Result<Config, String> {
     Ok(config)
 }
 
+/// Shut the helper down. The ONE place that ends the process.
+///
+/// Both the tray menu and the popover's footer control come through here, so
+/// there is a single shutdown path rather than two that can drift apart.
+///
+/// Quitting is NOT disconnecting: the office, the pairing and the stored token
+/// are all untouched, and reopening the app resumes exactly where it left off.
+/// Revoking a device's access is a different act that lives in the web UI (see
+/// pairing::REQUIRED_BACKEND), and the two must never be worded as if they were
+/// the same thing.
+fn quit_helper(app: &AppHandle) {
+    log::info!("quitting on request — nothing is disconnected, the token stays put");
+    app.exit(0);
+}
+
+/// Quit from the popover. Same path as the tray menu's Quit.
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    quit_helper(&app);
+}
+
 /// Is this endpoint a development server on this machine?
 ///
 /// Host-based, not a substring match on the whole URL: a path or query that
@@ -371,6 +392,7 @@ pub fn run() {
             set_muted,
             get_last_receipt,
             retry_token,
+            quit_app,
             get_sharing_health,
             set_show_in_dock,
             pair_begin,
@@ -380,8 +402,21 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building mumbl helper")
         .run(|app, event| match event {
-            // Closing the popover must not quit a background helper.
-            tauri::RunEvent::ExitRequested { api, .. } => api.prevent_exit(),
+            // Closing the popover must not quit a background helper -- but a
+            // DELIBERATE quit must still work.
+            //
+            // `code` is the difference and it is load-bearing: None means the
+            // exit came from user interaction (the last window closed), Some(_)
+            // means someone called app.exit() on purpose. Preventing BOTH, which
+            // is what this used to do, silently disabled Quit -- the tray menu
+            // item has never actually quit the app. Nothing surfaced it because
+            // prevent_exit fails quietly: the menu closes, the app stays, and it
+            // looks like the click simply missed.
+            tauri::RunEvent::ExitRequested { code, api, .. } => {
+                if code.is_none() {
+                    api.prevent_exit();
+                }
+            }
             // Clicking the Dock tile (or picking the app in Cmd-Tab) is the
             // fallback way in when the menubar icon cannot be found, so it has
             // to actually reopen the popover.
@@ -424,7 +459,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show_popover(app, None),
             "toggle" => toggle_sharing(app),
-            "quit" => app.exit(0),
+            "quit" => quit_helper(app),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

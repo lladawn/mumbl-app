@@ -386,3 +386,23 @@ body {
    failure — otherwise the colour that means "act now" stops meaning anything. */
 .alert.alert-note { background: var(--gold); }
 .alert.alert-note .alert-title { color: var(--gold-ink); }
+
+/* Quit lives in the footer and reads as a quiet link, not a button competing
+   with the real controls. It is the only irreversible-ish thing in this window
+   (irreversible for the session, not for the account), so it gets a confirm
+   step rather than a bigger target. */
+.foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.quit {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.quit:hover { color: var(--ink); }
+.quit.confirming { color: var(--clay-ink); text-decoration: none; font-weight: 700; }

@@ -125,7 +125,16 @@
         </div>
       </details>
 
-      <footer class="foot" id="foot"></footer>
+      <!-- Quit sits in the footer on purpose. It stops sharing entirely, so it
+           must not carry the same visual weight as pause, which is routine and
+           reversible from here. Quiet, last, and out of the way. -->
+      <footer class="foot">
+        <span id="foot"></span>
+        <button id="quit" class="quit" type="button"
+                title="Quit the mumbl helper. Your office stays connected — this Mac just stops reporting until you open it again.">
+          Quit helper
+        </button>
+      </footer>
     </div>
     <script type="module" src="./main.js"></script>
   </body>

@@ -38,6 +38,8 @@ async function boot() {
     renderHealth();
   });
 
+  wireQuit();
+
   $("health-action").addEventListener("click", async () => {
     const action = $("health-action");
     action.disabled = true;
@@ -62,6 +64,43 @@ function renderAll() {
   renderAllowlist();
   renderToggle();
   renderHealth();
+}
+
+// ---- quit ----------------------------------------------------------------
+
+// Two clicks, no dialog. This is a background app: if it goes away by accident
+// nothing announces it, the office just quietly stops filling up — which is the
+// exact silent failure the notice above exists to prevent. One stray click
+// should not be able to cause it.
+//
+// The wording says QUIT THE HELPER, never "disconnect". Quitting leaves the
+// office, the pairing and the token untouched; revoking a device's access is a
+// different act that lives in the web UI. Blurring them would let someone stop
+// an app when they meant to cut off a machine, or the reverse.
+function wireQuit() {
+  const btn = $("quit");
+  if (!btn) return;
+  let armed = false;
+  let disarm = null;
+
+  btn.addEventListener("click", async () => {
+    if (!armed) {
+      armed = true;
+      btn.classList.add("confirming");
+      btn.textContent = "Quit \u2014 sure?";
+      clearTimeout(disarm);
+      disarm = setTimeout(() => {
+        armed = false;
+        btn.classList.remove("confirming");
+        btn.textContent = "Quit helper";
+      }, 4000);
+      return;
+    }
+    clearTimeout(disarm);
+    btn.textContent = "quitting\u2026";
+    btn.disabled = true;
+    await invoke("quit_app");
+  });
 }
 
 // ---- "nothing is being shared" -------------------------------------------
