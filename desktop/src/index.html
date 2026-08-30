@@ -69,10 +69,22 @@
           <div class="receipt" id="receipt"><em class="muted">Nothing sent yet.</em></div>
         </div>
 
+        <!-- This paragraph is read at the moment someone decides whether to
+             trust the app, so it has to be PREDICTABLE: after reading it you
+             should be able to say exactly what a person holding your office
+             link can see.
+             It used to say "Only the app category leaves", which was FALSE.
+             network.rs sends the app's label as the actor name plus `tool`, and
+             redactForPublic in src/server/agentPresence.js keeps name, tool,
+             category, status and object on the PUBLIC payload — so the app's
+             identity leaves, not just its category.
+             If you edit this, do not trade precision for reassurance. Cutting a
+             claim is fine; softening one is not. -->
         <div class="assure">
           <span class="tick" aria-hidden="true">✓</span>
-          <p>Only the app <b>category</b> leaves. Never titles, URLs, keystrokes
-          or content. No macOS permissions needed.</p>
+          <p><b>Figma · design</b> — apps leave by name, with whether you&rsquo;re
+          active, and anyone holding your office link can see it. Never titles,
+          URLs, keystrokes or content. No macOS permissions needed.</p>
         </div>
 
         <div class="share-all">
@@ -110,7 +122,13 @@
             <button id="save" class="btn-ghost" type="button">Save</button>
             <span id="save-status" class="save-status"></span>
           </div>
-          <p class="hint">Token is kept in the macOS keychain, never on disk.</p>
+          <!-- "never on disk" was an overclaim: the keychain IS a file on disk
+               (login.keychain-db), encrypted at rest. What is actually true is
+               that the token never enters mumbl's own settings file — verified:
+               that file holds endpoint, slug, name, installId and preferences,
+               and no token. -->
+          <p class="hint">Token is kept in the macOS keychain, never in
+          mumbl&rsquo;s settings file.</p>
 
           <label class="switch dock-row" for="show-dock">
             <input id="show-dock" type="checkbox" />

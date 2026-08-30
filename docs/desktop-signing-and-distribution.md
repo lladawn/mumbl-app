@@ -157,6 +157,19 @@ embedded-asset trap bites:
   assets really are embedded, not being read from the dev tree.
 - The log shows zero `ERROR` or panic lines on a first run.
 
+### Anything broken here is worse on someone else's machine
+
+Obvious once stated, easy to forget while developing: a defect you can work
+around on your own Mac becomes unfixable for a recipient. The clearest example is
+one we shipped — **Quit did not quit** (the run handler prevented every exit, not
+just the window-close one; fixed in `e63a324`). On a dev machine that is a
+shrug and a `pkill`. On someone else's machine it is a menubar app they cannot
+get rid of except through Activity Monitor, and no reason to believe it is not
+also mishandling everything else.
+
+Treat "can a recipient install it, use it, and **get rid of it**" as part of the
+release check, not as an afterthought.
+
 ### The keychain prompt is a symptom of being unsigned
 
 An unsigned build has **no stable code identity**. Every rebuild is a different
