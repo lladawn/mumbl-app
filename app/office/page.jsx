@@ -1,176 +1,167 @@
 import Link from "next/link";
+import OfficeHero from "./OfficeHero";
+import { demoSpaceState } from "../../src/server/officeDemo";
 
 /**
  * /office — the product page.
  *
- * SHOW, DON'T TELL. The bar is that someone landing cold understands what this
- * is in about five seconds, without reading. So the page leads with a real
- * screenshot of a real office and a caption-length line, and tells the flow as
- * a sequence of actual captures with a few words each. Where an image and a
- * paragraph said the same thing, the paragraph is gone.
+ * THE PAGE IS THE GAME. This is not a page that explains an office; the first
+ * thing on it IS the office, running, from the same scene the product ships
+ * (see OfficeHero.jsx). Nobody needs this product — they want one — so the page
+ * is built to be looked at, not read. Every section is a real capture of the
+ * shipping app with a handful of words next to it, and where a picture said the
+ * thing, the paragraph is gone. One ask: get a desk.
  *
- * Every image here is a REAL capture of the shipping product, served from
- * public/office-screens/. No mockups and no illustrations of things that do not
- * exist — if a claim had no real screenshot, the claim was cut instead.
+ * Copy is Phyllis's (docs/office-swag-copy.md), used as written. One label of
+ * hers is deliberately NOT used: "the shape" for the privacy section. That
+ * phrasing comes from the product's old "shape, not content" line, which was
+ * retired this week because the app's IDENTITY leaves the machine and is
+ * visible to anyone with your link. A two-word eyebrow is exactly how a retired
+ * claim sneaks back in, so the section is labelled "what leaves" instead.
  *
- * The only place prose still earns its keep is privacy, because "what leaves
- * your machine" cannot be shown in a picture and is the thing people are right
- * to be careful about. That section is deliberately the longest thing here and
- * should stay that way: a first pass at this rebuild compressed it for balance
- * and quietly dropped the two sentences that actually tell someone what they
- * would want to know ("...if you would not want someone knowing you had Figma
- * open" and "if you never open the recap, it is still being counted"). On this
- * page the layout gives way to the disclosure, never the other way round.
+ * PRIVACY, AND WHY IT IS A DISCLOSURE BLOCK RATHER THAN A SECTION.
+ * The earlier version of this page made a privacy CLAIM in the main flow, and a
+ * claim needs qualifying, which is how a swag page grew four paragraphs of
+ * hedging. So the flow now makes no privacy promise at all — and the honest
+ * detail survives WORD FOR WORD in <details> below, where it is one click from
+ * anywhere. The rule that does not bend: a precise claim may be CUT, but it may
+ * never be replaced by a vaguer, friendlier one. If you are editing this page
+ * and the disclosure is in your way, the layout gives way, not the disclosure.
+ *
+ * Every image is a REAL capture from public/office-screens/ — the cast portraits
+ * are crops of one screenshot of the running room, labels and all. No mockups.
  */
 
 const description =
-  "A pixel office that draws itself from the apps you actually use — Figma, VS Code, a Zoom call, Spotify. Shape, not content: never a keystroke, title or URL.";
+  "Your apps just got bodies. A pixel office that draws itself from the apps you actually use — Figma, VS Code, a Zoom call, Spotify.";
 
 export const metadata = {
-  title: "mumbl office — your apps become an office",
+  title: "mumbl office — your apps just got bodies",
   description,
   alternates: { canonical: "/office" },
   openGraph: {
-    title: "mumbl office — your apps become an office",
+    title: "mumbl office — your apps just got bodies",
     description,
     url: "/office",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "mumbl office — your apps become an office",
+    title: "mumbl office — your apps just got bodies",
     description,
   },
 };
 
-// The flow, told in three real captures. The captions are deliberately short:
-// each image already says the thing, and repeating it in a paragraph is the
-// failure mode this page was rebuilt to fix.
-const flow = [
-  {
-    num: "01",
-    title: "connect your Mac, once",
-    caption: "One click, one authorize. Nothing is shared until you do.",
-    src: "/office-screens/flow-helper.png",
-    alt: "The mumbl menu-bar popover reading 'Your desk is empty' with a 'Connect my office' button, and a note that nothing is being shared yet",
-    w: 720,
-    h: 540,
-  },
-  {
-    num: "02",
-    title: "your office assembles itself",
-    caption: "Every app you use lands a station. Nobody designs the room.",
-    src: "/office-screens/flow-office.png",
-    alt: "A pixel office seen from above, with work stations, a café, a lounge and a ping-pong table, people at each",
-    w: 800,
-    h: 600,
-  },
-  {
-    num: "03",
-    title: "the day ends in a recap",
-    caption: "Where the hours went, as a card you can post.",
-    src: "/office-screens/flow-recap.png",
-    alt: "A day recap page reading 'you built something today', with time per app: VS Code 4h15m, Terminal 1h10m, Chrome 59m",
-    w: 800,
-    h: 600,
-  },
-];
+// The scene needs a cast to seat. Same seeded demo state /office/demo falls back
+// to, resolved on the server so the hero has nothing to fetch before it moves.
+const heroState = demoSpaceState("demo");
 
-const faqs = [
-  {
-    q: "can I use it today?",
-    a: "It's a private alpha, macOS only. Join the waitlist and we'll reach out with a build — it's a real invite, not a mailing list. The demo office is live right now if you want to walk around one first.",
-  },
-  {
-    q: "what actually leaves my machine?",
-    a: "Which app has focus and when it changed — the app's identity and its category, like Figma · design or VS Code · coding. That's what draws the office and it's what anyone with your link can see. Never window titles, URLs, file names, clipboard, keystrokes or pixels.",
-  },
-  {
-    q: "is anything kept?",
-    a: "The live event log expires after 15 minutes. One thing does persist so the recap can exist: a daily rollup of which app, which category, how many seconds, how many stretches. That's the whole row — no titles, no URLs, no task text. You can pause sharing from the menu bar at any time.",
-  },
-  {
-    q: "why macOS only?",
-    a: "The helper uses one macOS system notification — NSWorkspace.didActivateApplicationNotification — to know which app has focus. Windows support isn't built yet.",
-  },
+// Six desks, cropped out of one capture of the running room. The app's own name
+// label is part of the screenshot — the product wrote those, not this page.
+const cast = [
+  { app: "Figma", src: "/office-screens/cast-figma.png", tone: "clay" },
+  { app: "VS Code", src: "/office-screens/cast-vscode.png", tone: "sky" },
+  { app: "Spotify", src: "/office-screens/cast-spotify.png", tone: "green" },
+  { app: "Slack", src: "/office-screens/cast-slack.png", tone: "lilac" },
+  { app: "Zoom", src: "/office-screens/cast-zoom.png", tone: "gold" },
+  { app: "Terminal", src: "/office-screens/cast-terminal.png", tone: "mint" },
 ];
 
 export default function OfficePage() {
   return (
-    <div className="office-landing">
-      {/* HERO — image first. The picture is the pitch. */}
-      <section className="office-hero">
-        <p className="eyebrow">office · private alpha</p>
-        <h1>Your apps become an office.</h1>
-        <p className="office-hero-line">
-          Open Figma and a design desk appears. Take a call and the meeting room lights up.
-          It draws itself from your real workday.
-        </p>
-        <img
-          className="office-hero-img"
-          src="/office-screens/hero-office.png"
-          alt="A pixel office with six desks, each labelled with a real app — Spotify, Slack, Zoom, Terminal, Figma, VS Code — and a person working at each"
-          width={1560}
-          height={1146}
+    <div className="sw">
+      {/* ── HERO: the office, running ─────────────────────────────────── */}
+      <section className="sw-hero">
+        <p className="eyebrow sw-eyebrow">your office</p>
+        <h1 className="sw-title">
+          <span>your apps</span> <span>just got</span> <span>bodies.</span>
+        </h1>
+
+        <OfficeHero
+          initialState={heroState}
+          still="/office-screens/hero-stage.png"
+          stillNarrow="/office-screens/hero-stage-narrow.png"
+          alt="A pixel office seen from above: six desks labelled Spotify, Slack, Zoom, Terminal, Figma and VS Code, a person working at each, with a café off to one side"
         />
-        <div className="office-hero-actions">
-          <Link className="solid-button button-link" href="/office/demo">
-            walk around a live office
-          </Link>
-          <Link className="ghost-button button-link" href="/#waitlist">
-            join the alpha waitlist
-          </Link>
+
+        <div className="sw-cta">
+          <Link className="sw-button" href="/#waitlist">get a desk.</Link>
+          <p className="sw-fine">macOS · private alpha · invite only</p>
         </div>
       </section>
 
-      {/* THE FLOW — three real captures, a few words each */}
-      <section>
-        <p className="eyebrow">how it works</p>
-        <h2>three things happen. you do one of them.</h2>
-        <div className="office-flow">
-          {flow.map((step) => (
-            <figure className="office-flow-step" key={step.num}>
-              <div className="office-flow-shot">
-                <img src={step.src} alt={step.alt} width={step.w} height={step.h} loading="lazy" />
-              </div>
-              <figcaption>
-                <span className="office-step-num">{step.num}</span>
-                <h3>{step.title}</h3>
-                <p>{step.caption}</p>
-              </figcaption>
+      {/* ── THE CAST: one app, one body ───────────────────────────────── */}
+      <section className="sw-band sw-band-cast">
+        <p className="eyebrow sw-eyebrow">the cast</p>
+        <div className="sw-cast">
+          {cast.map((member, i) => (
+            <figure className={`sw-card tone-${member.tone}`} key={member.app} style={{ "--d": `${i * 90}ms` }}>
+              <img src={member.src} alt={`The ${member.app} desk in the office: a monitor, a WORKING pill, a person at the desk and the label ${member.app}`} width={250} height={275} loading="lazy" />
             </figure>
           ))}
         </div>
       </section>
 
-      {/* IT'S A PLACE — one more real capture, almost no words */}
-      <section>
-        <p className="eyebrow">not a dashboard</p>
-        <h2>it&apos;s a room. people are in it.</h2>
-        <img
-          className="office-wide-img"
-          src="/office-screens/detail-recroom.png"
-          alt="The rec room of a pixel office: two people rallying at a ping-pong table with a chalk scoreboard, another at an arcade cabinet"
-          width={1920}
-          height={1200}
-          loading="lazy"
-        />
-        <p className="office-wide-caption">
-          Idle teammates drift to the café and the rec room. Two people on a call sit at the same table.
-          The room is the status page.
-        </p>
+      {/* ── THE ROOM ──────────────────────────────────────────────────── */}
+      <section className="sw-band sw-band-room">
+        <p className="eyebrow sw-eyebrow">the room</p>
+        <figure className="sw-frame">
+          {/* the wide shot is unreadable at 390px — same capture, framed on the
+              rally, for phones */}
+          <picture>
+            <source media="(max-width: 700px)" srcSet="/office-screens/detail-recroom-narrow.png" width={800} height={650} />
+            <img
+              src="/office-screens/detail-recroom.png"
+              alt="Pia and Nadia rallying across a ping-pong table, paddles up, the ball mid-air, a scoreboard behind them reading 0 to 1. Both are pilled IDLE. Felix is at the arcade cabinet."
+              width={1920}
+              height={1200}
+              loading="lazy"
+            />
+          </picture>
+        </figure>
+        <p className="sw-line">nobody is working in this part.</p>
       </section>
 
-      {/* PRIVACY — the one place words beat pictures */}
-      <section>
-        <p className="eyebrow">privacy</p>
-        <h2>shape, not content.</h2>
-        <div className="office-privacy-box">
+      {/* ── THE RECAP ─────────────────────────────────────────────────── */}
+      <section className="sw-band sw-band-recap">
+        <p className="eyebrow sw-eyebrow">the recap</p>
+        <figure className="sw-frame sw-frame-card">
+          <picture>
+          <source media="(max-width: 700px)" srcSet="/office-screens/recap-card-narrow.png" width={560} height={580} />
+          <img
+            src="/office-screens/recap-card.png"
+            alt="The end-of-day card: 'demo\u2019s day', Aug 18, 6 tools, 9h35 focused, most time in VS Code at 4h20, then Spotify 3h10, Figma 2h05, Zoom 1h40, Slack 55m, Notion 35m."
+            width={1200}
+            height={630}
+            loading="lazy"
+          />
+          </picture>
+        </figure>
+        <p className="sw-line">the day ends as a card.</p>
+      </section>
+
+      {/* ── ONE ASK ───────────────────────────────────────────────────── */}
+      <section className="sw-band sw-band-end">
+        <p className="eyebrow sw-eyebrow">get in</p>
+        <h2 className="sw-end-title">everyone&rsquo;s getting an office.</h2>
+        <div className="sw-cta">
+          <Link className="sw-button" href="/#waitlist">get a desk.</Link>
+          <p className="sw-fine">macOS · private alpha · invite only</p>
+        </div>
+      </section>
+
+      {/* ── DISCLOSURE ────────────────────────────────────────────────────
+          Verbatim from the corrected version. Do not compress, soften, or
+          summarise this. Cutting a precise claim is allowed; blurring one is
+          not. See the file header. */}
+      <details className="sw-disclosure">
+        <summary>what leaves your Mac</summary>
+        <div className="sw-disclosure-body">
           <p>
-            What leaves: which app has focus and when it changed —{" "}
-            <em>Figma · design</em>, <em>VS Code · coding</em>. That is what draws the office and what
-            anyone with your link can see. If you would not want someone knowing you had Figma open,
-            this is the part to know about.
+            What leaves: which app has focus and when it changed — <em>Figma · design</em>,{" "}
+            <em>VS Code · coding</em>. That is what draws the office and what anyone with your link can
+            see. If you would not want someone knowing you had Figma open, this is the part to know
+            about.
           </p>
           <p>
             What never leaves: window titles, URLs, file names, clipboard contents, keystrokes, screen
@@ -178,57 +169,22 @@ export default function OfficePage() {
             shown to another person passes through it.
           </p>
           <p>
-            The live event log expires after 15 minutes — the office shows you <em>now</em>, not a running
-            transcript. History is opt-in and off unless you turn it on.
+            The live event log expires after 15 minutes — the office shows you <em>now</em>, not a
+            running transcript. History is opt-in and off unless you turn it on.
           </p>
           <p>
             One thing does persist, and it should be said plainly: so the day recap can exist, we keep a
-            daily rollup of <em>which app, which category, how many seconds, how many stretches</em>. That
-            is the whole row — no titles, no URLs, no file names, no task text. If you never open the
-            recap, it is still being counted.
+            daily rollup of <em>which app, which category, how many seconds, how many stretches</em>.
+            That is the whole row — no titles, no URLs, no file names, no task text. If you never open
+            the recap, it is still being counted.
           </p>
-          <ul className="office-privacy-list">
-            <li>no keystrokes or URLs</li>
-            <li>live events 15 min TTL</li>
-            <li>daily totals kept for the recap</li>
-            <li>pause with one click</li>
-          </ul>
-        </div>
-      </section>
-
-      {/* CTA — the existing waitlist, honestly labelled */}
-      <section>
-        <div className="office-cta-panel">
-          <p className="eyebrow">try it</p>
-          <h3>private alpha — macOS, invite only.</h3>
           <p>
-            Join the waitlist and we&apos;ll reach out with a build. It&apos;s early and we&apos;d rather
-            hand it to people who&apos;ll tell us what&apos;s wrong with it.
+            The helper is macOS only: it reads one system notification —{" "}
+            <code>NSWorkspace.didActivateApplicationNotification</code> — to know which app has focus.
+            You can pause sharing from the menu bar at any time.
           </p>
-          <div className="office-cta-buttons">
-            <Link className="solid-button button-link" href="/#waitlist">
-              join the alpha waitlist
-            </Link>
-            <Link className="ghost-button button-link" href="/office/demo">
-              see the demo first
-            </Link>
-          </div>
         </div>
-      </section>
-
-      {/* FAQ — collapsed, so it costs nothing to scroll past */}
-      <section>
-        <p className="eyebrow">honest questions</p>
-        <h2>the short answers.</h2>
-        <div className="office-faq-list">
-          {faqs.map((item) => (
-            <details className="office-faq-card" key={item.q}>
-              <summary>{item.q}</summary>
-              <p>{item.a}</p>
-            </details>
-          ))}
-        </div>
-      </section>
+      </details>
     </div>
   );
 }

@@ -244,344 +244,496 @@ a {
   opacity: 0.7;
 }
 
-/* Office landing page */
-.office-landing {
-  max-width: 900px;
+/* ═══ Office landing (/office) — "the page is the game" ═══════════════════
+   The office IS the brand, so nothing here invents a new visual language: the
+   palette is lifted straight out of public/office/office-scene.js (the same
+   mint wall, oat floor, gold, clay, sky and lilac the room is drawn with), the
+   edges are the product's hard 2-4px #2a241d with zero radius, and every shadow
+   is a flat offset with no blur. What is pushed is SCALE and MOTION — full
+   bleed colour bands, a living hero, and animation that is the point rather
+   than a garnish, which is the opposite of the restraint rule on the desktop
+   character. All of it is switched off under prefers-reduced-motion.
+   Replaces the old text-led .office-landing block. */
+.sw {
+  --sw-edge: #2a241d;
+  --sw-paper: #FFF8EC;
+  --sw-wall: #C7E9E5;
+  --sw-wall-dk: #A6D8D4;
+  --sw-oat: #EADFC6;
+  --sw-wood: #DDBA88;
+  --sw-gold: #F8DFA0;
+  --sw-clay: #F4B3A6;
+  --sw-sky: #BEE7F7;
+  --sw-lilac: #CFBBF0;
+  --sw-green: #9BD8B4;
+  --sw-text: #2a241d;
+  color: var(--sw-text);
+  background: var(--sw-wall);
+}
+
+.sw section {
+  padding: clamp(40px, 7vw, 84px) clamp(16px, 4vw, 40px);
+  border-bottom: 4px solid var(--sw-edge);
+}
+
+.sw .sw-eyebrow {
+  display: inline-block;
+  margin: 0 0 clamp(16px, 3vw, 28px);
+  padding: 7px 12px 6px;
+  border: 2px solid var(--sw-edge);
+  background: var(--sw-paper);
+  box-shadow: var(--px-shadow-sm);
+  color: var(--sw-text);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+}
+
+/* ── hero ─────────────────────────────────────────────────────────────── */
+.sw-hero {
+  background:
+    radial-gradient(circle at 12px 12px, rgba(42, 36, 29, 0.06) 2px, transparent 2px) 0 0 / 28px 28px,
+    var(--sw-oat);
+  text-align: center;
+}
+
+.sw-title {
+  max-width: 15ch;
+  margin: 0 auto clamp(24px, 4vw, 40px);
+  font-family: var(--px-display);
+  font-size: clamp(1.5rem, 5.4vw, 3.4rem);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  word-spacing: -0.12em;
+  text-wrap: balance;
+}
+
+.sw-title span {
+  display: inline-block;
+  animation: sw-pop 0.42s steps(4) backwards;
+}
+.sw-title span:nth-child(1) { animation-delay: 0.05s; }
+.sw-title span:nth-child(2) { animation-delay: 0.17s; }
+.sw-title span:nth-child(3) { animation-delay: 0.29s; color: #B4543F; }
+
+@keyframes sw-pop {
+  from { transform: translateY(18px) scale(0.9); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* ── the stage: a still of the room with the running room fading over it ── */
+.sw-stage {
+  position: relative;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: clamp(40px, 8vw, 80px) clamp(16px, 4vw, 42px);
 }
 
-.office-landing section {
-  margin-bottom: clamp(56px, 10vw, 96px);
-}
-
-.office-hero-head {
-  max-width: 640px;
-  margin-bottom: 32px;
-}
-
-.office-hero-head h1 {
-  margin: 12px 0 20px;
-  font-size: clamp(1.5rem, 5vw, 2.4rem);
-  line-height: 1.2;
-  color: var(--ink);
-}
-
-.office-hero-head p {
-  margin: 0;
-  font-size: 1rem;
-  line-height: 1.6;
-  color: var(--muted);
-  max-width: 540px;
-}
-
-.office-lead-quote {
-  max-width: 680px;
-  margin: 4px 0 0;
-  padding-left: 18px;
-  border-left: 3px solid var(--accent, var(--ink));
-  font-size: clamp(1.1rem, 2.6vw, 1.45rem);
-  line-height: 1.5;
-  font-weight: 500;
-  color: var(--ink);
-}
-
-.office-hero-actions {
+/* string lights, straight off the café wall in the scene */
+.sw-stage-lights {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 28px;
-}
-
-.office-screens {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-  margin-top: 32px;
-}
-
-.office-screen-img {
-  border: 2px solid var(--px-edge);
-  box-shadow: var(--px-shadow-sm);
-  width: 100%;
-  height: auto;
-  display: block;
-  image-rendering: pixelated;
-}
-
-/* ── show-don't-tell layout ────────────────────────────────────────────────
-   The product page leads with pictures, so these rules exist to keep real
-   screenshots readable rather than to decorate them. Every image is width:100%
-   / height:auto so a 1920px capture cannot push the page sideways on a phone —
-   which is exactly where an image-led page breaks. */
-
-.office-hero-line {
-  margin: 0 0 22px;
-  max-width: 46ch;
-  font-size: 1rem;
-  line-height: 1.6;
-  color: var(--muted);
-}
-
-.office-hero-img,
-.office-wide-img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border: 2px solid var(--px-edge);
-  box-shadow: var(--px-shadow);
-  /* the captures are pixel art; let the browser keep the pixels crisp when it
-     scales them rather than smearing them into mush */
-  image-rendering: pixelated;
-}
-
-.office-hero-img {
-  margin-bottom: 22px;
-}
-
-.office-wide-img {
-  margin-top: 22px;
-}
-
-.office-wide-caption {
-  margin: 14px 0 0;
-  max-width: 60ch;
-  font-size: 0.86rem;
-  line-height: 1.6;
-  color: var(--muted);
-}
-
-.office-flow {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  margin-top: 24px;
-  align-items: start;
-}
-
-.office-flow-step {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* Fixed-ratio window so three shots of different shapes (a tall popover, a wide
-   room, a portrait recap) still line up as a row instead of stair-stepping. */
-.office-flow-shot {
-  border: 2px solid var(--px-edge);
-  background: var(--panel);
-  box-shadow: var(--px-shadow-sm);
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  display: flex;
+  justify-content: space-between;
   align-items: flex-start;
-  justify-content: center;
+  height: 22px;
+  margin: 0 14px -2px;
+  padding: 0 6px;
+}
+.sw-stage-lights::before {
+  content: "";
+  position: absolute;
+  inset: 3px 0 auto;
+  height: 2px;
+  background: var(--sw-edge);
+  opacity: 0.55;
+}
+.sw-stage-lights i {
+  position: relative;
+  width: 8px;
+  height: 12px;
+  border: 2px solid var(--sw-edge);
+  background: var(--sw-gold);
+  animation: sw-twinkle 2.4s steps(2) infinite;
+  animation-delay: calc(var(--i) * 0.17s);
+}
+.sw-stage-lights i:nth-child(3n)   { background: var(--sw-clay); }
+.sw-stage-lights i:nth-child(3n+1) { background: var(--sw-sky); }
+.sw-stage-lights i:nth-child(4n)   { background: var(--sw-green); }
+
+@keyframes sw-twinkle {
+  0%, 60%  { opacity: 1; transform: translateY(0); }
+  61%, 100% { opacity: 0.45; transform: translateY(1px); }
 }
 
-.office-flow-shot img {
+.sw-stage-screen {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border: 4px solid var(--sw-edge);
+  box-shadow: 10px 10px 0 var(--sw-edge);
+  background: var(--sw-wall);
+  overflow: hidden;
+}
+
+.sw-stage-still,
+.sw-stage-screen picture {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
-  /* the three captures are pre-cropped to 4:3 so this never actually letterboxes
-     — it is here so a future swap for an odd-sized shot degrades to a whole
-     image rather than a silently beheaded one */
-  object-fit: contain;
+}
+.sw-stage-still {
+  object-fit: cover;
+  object-position: center;
+  transition: opacity 0.5s ease;
+}
+.is-live .sw-stage-still { opacity: 0; }
+
+.sw-stage-canvas {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.is-live .sw-stage-canvas { opacity: 1; }
+.sw-stage-canvas canvas { display: block; }
+
+/* office-scene's boot() appends the full office HUD to whatever parent it is
+   given — the agent detail panel, the terminal view, its toggle and a toast —
+   and none of it is styled outside /office/[slug], which carries those rules in
+   a component <style>. Unstyled, it dumps raw markup across the room.
+   The terminal, its [T] toggle and the toast are app chrome and stay hidden: a
+   hero is a shop window, not the whole app. The PANEL is kept and restyled here,
+   because the scene draws "press E to talk" over any agent you walk up to — hide
+   what E opens and the hero advertises an affordance that does nothing. */
+.sw-stage-canvas > .office-terminal,
+.sw-stage-canvas > .office-view-toggle,
+.sw-stage-canvas > .office-toast { display: none !important; }
+
+.sw-stage-canvas > .office-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  max-width: 62%;
+  padding: 20px;
+  border-left: 4px solid var(--sw-edge);
+  background: var(--sw-paper);
+  color: #4A5A56;
+  /* the section around it is centred; an activity log is not */
+  text-align: left;
+  transform: translateX(102%);
+  transition: transform 0.2s steps(4);
+}
+.sw-stage-canvas > .office-panel.on { transform: translateX(0); }
+.sw-stage-canvas .office-panel-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: 0;
+  background: none;
+  color: #8d857d;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sw-stage-canvas .office-panel-close:hover { color: var(--sw-edge); }
+.sw-stage-canvas .office-panel-role {
+  color: #B4791F;
+  font-family: var(--px-display);
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.sw-stage-canvas .office-panel-name {
+  margin: 8px 0 10px;
+  font-family: var(--px-display);
+  font-size: 0.9rem;
+  line-height: 1.3;
+  color: var(--sw-edge);
+}
+.sw-stage-canvas .office-panel-status {
+  align-self: flex-start;
+  padding: 4px 8px;
+  border: 2px solid var(--sw-edge);
+  background: var(--sw-green);
+  font-family: var(--px-display);
+  font-size: 0.45rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sw-stage-canvas .office-panel-label {
+  margin-top: 16px;
+  color: #9AA8A3;
+  font-family: var(--px-display);
+  font-size: 0.42rem;
+  letter-spacing: 0.1em;
+}
+.sw-stage-canvas .office-panel-task {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #3E4E4A;
+}
+.sw-stage-canvas .office-panel-log {
+  flex: 1;
+  margin: 6px 0 0;
+  overflow-y: auto;
+  font-family: var(--px-font);
+  font-size: 0.7rem;
+  line-height: 1.7;
+  color: #6E7E79;
+  white-space: pre-wrap;
+}
+
+.sw-stage-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+.sw-pill {
+  padding: 6px 10px 5px;
+  border: 2px solid var(--sw-edge);
+  background: var(--sw-green);
+  font-family: var(--px-display);
+  font-size: 0.52rem;
+}
+.sw-hint {
+  font-family: var(--px-font);
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.65;
+}
+
+/* ── the one ask ──────────────────────────────────────────────────────── */
+.sw-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: clamp(28px, 5vw, 48px);
+}
+
+.sw-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 0 clamp(24px, 5vw, 44px);
+  border: 4px solid var(--sw-edge);
+  background: var(--sw-gold);
+  box-shadow: 6px 6px 0 var(--sw-edge);
+  color: var(--sw-text);
+  font-family: var(--px-display);
+  font-size: clamp(0.8rem, 2.4vw, 1.05rem);
+  text-decoration: none;
+  transition: transform 0.08s steps(2), box-shadow 0.08s steps(2);
+}
+.sw-button:hover,
+.sw-button:focus-visible {
+  transform: translate(3px, 3px);
+  box-shadow: 3px 3px 0 var(--sw-edge);
+  background: #FBE9B8;
+}
+.sw-button:active {
+  transform: translate(6px, 6px);
+  box-shadow: none;
+}
+
+.sw-fine {
+  margin: 0;
+  font-family: var(--px-font);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  opacity: 0.6;
+}
+
+/* ── the cast: one app, one body ──────────────────────────────────────── */
+.sw-band { text-align: center; }
+.sw-band-cast { background: var(--sw-wall); }
+
+.sw-cast {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: clamp(10px, 1.6vw, 18px);
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.sw-card {
+  margin: 0;
+  border: 3px solid var(--sw-edge);
+  box-shadow: 5px 5px 0 var(--sw-edge);
+  background: var(--sw-paper);
+  overflow: hidden;
+  transition: transform 0.1s steps(2), box-shadow 0.1s steps(2);
+}
+.sw-card img {
+  display: block;
+  width: 100%;
+  height: auto;
   image-rendering: pixelated;
 }
-
-.office-flow-step figcaption h3 {
-  margin: 6px 0 6px;
-  font-size: 0.85rem;
-  line-height: 1.3;
-  color: var(--ink);
+.sw-card:hover {
+  transform: translate(-2px, -3px);
+  box-shadow: 8px 8px 0 var(--sw-edge);
 }
+.sw-card.tone-clay  { background: var(--sw-clay); }
+.sw-card.tone-sky   { background: var(--sw-sky); }
+.sw-card.tone-green { background: var(--sw-green); }
+.sw-card.tone-lilac { background: var(--sw-lilac); }
+.sw-card.tone-gold  { background: var(--sw-gold); }
+.sw-card.tone-mint  { background: var(--sw-wall-dk); }
 
-.office-flow-step figcaption p {
-  margin: 0;
-  font-size: 0.82rem;
-  line-height: 1.5;
-  color: var(--muted);
-}
-
-@media (max-width: 860px) {
-  .office-flow {
-    grid-template-columns: 1fr;
-    gap: 26px;
+/* Clock-in: each desk drops in as you scroll to it. Scroll-driven where the
+   browser has it, and simply already-visible where it does not — the default
+   state of a card is ON SCREEN, so an unsupported browser loses the animation
+   and nothing else. */
+@supports (animation-timeline: view()) {
+  .sw-card {
+    animation: sw-clockin auto steps(5) both;
+    animation-timeline: view();
+    animation-range: entry 5% cover 26%;
   }
-  /* one per row on a phone, so let each shot show its full height */
-  .office-flow-shot {
-    aspect-ratio: auto;
+  @keyframes sw-clockin {
+    from { transform: translateY(26px); opacity: 0; }
+    to   { transform: none; opacity: 1; }
   }
 }
 
-.office-step {
-  padding: 20px;
-  border: 2px solid var(--px-edge);
-  background: var(--panel);
-  box-shadow: var(--px-shadow-sm);
-}
+/* ── framed captures ──────────────────────────────────────────────────── */
+.sw-band-room  { background: var(--sw-lilac); }
+.sw-band-recap { background: var(--sw-sky); }
 
-.office-step-num {
+.sw-frame {
+  max-width: 1000px;
+  margin: 0 auto;
+  border: 4px solid var(--sw-edge);
+  box-shadow: 10px 10px 0 var(--sw-edge);
+  background: var(--sw-paper);
+  overflow: hidden;
+}
+.sw-frame-card { max-width: 760px; }
+.sw-frame img,
+.sw-frame picture {
   display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sw-line {
+  margin: clamp(20px, 3vw, 30px) auto 0;
+  max-width: 24ch;
   font-family: var(--px-display);
-  font-size: 0.55rem;
-  color: var(--muted);
-  margin-bottom: 10px;
-}
-
-.office-step h3 {
-  margin: 0 0 8px;
-  font-size: 0.85rem;
-  line-height: 1.3;
-  color: var(--ink);
-}
-
-.office-step p {
-  margin: 0;
-  font-size: 0.82rem;
+  font-size: clamp(0.82rem, 2.2vw, 1.15rem);
   line-height: 1.5;
-  color: var(--muted);
+  word-spacing: -0.12em;
 }
 
-.office-why-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin-top: 24px;
+/* ── closing ──────────────────────────────────────────────────────────── */
+.sw-band-end {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(42, 36, 29, 0.05) 0 10px,
+      transparent 10px 20px
+    ),
+    var(--sw-clay);
 }
-
-.office-why-card {
-  padding: 20px;
-  border: 2px solid var(--px-edge);
-  background: var(--panel);
-  box-shadow: var(--px-shadow-sm);
-}
-
-.office-why-card h3 {
-  margin: 0 0 8px;
-  font-size: 0.85rem;
-  color: var(--ink);
-}
-
-.office-why-card p {
-  margin: 0;
-  font-size: 0.82rem;
-  line-height: 1.5;
-  color: var(--muted);
-}
-
-.office-privacy-box {
-  margin-top: 24px;
-  padding: 24px 28px;
-  border: 2px solid var(--px-edge);
-  background: var(--mint);
-  box-shadow: var(--px-shadow-sm);
-}
-
-.office-privacy-box h3 {
-  margin: 0 0 12px;
-  font-size: 0.85rem;
-  color: var(--mint-ink);
-}
-
-.office-privacy-box p {
-  margin: 0 0 8px;
-  font-size: 0.88rem;
-  line-height: 1.6;
-  color: var(--ink);
-}
-
-.office-privacy-box p:last-child {
-  margin-bottom: 0;
-}
-
-.office-privacy-list {
-  list-style: none;
-  padding: 0;
-  margin: 12px 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.office-privacy-list li {
-  padding: 4px 10px;
-  border: 1px solid var(--mint-ink);
-  color: var(--mint-ink);
-  font-size: 0.7rem;
+.sw-end-title {
+  max-width: 18ch;
+  margin: 0 auto;
   font-family: var(--px-display);
+  font-size: clamp(1.1rem, 3.6vw, 2rem);
+  line-height: 1.4;
+  word-spacing: -0.12em;
+  text-wrap: balance;
 }
 
-.office-cta-panel {
-  margin-top: 24px;
-  padding: 28px;
-  border: 2px solid var(--px-edge);
-  background: var(--panel);
-  box-shadow: var(--px-shadow);
+/* ── disclosure ───────────────────────────────────────────────────────────
+   Deliberately the quietest thing on the page and deliberately still here. The
+   main flow makes no privacy claim, so there is nothing to qualify; this is
+   where the precise version lives, one click from anywhere. Never soften it to
+   fit — cutting a precise claim is allowed, blurring one is not. */
+.sw-disclosure {
+  border-bottom: 4px solid var(--sw-edge);
+  background: var(--sw-paper);
 }
-
-.office-cta-panel h3 {
-  margin: 0 0 6px;
-  font-size: 0.9rem;
-  color: var(--ink);
-}
-
-.office-cta-panel p {
-  margin: 0 0 20px;
-  font-size: 0.82rem;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.office-cta-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-}
-
-.office-faq-list {
-  margin-top: 24px;
-  display: grid;
-  gap: 2px;
-}
-
-.office-faq-card {
-  border: 2px solid var(--px-edge);
-  background: var(--panel);
-}
-
-.office-faq-card summary {
-  padding: 16px 20px;
-  font-size: 0.82rem;
-  font-weight: 700;
+.sw-disclosure summary {
+  padding: 22px clamp(16px, 4vw, 40px);
   cursor: pointer;
-  color: var(--ink);
+  font-family: var(--px-display);
+  font-size: 0.66rem;
   list-style: none;
 }
+.sw-disclosure summary::-webkit-details-marker { display: none; }
+.sw-disclosure summary::after {
+  content: " +";
+  opacity: 0.5;
+}
+.sw-disclosure[open] summary::after { content: " –"; }
+.sw-disclosure summary:hover { background: var(--sw-gold); }
 
-.office-faq-card summary::-webkit-details-marker {
-  display: none;
+.sw-disclosure-body {
+  max-width: 68ch;
+  padding: 0 clamp(16px, 4vw, 40px) 30px;
+}
+.sw-disclosure-body p {
+  margin: 0 0 14px;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: #4a4239;
+}
+.sw-disclosure-body p:last-child { margin-bottom: 0; }
+.sw-disclosure-body code {
+  padding: 1px 5px;
+  border: 1px solid var(--sw-edge);
+  background: var(--sw-gold);
+  font-size: 0.85em;
 }
 
-.office-faq-card summary::after {
-  content: " ▸";
-  font-size: 0.6rem;
-  color: var(--muted);
+/* ── narrow ───────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .sw-cast { grid-template-columns: repeat(3, 1fr); }
+  .sw-stage-screen { box-shadow: 6px 6px 0 var(--sw-edge); }
+  .sw-frame { box-shadow: 6px 6px 0 var(--sw-edge); }
 }
 
-.office-faq-card[open] summary::after {
-  content: " ▾";
+@media (max-width: 700px) {
+  /* the phone still is a tighter crop of the same capture, so the box has to
+     take its ratio or the cover-fit would re-crop it a second time */
+  .sw-stage-screen { aspect-ratio: 650 / 565; }
+  .sw-stage-lights { display: none; }
 }
 
-.office-faq-card p {
-  margin: 0;
-  padding: 0 20px 16px;
-  font-size: 0.82rem;
-  line-height: 1.6;
-  color: var(--muted);
-  border-top: 1px solid var(--line);
+@media (max-width: 520px) {
+  .sw-cast { grid-template-columns: repeat(2, 1fr); }
+  .sw-button { width: 100%; }
+}
+
+/* Motion is the point on this page, but never at someone else's expense. The
+   hero scene is not booted at all under this query (see OfficeHero.jsx). */
+@media (prefers-reduced-motion: reduce) {
+  .sw-title span,
+  .sw-stage-lights i,
+  .sw-card {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+  .sw-button,
+  .sw-card,
+  .sw-stage-still,
+  .sw-stage-canvas {
+    transition: none;
+  }
 }
 
 /* Home Office card */
@@ -621,14 +773,10 @@ a {
     right: 0;
   }
 
-  .office-cta-buttons,
-  .office-hero-actions,
   .office-home-card-actions {
     flex-direction: column;
   }
 
-  .office-cta-buttons a,
-  .office-hero-actions a,
   .office-home-card-actions a {
     width: 100%;
     justify-content: center;

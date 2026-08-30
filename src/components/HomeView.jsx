@@ -267,8 +267,8 @@ export default function HomeView() {
             <h2 id="office-heading">your workday, drawn live.</h2>
             <p>
               A tiny macOS menubar app notices which apps you&apos;re focused on — Figma, VS Code, a Zoom call —
-              and a pixel office assembles itself from the shape of your real day. One click makes a shareable card.
-              Shape, not content: never a window title, URL, or keystroke.
+              and a pixel office assembles itself from which apps you&apos;re in. One click makes a shareable card.
+              Never what&apos;s inside them: no titles, no URLs, no keystrokes.
             </p>
             <div className="office-home-card-actions">
               <Link className="solid-button button-link" href="/office" onClick={() => trackPublicCta("office_landing", { source: "home_card" })}>

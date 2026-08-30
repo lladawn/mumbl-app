@@ -16,28 +16,38 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://mumbl.wtf";
 const analyticsEnabled = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === "true";
 const umamiScriptSrc = process.env.NEXT_PUBLIC_UMAMI_SRC || "https://breathe-umami.vercel.app/script.js";
 const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID || "";
+// THE LINE THAT TRAVELS. This string and the title below are what every share,
+// unfurl and search result shows, whatever any page says — so they are the last
+// place the retired pitch ("your AI agents in a tiny pixel office") was still
+// alive. The product is your own workday as a world; agents are real and stay,
+// but as the closing clause rather than the headline. The title is deliberately
+// WORD FOR WORD the homepage hero line: the title is what gets clicked, the hero
+// is what confirms the click was right, and if they differ the visitor feels a
+// bait-and-switch in the first second. Change them together or not at all.
+const title = "mumbl — your workday, rendered as a world";
 const description =
-  "Your AI agents, in a tiny pixel office you can walk around. Walk up to a collaborator and see what they are doing — working, blocked or done, legible at a glance. Office sim energy meets real work.";
+  "Your apps become a pixel world you can walk around — Figma is an easel, Spotify a turntable, a call lights up the meeting room. Agents get desks too.";
 
 export const metadata = {
   metadataBase: new URL(appUrl),
   title: {
-    default: "mumbl — your AI agents in a tiny pixel office",
+    default: title,
     template: "%s · mumbl",
   },
   description,
   applicationName: "mumbl",
   keywords: [
     "mumbl",
-    "ai agents",
-    "agent workspace",
-    "agent observability",
-    "spatial workspace",
     "pixel office",
     "office sim",
+    "workday visualization",
+    "day recap",
+    "wrapped for work",
+    "shareable pixel art",
+    "macOS menubar app",
+    // last two on purpose: still true, still findable, no longer the pitch
+    "ai agents",
     "claude code",
-    "mcp",
-    "engineering teams",
   ],
   authors: [{ name: "mumbl" }],
   creator: "mumbl",
@@ -46,7 +56,7 @@ export const metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "mumbl — your AI agents in a tiny pixel office you can walk around",
+    title,
     description,
     url: "/",
     siteName: "mumbl",
@@ -56,13 +66,13 @@ export const metadata = {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "A tiny pixel office: AI collaborators at their desks, marked working, blocked and done.",
+        alt: "A pixel office seen from above: desks drawn from the apps someone is using, a café, and a rec room with a ping-pong table.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "mumbl — your AI agents in a tiny pixel office you can walk around",
+    title,
     description,
     images: ["/twitter-image"],
   },
