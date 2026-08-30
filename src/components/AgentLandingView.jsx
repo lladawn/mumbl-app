@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { joinWaitlist } from "../lib/api";
 import { trackConversionEvent, trackPublicCta } from "../lib/analytics";
-import WorldToggle from "./WorldToggle";
+import WorldToggle, { useWorldMode } from "./WorldToggle";
 
 // The front door. It used to sell agent observability — "your AI agents in a
 // tiny pixel office" — and the product moved out from under it: this is your own
@@ -379,6 +379,80 @@ function WorkLoop() {
 // The argument, shown rather than claimed: the same four agents as a log, and
 // as a room. The blocked one is the point — buried on the left, obvious on the
 // right.
+/**
+ * WORLD CAST — the people who walk in when the page becomes the office.
+ *
+ * The first version of world mode changed attributes and not behaviour: colours
+ * and borders swapped and the page did the same thing before and after, which
+ * reads as a filter, not a transformation. The verdict was blunt and correct —
+ * "right now it's just changing the background". A room with nobody in it is set
+ * dressing. This is the fix: after the room finishes assembling, it gets staffed.
+ *
+ * It sits BEHIND the content (z-index 0, with the page's panels opaque above it),
+ * which is what makes this cheap: the cast walks the full width of the floor and
+ * you see them in the margins and in the gaps between sections, with no
+ * per-breakpoint choreography. The room is bigger than the page, and the page
+ * is just the furniture standing on it.
+ *
+ * Deliberately SVG and CSS, not the Phaser scene. World mode's best property is
+ * that it costs zero download, and staffing it with the sprite geometry already
+ * in this file keeps that intact — the office engine would have cost 1.35MB to
+ * say the same thing.
+ */
+/* The cast walks in LANES placed between the page's sections, not on one big
+ * absolute layer. The layer version put everyone behind the content column and
+ * they were invisible; a lane is a real block in the flow, so it is visible at
+ * every width with no per-breakpoint placement, and the walker still crosses the
+ * FULL viewport because only the lane's height is bounded, not its overflow. */
+/* Two per lane, crossing in opposite directions at different speeds. One walker
+ * reads as a stray sprite; two passing each other reads as a room with people in
+ * it, which is the whole point of the change. */
+const lanes = [
+  [
+    { look: LOOKS.scout,   from: "left",  dur: 19, delay: 0.0, scale: 1.0 },
+    { look: LOOKS.builder, from: "right", dur: 27, delay: 5.5, scale: 0.85 },
+  ],
+  [
+    { look: LOOKS.courier, from: "right", dur: 24, delay: 2.2, scale: 0.9 },
+    { look: LOOKS.human,   from: "left",  dur: 31, delay: 8.0, scale: 1.0, human: true },
+  ],
+  [
+    { look: LOOKS.scribe,  from: "left",  dur: 21, delay: 1.1, scale: 1.05 },
+    { look: LOOKS.scout,   from: "right", dur: 29, delay: 6.4, scale: 0.9 },
+  ],
+];
+
+function WorldLane({ walkers }) {
+  return (
+    <div className="world-lane" aria-hidden="true">
+      {walkers.map((walker, i) => (
+        <span
+          key={i}
+          className={`world-walker from-${walker.from}`}
+          style={{ "--dur": `${walker.dur}s`, "--delay": `${walker.delay}s`, "--scale": walker.scale }}
+        >
+          <AgentSprite look={walker.look} ai={false} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/* The rec room, down by the footer. The page never mentioned a rec room and that
+ * is the point: pressing W should reveal there was more here than the page was
+ * showing you. Two players, a table, a rally. */
+function WorldRecRoom() {
+  return (
+    <div className="world-pingpong" aria-hidden="true">
+      <span className="world-pp-player"><AgentSprite look={LOOKS.courier} ai={false} /></span>
+      <span className="world-pp-table">
+        <span className="world-pp-ball" />
+      </span>
+      <span className="world-pp-player world-pp-right"><AgentSprite look={LOOKS.builder} ai={false} /></span>
+    </div>
+  );
+}
+
 const beats = [
   {
     id: "see",
@@ -403,6 +477,7 @@ const beats = [
 const teamSizes = ["just me", "2–10", "11–50", "51–200", "200+"];
 
 export default function AgentLandingView() {
+  const world = useWorldMode();
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
   const [teamSize, setTeamSize] = useState("");
@@ -450,7 +525,7 @@ export default function AgentLandingView() {
               so change them together or not at all. */}
           <h1>your workday, rendered as a world.</h1>
           <div className="agent-hero-actions">
-            <WorldToggle />
+            <WorldToggle on={world.on} toggle={world.toggle} />
             <a
               className="px-button button-link agent-primary-cta"
               href="#waitlist"
@@ -467,17 +542,23 @@ export default function AgentLandingView() {
         <WorkspaceScene />
       </header>
 
+      {world.on ? <WorldLane walkers={lanes[0]} /> : null}
+
       <WorkLoop />
 
+      {world.on ? <WorldLane walkers={lanes[1]} /> : null}
+
       <section className="agent-beats" aria-label="what mumbl does">
-        {beats.map((beat) => (
-          <article className={`agent-beat agent-beat-${beat.id}`} key={beat.id}>
+        {beats.map((beat, i) => (
+          <article className={`agent-beat agent-beat-${beat.id}`} key={beat.id} style={{ "--i": i }}>
             <AgentSprite look={beat.look} />
             <h2>{beat.title}</h2>
             <p>{beat.copy}</p>
           </article>
         ))}
       </section>
+
+      {world.on ? <WorldLane walkers={lanes[2]} /> : null}
 
       <section className="agent-waitlist" id="waitlist" aria-labelledby="waitlist-heading">
         <div>
@@ -552,6 +633,8 @@ export default function AgentLandingView() {
           ) : null}
         </form>
       </section>
+
+      {world.on ? <WorldRecRoom /> : null}
 
       <footer className="agent-footer">
         <p>mumbl is also a place for the human layer of work — the part no ticket captures.</p>

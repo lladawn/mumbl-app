@@ -7498,3 +7498,171 @@ html:has(.shell-soft) body {
   :root[data-world] * { transition: none !important; animation: none !important; }
   :root[data-world] .agent-landing::after { display: none; }
 }
+
+/* ═══ WORLD MODE, PART 2 — the room gets built, then staffed ══════════════
+   The first pass changed attributes and not behaviour: everything swapped
+   colour at once, which reads as a filter being applied rather than a world
+   being assembled, and the verdict was fair — "just changing the background".
+   Two things fix it, and neither needs a single new asset.
+
+   CHOREOGRAPHY. Everything changing at once is a filter. Everything changing in
+   sequence is a world being built, because the eye can follow one thing at a
+   time. The order below is deliberate and physical: you cannot stand a desk on a
+   floor that is not there yet.
+     0ms    the wipe crosses
+     120ms  the wall drops in
+     320ms  the floor arrives under it
+     560ms  the desks snap into place, one after another down the page
+     1150ms the string lights come on
+     1300ms the cast walks in
+   Total about 1.8s, which is long for a CSS transition and short for an arrival.
+
+   THE CAST sits BEHIND the content, so people walk the whole floor and you see
+   them in the margins and the gaps. No per-breakpoint placement, and the room
+   reads as bigger than the page standing on it. */
+
+:root[data-world="on"] .topbar { animation: world-wall 0.5s steps(5) 0.12s backwards; }
+@keyframes world-wall { from { background: #FBFAF7; border-bottom-color: #E3D5BD; } }
+
+:root[data-world="on"] body,
+:root[data-world="on"] .shell-soft { animation: world-floor 0.5s steps(5) 0.32s backwards; }
+@keyframes world-floor { from { background: #FBF4E8; } }
+
+/* the desks land in sequence down the page, not all at once */
+:root[data-world="on"] .agent-beat {
+  animation: world-desk 0.42s steps(5) backwards;
+  animation-delay: calc(0.56s + var(--i, 0) * 0.14s);
+}
+@keyframes world-desk {
+  from { transform: translateY(-14px) scaleY(0.94); opacity: 0.25; }
+  to   { transform: none; opacity: 1; }
+}
+
+:root[data-world="on"] .agent-hero-copy { animation: world-desk 0.42s steps(5) 0.44s backwards; }
+:root[data-world="on"] .work-loop       { animation: world-desk 0.42s steps(5) 0.72s backwards; }
+:root[data-world="on"] .agent-waitlist  { animation: world-desk 0.42s steps(5) 1.0s backwards; }
+:root[data-world="on"] .agent-footer    { animation: world-desk 0.42s steps(5) 1.1s backwards; }
+
+/* lights last, before the people */
+:root[data-world="on"] .agent-landing::before {
+  animation: world-lights 0.5s steps(4) 1.15s backwards;
+}
+
+/* ── the cast ──────────────────────────────────────────────────────────── */
+/* A lane is a real block between two sections, so the walker is visible at every
+   width with no per-breakpoint placement. Only the lane's HEIGHT is bounded —
+   overflow stays visible, so the walker crosses the whole viewport and passes
+   behind nothing. This replaced a single absolute layer that put the entire cast
+   behind the content column, where none of them could be seen. */
+.world-lane {
+  position: relative;
+  /* Full-bleed and clipped. Both halves matter: full-bleed so the walk crosses
+     the whole floor rather than just the content column, and CLIPPED because a
+     walker translating to 100vw+60px otherwise extends the document and gives
+     the page horizontal overflow — caught in a full-page capture, where the
+     floor stopped short and a strip of the old cream showed beyond it. */
+  width: 100vw;
+  margin: clamp(10px, 2vw, 22px) 0 clamp(10px, 2vw, 22px) calc(50% - 50vw);
+  height: 54px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.world-walker {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: block;
+  width: 40px;
+  animation:
+    world-walk var(--dur, 22s) linear var(--delay, 0s) infinite,
+    world-step 0.46s steps(2) infinite;
+}
+.world-walker svg { display: block; width: 100%; height: auto; }
+.world-walker.from-right { animation-name: world-walk-back, world-step; }
+
+/* enter off one edge, cross the floor, leave by the other. scaleX flips them to
+   face the way they are going, which is the whole of "walking" at this size. */
+@keyframes world-walk {
+  from { transform: translateX(-60px) scale(var(--scale, 1)); }
+  to   { transform: translateX(calc(100vw + 60px)) scale(var(--scale, 1)); }
+}
+@keyframes world-walk-back {
+  from { transform: translateX(calc(100vw + 60px)) scale(var(--scale, 1)) scaleX(-1); }
+  to   { transform: translateX(-60px) scale(var(--scale, 1)) scaleX(-1); }
+}
+@keyframes world-step { 50% { margin-bottom: 2px; } }
+
+/* the cast arrives only once the room has finished being built */
+:root[data-world="on"] .world-lane,
+:root[data-world="on"] .world-pingpong { animation: world-arrive 0.6s ease 1.3s backwards; }
+@keyframes world-arrive { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── the rec room, by the footer ───────────────────────────────────────── */
+.world-pingpong {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 12px;
+  margin: clamp(16px, 3vw, 30px) 0;
+  pointer-events: none;
+}
+.world-pp-player { display: block; width: 38px; animation: world-step 0.9s steps(2) infinite; }
+.world-pp-player svg { display: block; width: 100%; height: auto; }
+.world-pp-right { transform: scaleX(-1); }
+.world-pp-table {
+  position: relative;
+  width: clamp(120px, 22vw, 190px);
+  height: 38px;
+  border: 3px solid var(--px-edge);
+  background: linear-gradient(#BEE7F7 0 47%, var(--px-edge) 47% 53%, #BEE7F7 53% 100%);
+  box-shadow: var(--px-shadow-sm);
+}
+.world-pp-ball {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  width: 6px;
+  height: 6px;
+  background: #FFF8EC;
+  border: 2px solid var(--px-edge);
+  animation: world-rally 1s steps(8) infinite alternate;
+}
+@keyframes world-rally {
+  from { transform: translate(-46%, 0) translateX(-50px); }
+  50%  { transform: translate(-50%, -20px); }
+  to   { transform: translate(-54%, 0) translateX(50px); }
+}
+
+/* Reduced motion: the room is already built and already staffed. No wipe, no
+   arrival order, no walking, no rally — the destination with none of the ride.
+   This matters MORE now than it did, because the ride is the point. */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-world] .topbar,
+  :root[data-world] body,
+  :root[data-world] .shell-soft,
+  :root[data-world] .agent-beat,
+  :root[data-world] .agent-hero-copy,
+  :root[data-world] .work-loop,
+  :root[data-world] .agent-waitlist,
+  :root[data-world] .agent-footer,
+  :root[data-world] .agent-landing::before,
+  :root[data-world] .world-lane,
+  :root[data-world] .world-pingpong,
+  :root[data-world] .world-walker,
+  :root[data-world] .world-pp-player,
+  :root[data-world] .world-pp-ball {
+    animation: none !important;
+  }
+  /* the cast still belongs in the room; they are simply standing in it already */
+  :root[data-world] .world-walker { transform: translateX(30vw) scale(var(--scale, 1)); }
+  :root[data-world] .world-walker.from-right { transform: translateX(62vw) scale(var(--scale, 1)) scaleX(-1); }
+}
+
+/* Phones have no margins for anyone to walk in, so the cast thins out to the
+   two that read at that size rather than crowding the gaps. */
+@media (max-width: 700px) {
+  .world-lane { height: 44px; }
+  .world-walker { width: 32px; }
+  .world-pp-player { width: 30px; }
+}

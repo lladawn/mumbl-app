@@ -29,7 +29,11 @@ import { useCallback, useEffect, useState } from "react";
 const KEY = "w";
 const ATTR = "data-world";
 
-export default function WorldToggle() {
+/**
+ * World state lives in a hook rather than in the button, because the button is
+ * no longer the only thing that cares: the cast has to know when to walk in.
+ */
+export function useWorldMode() {
   const [on, setOn] = useState(false);
   const [reduced, setReduced] = useState(false);
 
@@ -69,6 +73,10 @@ export default function WorldToggle() {
     return () => window.removeEventListener("keydown", onKey);
   }, [toggle]);
 
+  return { on, reduced, toggle };
+}
+
+export default function WorldToggle({ on, toggle }) {
   return (
     <button
       type="button"
