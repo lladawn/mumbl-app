@@ -3,10 +3,18 @@
 import Link from "next/link";
 import { useState } from "react";
 import { joinWaitlist } from "../lib/api";
-import { trackConversionEvent, trackDemoEntry, trackPublicCta } from "../lib/analytics";
+import { trackConversionEvent, trackPublicCta } from "../lib/analytics";
+import WorldToggle from "./WorldToggle";
 
-// The agent-collaborator pitch. The demo at /demo is the conversion driver here,
-// not the form — the form is a research channel. See the build brief §6.
+// The front door. It used to sell agent observability — "your AI agents in a
+// tiny pixel office" — and the product moved out from under it: this is your own
+// workday as a world, where the apps you use become stations and a day ends as a
+// card. Agents are REAL and stay, but as one beat among several rather than the
+// pitch. If you are re-adding an agent-led headline here, the product changed,
+// not the copy.
+//
+// Near-zero text on purpose. The demo at /demo is the conversion driver, not the
+// form — the form is a research channel. See the build brief §6.
 //
 // The pixel art below reuses the demo's sprite geometry (14x20 person) and its
 // palette, so the landing and /demo read as one world rather than two designs.
@@ -371,79 +379,23 @@ function WorkLoop() {
 // The argument, shown rather than claimed: the same four agents as a log, and
 // as a room. The blocked one is the point — buried on the left, obvious on the
 // right.
-function ListVsRoom() {
-  const roster = [
-    { look: LOOKS.scout, cx: 22, pill: "working" },
-    { look: LOOKS.courier, cx: 66, pill: "blocked" },
-    { look: LOOKS.builder, cx: 110, pill: "done" },
-  ];
-  return (
-    <div className="vs-grid">
-      <figure className="vs-card vs-card-list">
-        <figcaption>the same work, as a list</figcaption>
-        <pre>
-{`[scout]   fetch pricing/6 → ok
-[scribe]  drafted 340 words
-[auditor] query signups_daily → ok
-[auditor] query activation → DENIED
-[builder] 38 passing, 2 failing
-[scribe]  done — awaiting review`}
-        </pre>
-        <p>you read every line to find the one that needs you.</p>
-      </figure>
-
-      <figure className="vs-card vs-card-room">
-        <figcaption>the same work, as a room</figcaption>
-        <div className="vs-room">
-          <svg viewBox="0 0 132 46" role="img" aria-hidden="true">
-            <rect x="0" y="0" width="132" height="46" fill="#D2DAF0" />
-            <rect x="0" y="0" width="132" height="1" fill="#AEB9DE" />
-            {roster.map(({ look, cx }) => (
-              <g key={cx}>
-                <rect x={cx - 9} y="6" width="18" height="11" fill="#9FB3BE" />
-                <rect x={cx - 7} y="8" width="14" height="7" fill="#BBDCF0" />
-                <rect x={cx - 16} y="17" width="32" height="3" fill="#F0D5A8" />
-                <rect x={cx - 16} y="20" width="32" height="4" fill="#E3C094" />
-                <ellipse cx={cx} cy="24" rx="17" ry="2" fill="#C9AE86" opacity="0.3" />
-                <g transform={`translate(${cx - 7} 25)`}>
-                  <Person look={look} ai />
-                </g>
-              </g>
-            ))}
-          </svg>
-          {roster.map(({ cx, pill }) => (
-            <span
-              key={pill}
-              className={`hero-pill vs-pill hero-pill-${pill}`}
-              style={{ left: `${(cx / 132) * 100}%` }}
-            >
-              {pill}
-            </span>
-          ))}
-        </div>
-        <p>one look tells you who is stuck. nobody had to read anything.</p>
-      </figure>
-    </div>
-  );
-}
-
 const beats = [
   {
     id: "see",
-    title: "agents you can see",
-    copy: "every agent is a character at a workstation. working, blocked, done — legible at a glance, without opening anything.",
+    title: "your apps become stations",
+    copy: "figma is an easel. spotify is a turntable. a call lights the meeting room.",
     look: LOOKS.scout,
   },
   {
     id: "ask",
-    title: "ask, and a collaborator arrives",
-    copy: "say what you need help with. a new collaborator walks in, takes a free desk, and starts on it.",
+    title: "ask, and a collaborator walks in and takes a desk",
+    copy: "say what you need help with. a collaborator walks in, takes a free desk, and starts on it.",
     look: LOOKS.courier,
   },
   {
     id: "shared",
-    title: "your team and your agents in one place",
-    copy: "agent work stops being buried in one person's terminal and becomes something the room can see.",
+    title: "the day ends as a card",
+    copy: "where the hours went, as something you can post.",
     look: LOOKS.scribe,
   },
 ];
@@ -491,33 +443,22 @@ export default function AgentLandingView() {
     <section className="agent-landing pixel-screen">
       <header className="agent-hero">
         <div className="agent-hero-copy">
-          <p className="eyebrow">office sim energy meets real work</p>
-          {/* Leads with the office, not the problem: people arrive from "a tiny
-              pixel office you can walk around" and should land on the same
-              sentence they got excited about. The terminal argument still runs,
-              one line down. */}
-          <h1>your AI agents, in a tiny pixel office you can walk around.</h1>
-          <p className="agent-hero-lede">
-            Agent work still feels like a terminal. Most people use a code editor instead — same power,
-            legible surface. Mumbl is that surface for your agents.
-          </p>
+          <p className="eyebrow">your world</p>
+          {/* WORD FOR WORD the metadata title in app/layout.jsx. The title is what
+              gets clicked; the hero is what confirms the click was right. If they
+              ever differ the visitor feels a bait-and-switch in the first second,
+              so change them together or not at all. */}
+          <h1>your workday, rendered as a world.</h1>
           <div className="agent-hero-actions">
+            <WorldToggle />
             <a
               className="px-button button-link agent-primary-cta"
-              href="/demo"
-              onClick={() => {
-                trackDemoEntry("agent_landing_hero");
-                trackPublicCta("demo", { source: "hero" });
-              }}
+              href="#waitlist"
+              onClick={() => trackPublicCta("waitlist", { source: "hero" })}
             >
-              open the demo →
+              get in →
             </a>
-            <a className="text-link" href="#waitlist">or join the waitlist</a>
           </div>
-          <p className="agent-hero-hint">
-            walkable, no signup. wander in, type <b>&ldquo;I need help with competitor research&rdquo;</b> and watch someone
-            walk in and take a desk.
-          </p>
           <p className="agent-hero-note">
             A prototype: the interface is real, the agents are scripted. Nothing is connected to your tools yet.
           </p>
@@ -538,36 +479,12 @@ export default function AgentLandingView() {
         ))}
       </section>
 
-      <section className="agent-argument" aria-labelledby="argument-heading">
-        <p className="eyebrow">the whole argument</p>
-        <h2 id="argument-heading">the same work, two surfaces.</h2>
-        <p>
-          A terminal shows you a wall of scrolling text that only one person is reading. The same agents,
-          rendered as a room, tell you who is stuck and who is finished without you reading a single line.
-          Press <b>T</b> inside the demo to flip between them.
-        </p>
-
-        <ListVsRoom />
-
-        <a
-          className="px-button button-link"
-          href="/demo"
-          onClick={() => {
-            trackDemoEntry("agent_landing_argument");
-            trackPublicCta("demo", { source: "argument" });
-          }}
-        >
-          see it flip →
-        </a>
-      </section>
-
       <section className="agent-waitlist" id="waitlist" aria-labelledby="waitlist-heading">
         <div>
-          <p className="eyebrow">early access</p>
-          <h2 id="waitlist-heading">tell us what your agents do.</h2>
+          <p className="eyebrow">get in</p>
+          <h2 id="waitlist-heading">get a desk.</h2>
           <p>
-            We&apos;re picking the first real integration based on what teams actually run. The third question
-            is the one that decides it.
+            The third question is the one that decides which integration we build first.
           </p>
           <div className="agent-waitlist-art" aria-hidden="true">
             <AgentSprite look={LOOKS.scout} />
