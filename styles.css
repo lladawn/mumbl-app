@@ -309,11 +309,21 @@ a {
   image-rendering: pixelated;
 }
 
+/* Four steps, so 2x2 rather than auto-fit: at most container widths auto-fit
+   packed three across and stranded step 04 alone on its own row next to a hole.
+   A fixed pair also keeps the line length readable — four across squeezed each
+   card to ~190px and made the longest step a tower. */
 .office-steps {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
   margin-top: 24px;
+}
+
+@media (max-width: 620px) {
+  .office-steps {
+    grid-template-columns: 1fr;
+  }
 }
 
 .office-step {

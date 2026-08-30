@@ -28,14 +28,31 @@ const steps = [
   },
   {
     num: "02",
-    title: "just work",
-    body: "Switch to Figma. Jump into VS Code. Take a Zoom call. Connect Claude Code or GitHub. The helper notices the shape of what you're doing — never the content — and sends a brief ping.",
+    title: "connect it to your office",
+    body: "Click “Connect my office”. Your browser opens on a page where you're already signed in, you check the name of the Mac asking, and you click Authorize. That's it — you never copy a token out of a web page.",
   },
   {
     num: "03",
-    title: "your office fills in",
-    body: "Each ping lands a station in the room, live. Screenshot it or grab a share card in one click.",
+    title: "just work",
+    body: "Switch to Figma. Jump into VS Code. Take a Zoom call. Connect Claude Code or GitHub. Each app you focus lands a station in the room, live — a coding desk, a record player, a lit meeting room.",
   },
+  {
+    num: "04",
+    title: "get a recap at the end of the day",
+    body: "The day rolls up into a recap — which apps, how long, how many stretches, and the shape of the day as a card you can post. Built from the same shape data, never from anything you typed.",
+  },
+];
+
+// The pairing step above is the one people are most suspicious of, so the copy
+// stays specific about what the Mac actually receives. See app/pair and
+// src/server/devicePairing.js: authorizing mints a token scoped to that ONE
+// machine, valid only for posting activity to one office, and revocable on its
+// own. The space-wide ingest token never travels.
+const pairingNotes = [
+  "one key per Mac, not a shared password",
+  "it can post activity, and nothing else",
+  "revoke one machine without touching the others",
+  "the code expires in 10 minutes",
 ];
 
 const whyCards = [
@@ -69,6 +86,14 @@ const faqs = [
   {
     q: "how does the shareable card work?",
     a: "Every office has a public link at mumbl.wtf/office/[yourname]. That page shows only the shape: which stations are lit, how busy it looks, the vibe. One button copies a share card you can post to X or Slack. The card carries your link — that's the loop.",
+  },
+  {
+    q: "how do I actually install it?",
+    a: "Today: you don't — it's invite-only. Not because we're drip-feeding scarcity, but because a Mac app has to be notarized by Apple before Gatekeeper will let a stranger open it, and we're still finishing that. Early-access invites come with a build that opens normally. Once notarization lands, the helper becomes a plain download on this page.",
+  },
+  {
+    q: "what does the day recap keep?",
+    a: "One row per app per day: which app, which category, how many seconds, how many separate stretches. That's the whole record — it's what makes the recap possible, and it persists rather than expiring like the live events do. No window titles, URLs, file names, or task text are stored anywhere, ever.",
   },
   {
     q: "when can I connect my own live data?",
@@ -132,7 +157,7 @@ export default function OfficePage() {
       {/* HOW IT WORKS */}
       <section>
         <p className="eyebrow">how it works</p>
-        <h2>three steps, then forget about it.</h2>
+        <h2>install, connect, then forget about it.</h2>
         <div className="office-steps">
           {steps.map((step) => (
             <div className="office-step" key={step.num}>
@@ -142,6 +167,14 @@ export default function OfficePage() {
             </div>
           ))}
         </div>
+        <p style={{ color: "var(--muted)", margin: "18px 0 0", fontSize: "0.82rem", lineHeight: 1.6 }}>
+          Step 02 is the one worth being picky about, so here is exactly what your Mac gets:
+        </p>
+        <ul className="office-privacy-list">
+          {pairingNotes.map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
       </section>
 
       {/* WHY */}
@@ -165,9 +198,11 @@ export default function OfficePage() {
         <div className="office-privacy-box">
           <h3>what leaves your machine (and what never does)</h3>
           <p>
-            The helper asks the OS exactly one question: which app just got focus? From that it derives a shape
-            token — <em>coding</em>, <em>design</em>, <em>call</em>, <em>music</em> — and sends that. The shape
-            is what self-assembles the office and what anyone with your link can see.
+            The helper asks the OS exactly one question: which app just got focus? What it sends is that app&apos;s
+            identity and category — <em>Figma · design</em>, <em>VS Code · coding</em>, <em>Zoom · call</em> — plus
+            when the switch happened. That is the shape: it is what self-assembles the office, and it is what
+            anyone with your link can see. If you would not want someone knowing you had Figma open, this is the
+            part to know about.
           </p>
           <p>
             What never leaves: window titles, URLs, file names, clipboard contents, keystrokes, screen pixels.
@@ -176,12 +211,19 @@ export default function OfficePage() {
             or a URL near a card someone else can see.
           </p>
           <p>
-            Events expire after 15 minutes by default. The office shows you <em>now</em>, not a permanent record
-            someone could screenshot and hold against you later. History is opt-in and off unless you turn it on.
+            The live event log expires after 15 minutes by default — the office shows you <em>now</em>, not a
+            running transcript. History is opt-in and off unless you turn it on.
+          </p>
+          <p>
+            One thing does persist, and it should be said plainly: so the day recap can exist, we keep a daily
+            rollup of <em>which app, which category, how many seconds, how many stretches</em>. That is the whole
+            row. No titles, no URLs, no file names, no task text — the same shape vocabulary as everything above,
+            just totalled per day instead of expiring. If you never open the recap, it is still being counted.
           </p>
           <ul className="office-privacy-list">
             <li>shape only, not content</li>
-            <li>events ephemeral (15 min TTL)</li>
+            <li>live events ephemeral (15 min TTL)</li>
+            <li>daily totals kept for the recap</li>
             <li>no keystrokes or URLs</li>
             <li>pause with one click</li>
             <li>history off by default</li>
@@ -205,24 +247,41 @@ export default function OfficePage() {
         </div>
       </section>
 
-      {/* TRY IT — HONEST */}
+      {/* GET THE HELPER — the download surface, honestly gated */}
       <section>
+        <p className="eyebrow">get the helper</p>
+        <h2>macOS helper — invite-only while we finish notarizing.</h2>
         <div className="office-cta-panel">
-          <p className="eyebrow">try it</p>
-          <h3>private beta — honest about where we are.</h3>
+          <h3>why there isn&apos;t a download button here yet</h3>
           <p>
-            Live data and self-serve aren&apos;t open yet. The demo is real; your own office connected to your
-            real workday is what we&apos;re building toward. Get early access and you&apos;ll be first — we&apos;ll
-            keep it useful, not spammy.
+            We could put a build behind a button today. You would download it, macOS would refuse to open it, and
+            you would get a dialog telling you the app is damaged or from an unidentified developer — because
+            Gatekeeper blocks anything that has not been notarized by Apple. That is not a scary-but-fine warning
+            you can click past; for most people it is a dead end. We would rather not spend your first two minutes
+            with mumbl on a wall.
           </p>
-          <div className="office-cta-buttons">
-            <Link className="solid-button button-link" href="/office/demo">
-              see a live office
-            </Link>
-            <Link className="ghost-button button-link" href="/#waitlist">
+          <p>
+            Notarization is an automated malware scan, not a review board — nobody is judging the app. It just
+            needs a paid Apple developer account attached to the build, and that is the step we are on. When it
+            is done the download becomes a normal download, and this section becomes a button.
+          </p>
+          <ul className="office-privacy-list">
+            <li>macOS only for now</li>
+            <li>notarization in progress</li>
+            <li>invite-only until then</li>
+          </ul>
+          <div className="office-cta-buttons" style={{ marginTop: 20 }}>
+            <Link className="solid-button button-link" href="/#waitlist">
               get early access
             </Link>
+            <Link className="ghost-button button-link" href="/office/demo">
+              walk around the demo instead
+            </Link>
           </div>
+          <p style={{ margin: "18px 0 0", fontSize: "0.78rem", lineHeight: 1.6 }}>
+            Early access is a real invite with a real build, not a mailing list holding pattern. We are not going
+            to guess a date at you.
+          </p>
         </div>
       </section>
 
