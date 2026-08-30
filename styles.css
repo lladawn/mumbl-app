@@ -7666,3 +7666,162 @@ html:has(.shell-soft) body {
   .world-walker { width: 32px; }
   .world-pp-player { width: 30px; }
 }
+
+/* ═══ WORLD MODE, PART 3 — traversable ════════════════════════════════════
+   "Not scrollable but traversable" is a feeling, not a instruction to disable
+   scrolling. The document IS the floor: the avatar is fixed and the floor moves
+   past them, so scrolling is walking. Scroll is never intercepted, which is why
+   keyboard-only, trackpads, screen readers and phones all keep working with no
+   special case — see useTraversal.js. */
+
+/* ── the floor is longer than the page ─────────────────────────────────────
+   Five sections shoulder to shoulder is a corridor, not a place, so the lanes
+   between them (which already carry the walking NPCs) stretch out in world mode
+   to become floor you actually cross. No new sections, just distance. */
+:root[data-world] .world-lane {
+  height: clamp(150px, 26vh, 260px);
+  margin-top: clamp(30px, 6vh, 70px);
+  margin-bottom: clamp(30px, 6vh, 70px);
+}
+
+/* ── one station per depth ────────────────────────────────────────────────
+   The beats sit side by side normally, which makes three objects share one
+   depth — and scrolling alone cannot choose between them. The alternative was a
+   horizontal control to disambiguate, which would have to be taught, and a
+   control that needs teaching means the affordance is wrong. So in world mode
+   the row becomes a column: every station has its own place on the floor and
+   walking reaches all of them. */
+:root[data-world] .agent-beats {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(80px, 16vh, 180px);
+}
+:root[data-world] .agent-beat { max-width: 34rem; }
+:root[data-world] .agent-beat:nth-child(even) { align-self: flex-end; }
+
+/* ── you ──────────────────────────────────────────────────────────────── */
+.world-avatar {
+  position: fixed;
+  left: clamp(12px, 6vw, 90px);
+  top: 60%;
+  z-index: 5;
+  width: 46px;
+  margin-top: -23px;
+  pointer-events: none;
+  animation: world-enter 0.75s steps(6) 1.3s backwards;
+}
+.world-avatar svg { display: block; width: 100%; height: auto; }
+.world-avatar[data-walking="true"] { animation: world-enter 0.75s steps(6) 1.3s backwards, world-step 0.34s steps(2) infinite; }
+/* Facing is the direction of travel: walking back up the page turns you around.
+   The flip is on the SPRITE, not the container — mirroring the container also
+   mirrors the prompt, which rendered the hint as reversed text and threw it off
+   the left edge of the screen. */
+.world-avatar[data-facing="up"] svg { transform: scaleX(-1); }
+
+@keyframes world-enter {
+  from { transform: translateX(-140px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* one glanceable hint, attached to you, naming the thing within reach. If this
+   ever needs a second line the affordances are wrong. */
+.world-prompt {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px 4px;
+  border: 2px solid var(--px-edge);
+  background: #FFF8EC;
+  box-shadow: var(--px-shadow-sm);
+  color: var(--px-edge);
+  font-family: var(--px-display);
+  font-size: 0.5rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.world-prompt kbd {
+  padding: 2px 5px 1px;
+  border: 2px solid var(--px-edge);
+  background: var(--gold);
+  font: inherit;
+}
+
+/* ── things within reach light up ─────────────────────────────────────── */
+:root[data-world] [data-world-object] {
+  transition: box-shadow 0.15s steps(2), transform 0.15s steps(2);
+}
+:root[data-world] [data-world-object][data-near] {
+  box-shadow: 0 0 0 4px var(--gold), 8px 8px 0 var(--px-edge);
+  transform: translateY(-3px);
+}
+/* the room remembers: anywhere you have walked past keeps its light on, so a
+   visitor who reaches reception has effectively read the page */
+:root[data-world] [data-world-object][data-visited] { opacity: 1; }
+:root[data-world] [data-world-object]:not([data-visited]) { opacity: 0.72; }
+
+/* ── doors ────────────────────────────────────────────────────────────── */
+/* A CORRIDOR OF DOORS, not a row of them. A row puts all four at the same depth,
+   and depth is the only axis traversal has — so the nearest-object test could
+   only ever pick the first one and the other three were unreachable. That is the
+   same 2D-page/1D-traversal trap that killed the horizontal control, arriving by
+   a side door. One door per depth: you walk down the corridor and pass them one
+   at a time, which is also more like a building than a row of exits was. */
+.world-doors {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(70px, 14vh, 150px);
+  margin: clamp(50px, 9vh, 110px) 0 clamp(40px, 7vh, 90px);
+}
+.world-doors .world-door:nth-child(even) { align-self: flex-end; }
+.world-doors .world-door:nth-child(odd) { align-self: flex-start; }
+@media (min-width: 701px) {
+  .world-doors .world-door:nth-child(odd) { margin-left: clamp(60px, 14vw, 220px); }
+  .world-doors .world-door:nth-child(even) { margin-right: clamp(60px, 14vw, 220px); }
+}
+.world-door {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.world-door-frame {
+  display: block;
+  width: 62px;
+  height: 86px;
+  border: 4px solid var(--px-edge);
+  border-bottom: 0;
+  background: linear-gradient(#3E4E4A 0 62%, #2a241d 62% 100%);
+  box-shadow: inset 0 0 0 4px #EFC08A;
+}
+.world-door-sign {
+  padding: 5px 9px 4px;
+  border: 2px solid var(--px-edge);
+  background: #FFF8EC;
+  box-shadow: var(--px-shadow-sm);
+  color: var(--px-edge);
+  font-family: var(--px-display);
+  font-size: 0.55rem;
+}
+.world-door[data-near] .world-door-frame { background: linear-gradient(#7FB7A8 0 62%, #3E4E4A 62% 100%); }
+
+/* ── reduced motion: a room you can move through, without the motion ──── */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-world] .world-avatar { animation: none !important; }
+  :root[data-world] [data-world-object] { transition: none; }
+}
+
+/* ── phones ───────────────────────────────────────────────────────────────
+   No new mechanic, deliberately: swipe is scroll is walk, and tap is click
+   because every object is a real element. The only thing that needs changing is
+   that the avatar must not stand on top of a 390px text column. */
+@media (max-width: 700px) {
+  .world-avatar { left: 4px; width: 34px; }
+  .world-prompt { left: auto; right: calc(100% + 8px); }
+  :root[data-world] .agent-beat:nth-child(even) { align-self: stretch; }
+  :root[data-world] .world-lane { height: clamp(110px, 18vh, 170px); }
+  .world-door-frame { width: 48px; height: 66px; }
+}

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { joinWaitlist } from "../lib/api";
 import { trackConversionEvent, trackPublicCta } from "../lib/analytics";
 import WorldToggle, { useWorldMode } from "./WorldToggle";
+import useTraversal from "./useTraversal";
 
 // The front door. It used to sell agent observability — "your AI agents in a
 // tiny pixel office" — and the product moved out from under it: this is your own
@@ -453,6 +454,56 @@ function WorldRecRoom() {
   );
 }
 
+/* YOU. Six NPCs walked the floor already; if the room is traversable there has
+ * to be a you, and pressing W ends with your character walking in and settling.
+ * Fixed to the viewport so the floor moves past them — see useTraversal.js. */
+function WorldAvatar({ avatarRef, near }) {
+  return (
+    <div className="world-avatar" ref={avatarRef} data-walking="false" data-facing="down" aria-hidden="true">
+      <AgentSprite look={LOOKS.human} ai={false} />
+      {near ? (
+        <span className="world-prompt">
+          <kbd>E</kbd> {near.label}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/* DOORS. The nav destinations become doorways you can walk through — the most
+ * game-like thing a website can do, and the one piece to land if nothing else.
+ *
+ * These are REAL <Link>s rendered into the room, not mirrors of the topbar's.
+ * The topbar is the sticky back wall, and a wall you walk toward but never reach
+ * is worse than no wall. Because they are real anchors they stay tabbable,
+ * clickable and readable by a screen reader, so walking through one is an EXTRA
+ * way to use a link that already worked — which is how this stays a website. */
+const doors = [
+  { href: "/office", label: "the office" },
+  { href: "/office/demo", label: "the demo" },
+  { href: "/slack", label: "slack" },
+  { href: "/blog", label: "the blog" },
+];
+
+function WorldDoors() {
+  return (
+    <nav className="world-doors" aria-label="rooms">
+      {doors.map((door) => (
+        <Link
+          key={door.href}
+          className="world-door"
+          href={door.href}
+          data-world-object={`walk through to ${door.label}`}
+          data-world-kind="door"
+        >
+          <span className="world-door-frame" aria-hidden="true" />
+          <span className="world-door-sign">{door.label}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 const beats = [
   {
     id: "see",
@@ -478,6 +529,7 @@ const teamSizes = ["just me", "2–10", "11–50", "51–200", "200+"];
 
 export default function AgentLandingView() {
   const world = useWorldMode();
+  const { avatarRef, near } = useTraversal({ enabled: world.on, reduced: world.reduced });
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
   const [teamSize, setTeamSize] = useState("");
@@ -516,6 +568,7 @@ export default function AgentLandingView() {
 
   return (
     <section className="agent-landing pixel-screen">
+      {world.on ? <WorldAvatar avatarRef={avatarRef} near={near} /> : null}
       <header className="agent-hero">
         <div className="agent-hero-copy">
           <p className="eyebrow">your world</p>
@@ -529,6 +582,8 @@ export default function AgentLandingView() {
             <a
               className="px-button button-link agent-primary-cta"
               href="#waitlist"
+              data-world-object="read the sign"
+              data-world-kind="sign"
               onClick={() => trackPublicCta("waitlist", { source: "hero" })}
             >
               get in →
@@ -550,7 +605,13 @@ export default function AgentLandingView() {
 
       <section className="agent-beats" aria-label="what mumbl does">
         {beats.map((beat, i) => (
-          <article className={`agent-beat agent-beat-${beat.id}`} key={beat.id} style={{ "--i": i }}>
+          <article
+            className={`agent-beat agent-beat-${beat.id}`}
+            key={beat.id}
+            style={{ "--i": i }}
+            data-world-object={`the ${beat.id} station`}
+            data-world-kind="station"
+          >
             <AgentSprite look={beat.look} />
             <h2>{beat.title}</h2>
             <p>{beat.copy}</p>
@@ -560,7 +621,11 @@ export default function AgentLandingView() {
 
       {world.on ? <WorldLane walkers={lanes[2]} /> : null}
 
-      <section className="agent-waitlist" id="waitlist" aria-labelledby="waitlist-heading">
+      <section
+        className="agent-waitlist"
+        data-world-object="sign the clipboard"
+        data-world-kind="desk"
+        id="waitlist" aria-labelledby="waitlist-heading">
         <div>
           <p className="eyebrow">get in</p>
           <h2 id="waitlist-heading">get a desk.</h2>
@@ -635,6 +700,8 @@ export default function AgentLandingView() {
       </section>
 
       {world.on ? <WorldRecRoom /> : null}
+
+      {world.on ? <WorldDoors /> : null}
 
       <footer className="agent-footer">
         <p>mumbl is also a place for the human layer of work — the part no ticket captures.</p>
