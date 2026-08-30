@@ -288,7 +288,7 @@ pub fn view(app: &AppHandle) -> ConfigView {
 
 /// The UI's view of the token, without ever blocking on the keychain.
 ///
-/// Same `try_lock` discipline as `has_token_now`: if the startup read is in
+/// `try_lock`, deliberately: if the startup keychain read is in
 /// flight (an OS prompt is on screen) this reports `Loading` and returns
 /// immediately rather than freezing the popover behind a modal.
 fn token_state_now(app: &AppHandle) -> (TokenState, Option<String>) {
@@ -340,21 +340,6 @@ pub fn retry_token_read(app: &AppHandle) {
     });
 }
 
-/// Non-blocking "is a token set?" for the UI.
-///
-/// Deliberately `try_lock`: if the startup keychain read is still in flight
-/// (i.e. the OS prompt is on screen) this reports `false` and returns
-/// immediately rather than freezing the popover behind a modal dialog. The read
-/// emits `config-changed` when it lands, so the UI corrects itself a moment
-/// later. A momentarily wrong "not connected" beats a hung window.
-fn has_token_now(app: &AppHandle) -> bool {
-    let Some(state) = app.try_state::<ConfigState>() else { return false };
-    let found = match state.token.try_lock() {
-        Ok(cache) => cache.value.as_deref().map(|t| !t.is_empty()).unwrap_or(false),
-        Err(_) => false,
-    };
-    found
-}
 
 pub fn apply_patch(app: &AppHandle, patch: ConfigPatch) -> Result<ConfigView, String> {
     {
