@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "mumbl pixel world",
+  "version": "0.0.1",
+  "description": "SPIKE — turn any website into the mumbl pixel world. Feasibility only.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "action": { "default_title": "Pixelate this page" },
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    { "resources": ["fonts/PressStart2P-latin.woff2", "pixel.css"], "matches": ["<all_urls>"] }
+  ]
+}

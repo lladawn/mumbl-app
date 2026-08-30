@@ -1,0 +1,164 @@
+/* mumbl pixel world — the transform, as a re-skin.
+ *
+ * SAME VOCABULARY AS THE SITE, deliberately: --px-edge #2a241d, zero radius,
+ * hard offset shadows with no blur, the office palette, Press Start 2P for
+ * SHORT text only. Two different pixel aesthetics would be worse than one.
+ *
+ * Everything is scoped under html.mumbl-px so removing that one class restores
+ * the page exactly. No inline styles are written by the CSS half.
+ */
+
+html.mumbl-px {
+  --px-edge: #2a241d;
+  --px-ink: #161412;
+  --px-muted: #6d6760;
+  --px-paper: #fbf4e8;
+  --px-panel: #fffaf2;
+  --px-gold: #f8dda0;
+  --px-mint: #d9f2df;
+  --px-clay: #edcec4;
+  --px-sky: #bee7f7;
+  --px-display: "MumblPixel", "Courier New", ui-monospace, monospace;
+  --px-body: "Courier New", "DejaVu Sans Mono", ui-monospace, monospace;
+  --px-sh: 4px 4px 0 var(--px-edge);
+  --px-sh-sm: 3px 3px 0 var(--px-edge);
+}
+
+/* ---- ground ------------------------------------------------------------- */
+html.mumbl-px,
+html.mumbl-px body {
+  background-color: var(--px-paper) !important;
+  background-image: none !important;
+  color: var(--px-ink) !important;
+}
+
+/* Everything loses its rounding and its soft shadow. This single pair of rules
+   does more of the work than anything else here: soft corners and blurred
+   shadows are what read as "modern web", and removing them is most of the
+   transformation. */
+html.mumbl-px *,
+html.mumbl-px *::before,
+html.mumbl-px *::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  font-family: var(--px-body) !important;
+  letter-spacing: 0 !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+/* ---- type --------------------------------------------------------------- */
+/* Press Start 2P ONLY for short text. It is ~2x the advance width of a normal
+   face, so using it for body copy both explodes the layout and stops being
+   readable at paragraph length — the site applies the same restraint. */
+html.mumbl-px h1,
+html.mumbl-px h2,
+html.mumbl-px h3,
+html.mumbl-px .mumbl-px-short {
+  font-family: var(--px-display) !important;
+  line-height: 1.4 !important;
+  word-break: break-word;
+}
+html.mumbl-px h1 { font-size: 22px !important; }
+html.mumbl-px h2 { font-size: 17px !important; }
+html.mumbl-px h3 { font-size: 14px !important; }
+
+html.mumbl-px p,
+html.mumbl-px li,
+html.mumbl-px td,
+html.mumbl-px span,
+html.mumbl-px div {
+  line-height: 1.6 !important;
+}
+
+/* ---- surfaces ----------------------------------------------------------- */
+/* Anything that already reads as a card gets the hard border + offset shadow.
+   Chosen by role, not by tag: these are the elements sites use for panels. */
+html.mumbl-px article,
+html.mumbl-px aside,
+html.mumbl-px table,
+html.mumbl-px blockquote,
+html.mumbl-px figure,
+html.mumbl-px pre {
+  border: 2px solid var(--px-edge) !important;
+  box-shadow: var(--px-sh) !important;
+  background: var(--px-panel) !important;
+  padding: 12px !important;
+}
+
+/* ---- controls ----------------------------------------------------------- */
+html.mumbl-px button,
+html.mumbl-px [role="button"],
+html.mumbl-px input[type="submit"],
+html.mumbl-px input[type="button"],
+html.mumbl-px .btn {
+  border: 2px solid var(--px-edge) !important;
+  box-shadow: var(--px-sh-sm) !important;
+  background: var(--px-gold) !important;
+  color: var(--px-ink) !important;
+  padding: 6px 10px !important;
+}
+
+html.mumbl-px input:not([type="submit"]):not([type="button"]),
+html.mumbl-px textarea,
+html.mumbl-px select {
+  border: 2px solid var(--px-edge) !important;
+  background: var(--px-panel) !important;
+  color: var(--px-ink) !important;
+  padding: 6px 8px !important;
+}
+
+html.mumbl-px a { color: #245384 !important; text-underline-offset: 3px; }
+
+/* ---- imagery ------------------------------------------------------------ */
+/* PHOTOGRAPHS ARE LEFT ALONE. This was the single most important finding of the
+   spike, and it was an A/B not a hunch.
+   The first version ran every image through an SVG posterise filter, because
+   that is the only stylising that works cross-origin (it never reads pixels
+   back, so it cannot taint a canvas). On a photo gallery it was a disaster:
+   six-step discrete banding crushes dark photographs to near-black rectangles.
+   A wallpaper site where you cannot see any wallpaper is not a vibe, it is a
+   bug. Removing the filter took that page from broken to good, and the pixel
+   chrome around the images — hard borders, paper ground, mono type — still
+   carries the transformation on its own.
+   image-rendering only bites once something is being SCALED UP, so it does
+   nothing here on its own; it is what makes the JS half's output look right. */
+html.mumbl-px img,
+html.mumbl-px video,
+html.mumbl-px canvas {
+  image-rendering: pixelated !important;
+  border: 2px solid var(--px-edge) !important;
+}
+
+/* Inline SVG is almost always an ICON, not a picture. Bordering them turned
+   every icon on GitHub into a meaningless little box, which broke the page's
+   legibility far more than it stylised it. Icons are left untouched. */
+html.mumbl-px svg {
+  image-rendering: pixelated !important;
+}
+
+/* A genuinely pixelated image, once JS has managed it. */
+html.mumbl-px img[data-mumbl-px="done"] {
+  filter: none !important;
+  image-rendering: pixelated !important;
+}
+
+/* ---- the badge ---------------------------------------------------------- */
+/* Says the page is being transformed, so a broken-looking site is never
+   mistaken for a broken site. Same reasoning as the helper's sharing notice. */
+html.mumbl-px .mumbl-px-badge {
+  position: fixed !important;
+  right: 10px !important;
+  bottom: 10px !important;
+  z-index: 2147483647 !important;
+  padding: 7px 9px !important;
+  border: 2px solid var(--px-edge) !important;
+  box-shadow: var(--px-sh-sm) !important;
+  background: var(--px-mint) !important;
+  color: var(--px-ink) !important;
+  font-family: var(--px-display) !important;
+  font-size: 8px !important;
+  line-height: 1.4 !important;
+  pointer-events: none !important;
+}
