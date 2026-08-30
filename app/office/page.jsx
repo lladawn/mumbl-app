@@ -15,7 +15,12 @@ import Link from "next/link";
  *
  * The only place prose still earns its keep is privacy, because "what leaves
  * your machine" cannot be shown in a picture and is the thing people are right
- * to be careful about.
+ * to be careful about. That section is deliberately the longest thing here and
+ * should stay that way: a first pass at this rebuild compressed it for balance
+ * and quietly dropped the two sentences that actually tell someone what they
+ * would want to know ("...if you would not want someone knowing you had Figma
+ * open" and "if you never open the recap, it is still being counted"). On this
+ * page the layout gives way to the disclosure, never the other way round.
  */
 
 const description =
@@ -164,12 +169,23 @@ export default function OfficePage() {
           <p>
             What leaves: which app has focus and when it changed —{" "}
             <em>Figma · design</em>, <em>VS Code · coding</em>. That is what draws the office and what
-            anyone with your link can see.
+            anyone with your link can see. If you would not want someone knowing you had Figma open,
+            this is the part to know about.
           </p>
           <p>
-            What never leaves: window titles, URLs, file names, clipboard, keystrokes, screen pixels.
-            Live events expire in 15 minutes; a daily rollup of app, category and seconds persists so the
-            recap can exist. That is the whole row.
+            What never leaves: window titles, URLs, file names, clipboard contents, keystrokes, screen
+            pixels. There is one function in the codebase — <code>redactForPublic</code> — and every byte
+            shown to another person passes through it.
+          </p>
+          <p>
+            The live event log expires after 15 minutes — the office shows you <em>now</em>, not a running
+            transcript. History is opt-in and off unless you turn it on.
+          </p>
+          <p>
+            One thing does persist, and it should be said plainly: so the day recap can exist, we keep a
+            daily rollup of <em>which app, which category, how many seconds, how many stretches</em>. That
+            is the whole row — no titles, no URLs, no file names, no task text. If you never open the
+            recap, it is still being counted.
           </p>
           <ul className="office-privacy-list">
             <li>no keystrokes or URLs</li>
