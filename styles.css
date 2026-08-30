@@ -309,20 +309,109 @@ a {
   image-rendering: pixelated;
 }
 
-/* Four steps, so 2x2 rather than auto-fit: at most container widths auto-fit
-   packed three across and stranded step 04 alone on its own row next to a hole.
-   A fixed pair also keeps the line length readable — four across squeezed each
-   card to ~190px and made the longest step a tower. */
-.office-steps {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  margin-top: 24px;
+/* ── show-don't-tell layout ────────────────────────────────────────────────
+   The product page leads with pictures, so these rules exist to keep real
+   screenshots readable rather than to decorate them. Every image is width:100%
+   / height:auto so a 1920px capture cannot push the page sideways on a phone —
+   which is exactly where an image-led page breaks. */
+
+.office-hero-line {
+  margin: 0 0 22px;
+  max-width: 46ch;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--muted);
 }
 
-@media (max-width: 620px) {
-  .office-steps {
+.office-hero-img,
+.office-wide-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 2px solid var(--px-edge);
+  box-shadow: var(--px-shadow);
+  /* the captures are pixel art; let the browser keep the pixels crisp when it
+     scales them rather than smearing them into mush */
+  image-rendering: pixelated;
+}
+
+.office-hero-img {
+  margin-bottom: 22px;
+}
+
+.office-wide-img {
+  margin-top: 22px;
+}
+
+.office-wide-caption {
+  margin: 14px 0 0;
+  max-width: 60ch;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.office-flow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 24px;
+  align-items: start;
+}
+
+.office-flow-step {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Fixed-ratio window so three shots of different shapes (a tall popover, a wide
+   room, a portrait recap) still line up as a row instead of stair-stepping. */
+.office-flow-shot {
+  border: 2px solid var(--px-edge);
+  background: var(--panel);
+  box-shadow: var(--px-shadow-sm);
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.office-flow-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* the three captures are pre-cropped to 4:3 so this never actually letterboxes
+     — it is here so a future swap for an odd-sized shot degrades to a whole
+     image rather than a silently beheaded one */
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.office-flow-step figcaption h3 {
+  margin: 6px 0 6px;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.office-flow-step figcaption p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+@media (max-width: 860px) {
+  .office-flow {
     grid-template-columns: 1fr;
+    gap: 26px;
+  }
+  /* one per row on a phone, so let each shot show its full height */
+  .office-flow-shot {
+    aspect-ratio: auto;
   }
 }
 

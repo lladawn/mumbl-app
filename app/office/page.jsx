@@ -1,297 +1,212 @@
 import Link from "next/link";
 
+/**
+ * /office — the product page.
+ *
+ * SHOW, DON'T TELL. The bar is that someone landing cold understands what this
+ * is in about five seconds, without reading. So the page leads with a real
+ * screenshot of a real office and a caption-length line, and tells the flow as
+ * a sequence of actual captures with a few words each. Where an image and a
+ * paragraph said the same thing, the paragraph is gone.
+ *
+ * Every image here is a REAL capture of the shipping product, served from
+ * public/office-screens/. No mockups and no illustrations of things that do not
+ * exist — if a claim had no real screenshot, the claim was cut instead.
+ *
+ * The only place prose still earns its keep is privacy, because "what leaves
+ * your machine" cannot be shown in a picture and is the thing people are right
+ * to be careful about.
+ */
+
 const description =
-  "A tiny macOS menubar app watches which apps you're focused on — Figma, VS Code, a Zoom call — and a pixel office assembles itself from the shape of your real workday. One click makes a card you can post. Shape, not content — never a single keystroke or URL.";
+  "A pixel office that draws itself from the apps you actually use — Figma, VS Code, a Zoom call, Spotify. Shape, not content: never a keystroke, title or URL.";
 
 export const metadata = {
-  title: "mumbl office — your workday, drawn live",
+  title: "mumbl office — your apps become an office",
   description,
   alternates: { canonical: "/office" },
   openGraph: {
-    title: "mumbl office — your workday, drawn live",
+    title: "mumbl office — your apps become an office",
     description,
     url: "/office",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "mumbl office — your workday, drawn live",
+    title: "mumbl office — your apps become an office",
     description,
   },
 };
 
-const steps = [
+// The flow, told in three real captures. The captions are deliberately short:
+// each image already says the thing, and repeating it in a paragraph is the
+// failure mode this page was rebuilt to fix.
+const flow = [
   {
     num: "01",
-    title: "install the menubar helper",
-    body: "A small macOS app sits quietly in your menu bar. It asks the OS one question: which app just got focus? Nothing else. No Accessibility permission, no window titles, no keystrokes.",
+    title: "connect your Mac, once",
+    caption: "One click, one authorize. Nothing is shared until you do.",
+    src: "/office-screens/flow-helper.png",
+    alt: "The mumbl menu-bar popover reading 'Your desk is empty' with a 'Connect my office' button, and a note that nothing is being shared yet",
+    w: 720,
+    h: 540,
   },
   {
     num: "02",
-    title: "connect it to your office",
-    body: "Click “Connect my office”. Your browser opens on a page where you're already signed in, you check the name of the Mac asking, and you click Authorize. That's it — you never copy a token out of a web page.",
+    title: "your office assembles itself",
+    caption: "Every app you use lands a station. Nobody designs the room.",
+    src: "/office-screens/flow-office.png",
+    alt: "A pixel office seen from above, with work stations, a café, a lounge and a ping-pong table, people at each",
+    w: 800,
+    h: 600,
   },
   {
     num: "03",
-    title: "just work",
-    body: "Switch to Figma. Jump into VS Code. Take a Zoom call. Connect Claude Code or GitHub. Each app you focus lands a station in the room, live — a coding desk, a record player, a lit meeting room.",
-  },
-  {
-    num: "04",
-    title: "get a recap at the end of the day",
-    body: "The day rolls up into a recap — which apps, how long, how many stretches, and the shape of the day as a card you can post. Built from the same shape data, never from anything you typed.",
-  },
-];
-
-// The pairing step above is the one people are most suspicious of, so the copy
-// stays specific about what the Mac actually receives. See app/pair and
-// src/server/devicePairing.js: authorizing mints a token scoped to that ONE
-// machine, valid only for posting activity to one office, and revocable on its
-// own. The space-wide ingest token never travels.
-const pairingNotes = [
-  "one key per Mac, not a shared password",
-  "it can post activity, and nothing else",
-  "revoke one machine without touching the others",
-  "the code expires in 10 minutes",
-];
-
-const whyCards = [
-  {
-    title: "ambient presence",
-    body: "Your team and your AI agents are in the same room. Walk up to a desk and see what's happening — working, blocked, on a call — without interrupting anyone.",
-  },
-  {
-    title: "a shareable card that's actually honest",
-    body: "One click turns your office into a postable card: the vibe of your day, which rooms lit up, how busy it looks. Not once a year and curated — right now and honest. That's the stranger, more interesting thing to share.",
-  },
-  {
-    title: "no two offices look alike",
-    body: "The office self-assembles from whatever you actually used. A design table exists iff you opened Figma. A record player exists iff Spotify was playing. It's a fingerprint, not a template — curiosity bait for anyone who sees your card.",
+    title: "the day ends in a recap",
+    caption: "Where the hours went, as a card you can post.",
+    src: "/office-screens/flow-recap.png",
+    alt: "A day recap page reading 'you built something today', with time per app: VS Code 4h15m, Terminal 1h10m, Chrome 59m",
+    w: 800,
+    h: 600,
   },
 ];
 
 const faqs = [
   {
-    q: "is this macOS only right now?",
-    a: "Yes. The helper uses a single macOS system notification — NSWorkspace.didActivateApplicationNotification — to know which app has focus. Windows support is on the roadmap but isn't built yet. If you're on a Mac, you can get early access below.",
+    q: "can I use it today?",
+    a: "It's a private alpha, macOS only. Join the waitlist and we'll reach out with a build — it's a real invite, not a mailing list. The demo office is live right now if you want to walk around one first.",
   },
   {
-    q: "what data actually leaves my machine?",
-    a: "Only the shape of the work: which app category (coding, design, call, music…) and when. Never window titles, URLs, file names, clipboard, keystrokes, or screen pixels. The data that leaves is the same data that's safe to post publicly.",
+    q: "what actually leaves my machine?",
+    a: "Which app has focus and when it changed — the app's identity and its category, like Figma · design or VS Code · coding. That's what draws the office and it's what anyone with your link can see. Never window titles, URLs, file names, clipboard, keystrokes or pixels.",
   },
   {
-    q: "is it private?",
-    a: "Shape is visible to anyone you share your office link with; task details and content are never captured at all. Events expire after 15 minutes by default — the office shows you now, not a permanent record. History is off unless you explicitly enable it. You can pause sharing from the menu bar with one click.",
+    q: "is anything kept?",
+    a: "The live event log expires after 15 minutes. One thing does persist so the recap can exist: a daily rollup of which app, which category, how many seconds, how many stretches. That's the whole row — no titles, no URLs, no task text. You can pause sharing from the menu bar at any time.",
   },
   {
-    q: "how does the shareable card work?",
-    a: "Every office has a public link at mumbl.wtf/office/[yourname]. That page shows only the shape: which stations are lit, how busy it looks, the vibe. One button copies a share card you can post to X or Slack. The card carries your link — that's the loop.",
-  },
-  {
-    q: "how do I actually install it?",
-    a: "Today: you don't — it's invite-only. Not because we're drip-feeding scarcity, but because a Mac app has to be notarized by Apple before Gatekeeper will let a stranger open it, and we're still finishing that. Early-access invites come with a build that opens normally. Once notarization lands, the helper becomes a plain download on this page.",
-  },
-  {
-    q: "what does the day recap keep?",
-    a: "One row per app per day: which app, which category, how many seconds, how many separate stretches. That's the whole record — it's what makes the recap possible, and it persists rather than expiring like the live events do. No window titles, URLs, file names, or task text are stored anywhere, ever.",
-  },
-  {
-    q: "when can I connect my own live data?",
-    a: "We're in private beta right now. The demo at /office/demo shows a real seeded cast so you can see how it feels. Self-serve live data is what we're building toward — get early access below and you'll be first.",
+    q: "why macOS only?",
+    a: "The helper uses one macOS system notification — NSWorkspace.didActivateApplicationNotification — to know which app has focus. Windows support isn't built yet.",
   },
 ];
 
 export default function OfficePage() {
   return (
     <div className="office-landing">
-      {/* HERO */}
-      <section>
-        <div className="office-hero-head">
-          <p className="eyebrow">office · private beta</p>
-          <h1>Your office, drawn from your real workday.</h1>
-          <p>
-            A pixel office that assembles itself from the apps you actually use — Figma, VS Code, a Zoom call,
-            Spotify — so what you share is honest without being exposing. Shape, not content. Your day, not your diary.
-          </p>
-        </div>
-        <p className="office-lead-quote">
-          A pixel office assembles itself from those pings. A coding desk appears because you&apos;re coding.
-          A record player spins because Spotify&apos;s on. A meeting room lights up because you&apos;re on a call.
-          Nobody designs it — it just shows up, shaped like your actual day.
+      {/* HERO — image first. The picture is the pitch. */}
+      <section className="office-hero">
+        <p className="eyebrow">office · private alpha</p>
+        <h1>Your apps become an office.</h1>
+        <p className="office-hero-line">
+          Open Figma and a design desk appears. Take a call and the meeting room lights up.
+          It draws itself from your real workday.
         </p>
+        <img
+          className="office-hero-img"
+          src="/office-screens/hero-office.png"
+          alt="A pixel office with six desks, each labelled with a real app — Spotify, Slack, Zoom, Terminal, Figma, VS Code — and a person working at each"
+          width={1560}
+          height={1146}
+        />
         <div className="office-hero-actions">
           <Link className="solid-button button-link" href="/office/demo">
-            see a live office
+            walk around a live office
           </Link>
           <Link className="ghost-button button-link" href="/#waitlist">
-            get early access
+            join the alpha waitlist
           </Link>
         </div>
-
-        {/* Screenshots */}
-        <div className="office-screens">
-          <img
-            src="/office-screens/live-per-app-office.png"
-            alt="A live pixel office with per-app stations: VS Code, Figma, Zoom, and Spotify each rendered as distinct desks"
-            className="office-screen-img"
-            width={480}
-            height={300}
-          />
-          <img
-            src="/office-screens/office-disha.png"
-            alt="Disha's pixel office, with a coding desk and meeting room lit up"
-            className="office-screen-img"
-            width={480}
-            height={300}
-          />
-          <img
-            src="/office-screens/share-card.png"
-            alt="The shareable office card — shows the shape of the day, never any content"
-            className="office-screen-img"
-            width={480}
-            height={300}
-          />
-        </div>
       </section>
 
-      {/* HOW IT WORKS */}
+      {/* THE FLOW — three real captures, a few words each */}
       <section>
         <p className="eyebrow">how it works</p>
-        <h2>install, connect, then forget about it.</h2>
-        <div className="office-steps">
-          {steps.map((step) => (
-            <div className="office-step" key={step.num}>
-              <span className="office-step-num">{step.num}</span>
-              <h3>{step.title}</h3>
-              <p>{step.body}</p>
-            </div>
+        <h2>three things happen. you do one of them.</h2>
+        <div className="office-flow">
+          {flow.map((step) => (
+            <figure className="office-flow-step" key={step.num}>
+              <div className="office-flow-shot">
+                <img src={step.src} alt={step.alt} width={step.w} height={step.h} loading="lazy" />
+              </div>
+              <figcaption>
+                <span className="office-step-num">{step.num}</span>
+                <h3>{step.title}</h3>
+                <p>{step.caption}</p>
+              </figcaption>
+            </figure>
           ))}
         </div>
-        <p style={{ color: "var(--muted)", margin: "18px 0 0", fontSize: "0.82rem", lineHeight: 1.6 }}>
-          Step 02 is the one worth being picky about, so here is exactly what your Mac gets:
-        </p>
-        <ul className="office-privacy-list">
-          {pairingNotes.map((note) => (
-            <li key={note}>{note}</li>
-          ))}
-        </ul>
       </section>
 
-      {/* WHY */}
+      {/* IT'S A PLACE — one more real capture, almost no words */}
       <section>
-        <p className="eyebrow">why it matters</p>
-        <h2>the shareable card is the viral part.</h2>
-        <div className="office-why-list">
-          {whyCards.map((card) => (
-            <div className="office-why-card" key={card.title}>
-              <h3>{card.title}</h3>
-              <p>{card.body}</p>
-            </div>
-          ))}
-        </div>
+        <p className="eyebrow">not a dashboard</p>
+        <h2>it&apos;s a room. people are in it.</h2>
+        <img
+          className="office-wide-img"
+          src="/office-screens/detail-recroom.png"
+          alt="The rec room of a pixel office: two people rallying at a ping-pong table with a chalk scoreboard, another at an arcade cabinet"
+          width={1920}
+          height={1200}
+          loading="lazy"
+        />
+        <p className="office-wide-caption">
+          Idle teammates drift to the café and the rec room. Two people on a call sit at the same table.
+          The room is the status page.
+        </p>
       </section>
 
-      {/* PRIVACY */}
+      {/* PRIVACY — the one place words beat pictures */}
       <section>
         <p className="eyebrow">privacy</p>
         <h2>shape, not content.</h2>
         <div className="office-privacy-box">
-          <h3>what leaves your machine (and what never does)</h3>
           <p>
-            The helper asks the OS exactly one question: which app just got focus? What it sends is that app&apos;s
-            identity and category — <em>Figma · design</em>, <em>VS Code · coding</em>, <em>Zoom · call</em> — plus
-            when the switch happened. That is the shape: it is what self-assembles the office, and it is what
-            anyone with your link can see. If you would not want someone knowing you had Figma open, this is the
-            part to know about.
+            What leaves: which app has focus and when it changed —{" "}
+            <em>Figma · design</em>, <em>VS Code · coding</em>. That is what draws the office and what
+            anyone with your link can see.
           </p>
           <p>
-            What never leaves: window titles, URLs, file names, clipboard contents, keystrokes, screen pixels.
-            There is one function in the codebase — <code>redactForPublic</code> — and every byte shown to
-            another person passes through it. Its entire job is refusing to let a task description, a file name,
-            or a URL near a card someone else can see.
-          </p>
-          <p>
-            The live event log expires after 15 minutes by default — the office shows you <em>now</em>, not a
-            running transcript. History is opt-in and off unless you turn it on.
-          </p>
-          <p>
-            One thing does persist, and it should be said plainly: so the day recap can exist, we keep a daily
-            rollup of <em>which app, which category, how many seconds, how many stretches</em>. That is the whole
-            row. No titles, no URLs, no file names, no task text — the same shape vocabulary as everything above,
-            just totalled per day instead of expiring. If you never open the recap, it is still being counted.
+            What never leaves: window titles, URLs, file names, clipboard, keystrokes, screen pixels.
+            Live events expire in 15 minutes; a daily rollup of app, category and seconds persists so the
+            recap can exist. That is the whole row.
           </p>
           <ul className="office-privacy-list">
-            <li>shape only, not content</li>
-            <li>live events ephemeral (15 min TTL)</li>
-            <li>daily totals kept for the recap</li>
             <li>no keystrokes or URLs</li>
+            <li>live events 15 min TTL</li>
+            <li>daily totals kept for the recap</li>
             <li>pause with one click</li>
-            <li>history off by default</li>
           </ul>
         </div>
       </section>
 
-      {/* SEE IT */}
+      {/* CTA — the existing waitlist, honestly labelled */}
       <section>
-        <p className="eyebrow">see it</p>
-        <h2>the demo office is live now.</h2>
-        <p style={{ color: "var(--muted)", marginBottom: 20, fontSize: "0.9rem", lineHeight: 1.6 }}>
-          The demo at <Link href="/office/demo" style={{ textDecoration: "underline" }}>/office/demo</Link> runs
-          a real seeded cast so you can walk around and see how the office feels. Your own live data isn't
-          self-serve yet — that&apos;s what early access is for.
-        </p>
-        <div className="office-hero-actions">
-          <Link className="solid-button button-link" href="/office/demo">
-            open the demo office
-          </Link>
-        </div>
-      </section>
-
-      {/* GET THE HELPER — the download surface, honestly gated */}
-      <section>
-        <p className="eyebrow">get the helper</p>
-        <h2>macOS helper — invite-only while we finish notarizing.</h2>
         <div className="office-cta-panel">
-          <h3>why there isn&apos;t a download button here yet</h3>
+          <p className="eyebrow">try it</p>
+          <h3>private alpha — macOS, invite only.</h3>
           <p>
-            We could put a build behind a button today. You would download it, macOS would refuse to open it, and
-            you would get a dialog telling you the app is damaged or from an unidentified developer — because
-            Gatekeeper blocks anything that has not been notarized by Apple. That is not a scary-but-fine warning
-            you can click past; for most people it is a dead end. We would rather not spend your first two minutes
-            with mumbl on a wall.
+            Join the waitlist and we&apos;ll reach out with a build. It&apos;s early and we&apos;d rather
+            hand it to people who&apos;ll tell us what&apos;s wrong with it.
           </p>
-          <p>
-            Notarization is an automated malware scan, not a review board — nobody is judging the app. It just
-            needs a paid Apple developer account attached to the build, and that is the step we are on. When it
-            is done the download becomes a normal download, and this section becomes a button.
-          </p>
-          <ul className="office-privacy-list">
-            <li>macOS only for now</li>
-            <li>notarization in progress</li>
-            <li>invite-only until then</li>
-          </ul>
-          <div className="office-cta-buttons" style={{ marginTop: 20 }}>
+          <div className="office-cta-buttons">
             <Link className="solid-button button-link" href="/#waitlist">
-              get early access
+              join the alpha waitlist
             </Link>
             <Link className="ghost-button button-link" href="/office/demo">
-              walk around the demo instead
+              see the demo first
             </Link>
           </div>
-          <p style={{ margin: "18px 0 0", fontSize: "0.78rem", lineHeight: 1.6 }}>
-            Early access is a real invite with a real build, not a mailing list holding pattern. We are not going
-            to guess a date at you.
-          </p>
         </div>
       </section>
 
-      {/* FAQ */}
+      {/* FAQ — collapsed, so it costs nothing to scroll past */}
       <section>
         <p className="eyebrow">honest questions</p>
-        <h2>before you try mumbl office.</h2>
+        <h2>the short answers.</h2>
         <div className="office-faq-list">
-          {faqs.map((item, i) => (
-            <details className="office-faq-card" key={item.q} open={i === 0}>
+          {faqs.map((item) => (
+            <details className="office-faq-card" key={item.q}>
               <summary>{item.q}</summary>
               <p>{item.a}</p>
             </details>
